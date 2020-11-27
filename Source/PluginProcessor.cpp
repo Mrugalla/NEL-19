@@ -12,17 +12,17 @@ Nel19AudioProcessor::Nel19AudioProcessor()
                      #endif
                        ), apvts(*this, nullptr, "parameters", tape::param::createParameters()),
     param({
-        apvts.getRawParameterValue(tape::param::getID(tape::param::ID::WowDepth)),
-        apvts.getRawParameterValue(tape::param::getID(tape::param::ID::WowFreq)),
-        apvts.getRawParameterValue(tape::param::getID(tape::param::ID::WowWidth)),
+        apvts.getRawParameterValue(tape::param::getID(tape::param::ID::VibratoDepth)),
+        apvts.getRawParameterValue(tape::param::getID(tape::param::ID::VibratoFreq)),
+        apvts.getRawParameterValue(tape::param::getID(tape::param::ID::VibratoWidth)),
         apvts.getRawParameterValue(tape::param::getID(tape::param::ID::Lookahead))
         }),
     paramRange({
-        apvts.getParameter(tape::param::getID(tape::param::ID::WowDepth)),
-        apvts.getParameter(tape::param::getID(tape::param::ID::WowFreq)),
-        apvts.getParameter(tape::param::getID(tape::param::ID::WowWidth))
+        apvts.getParameter(tape::param::getID(tape::param::ID::VibratoDepth)),
+        apvts.getParameter(tape::param::getID(tape::param::ID::VibratoFreq)),
+        apvts.getParameter(tape::param::getID(tape::param::ID::VibratoWidth))
         }),
-    paramNormalized({0,0,0}),
+    paramNormalized({ 0, 0, 0 }),
     paramValue({-1, -1, -1, -1}),
     tape()
 #endif
@@ -85,13 +85,13 @@ bool Nel19AudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) co
   #endif
 }
 #endif
-void Nel19AudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) {
+void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) {
     if (buffer.getNumSamples() == 0) return;
     juce::ScopedNoDenormals noDenormals;
     const auto totalNumInputChannels  = getTotalNumInputChannels();
     const auto totalNumOutputChannels = getTotalNumOutputChannels();
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear (i, 0, buffer.getNumSamples());
+        buffer.clear(i, 0, buffer.getNumSamples());
 
     paramValue[0] = param[0]->load(); // depth
     tape.setWowDepth(paramValue[0]);

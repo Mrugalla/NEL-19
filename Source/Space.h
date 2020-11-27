@@ -5,7 +5,7 @@
 namespace Util {
     static constexpr double Tau = 6.28318530718;
     static constexpr int SliderWidth = 4;
-    static constexpr int SliderHeight = 17;
+    static constexpr int SliderHeight = 21;
     static constexpr int LFOY = 122, LFOHeight = 2, LFOWidthHalf = 14;
     static constexpr double LFOMidX = 99.5;
 
@@ -62,7 +62,7 @@ namespace Util {
 
     static const juce::Image setStudioColour(const juce::Image& ui, const juce::Colour& c) {
         auto x = 10;
-        auto y = 40;
+        auto y = 46;
         auto width = 28;
         auto height = 8;
 
@@ -111,7 +111,185 @@ namespace Util {
     }
 }
 
+struct Letter { int x, width; };
+struct Font {
+    static constexpr int LetterCount = 15;
+    static constexpr int Height = 9;
+    enum { Zero, One, Two, Three, Four, Five, Six, Seven, Eight, Nine, Start, Hz, Percent, Point, End };
+
+    Font() :
+        letter(initLetter()),
+        srcImage(juce::ImageCache::getFromMemory(BinaryData::font_png, BinaryData::font_pngSize))
+    {}
+
+    const std::array<Letter, LetterCount> letter;
+    const juce::Image srcImage;
+private:
+    const std::array<Letter, LetterCount> initLetter() {
+        std::array<Letter, LetterCount> ltr;
+        ltr[Start] = { 0, 2 };
+        ltr[Zero] = { 2, 4 };
+        ltr[One] = { 6, 3 };
+        ltr[Two] = { 9, 3 };
+        ltr[Three] = { 12, 3 };
+        ltr[Four] = { 15, 4 };
+        ltr[Five] = { 19, 3 };
+        ltr[Six] = { 22, 4 };
+        ltr[Seven] = { 26, 4 };
+        ltr[Eight] = { 30, 4 };
+        ltr[Nine] = { 34, 4 };
+        ltr[Hz] = { 38, 8 };
+        ltr[Percent] = { 46, 5 };
+        ltr[Point] = { 51, 2 };
+        ltr[End] = { 53, 1 };
+        return ltr;
+    }
+};
+struct ParameterTextField {
+    enum Type { Percent, Freq };
+
+    ParameterTextField(Font& font, juce::Image& textImage, float upscale, Type t) :
+        font(font),
+        textImage(textImage),
+        upscaledTextImage(),
+        upscaleFactor(upscale),
+        type(t)
+    {}
+    // PARAM
+    void updateParameterValue(float value) {
+        switch (type) {
+        case Percent: updatePercentImage(value); return;
+        case Freq: updateFreqImage(value); return;
+        }
+    }
+    // GET
+    void draw(juce::Graphics& g, juce::Point<int> p) {
+        g.drawImageAt(upscaledTextImage, p.getX() - upscaledTextImage.getWidth(), p.getY(), false);
+    }
+    Font& font;
+    juce::Image& textImage;
+    juce::Image upscaledTextImage;
+    juce::Rectangle<float> upscaledBounds;
+    float upscaleFactor;
+    Type type;
+private:
+    void updateNumber(juce::Graphics& g, float value, int& x) {
+        auto preDecimal = int(value);
+        auto postDecimal = (int)((value - preDecimal) * 10);
+        auto pre0 = preDecimal / 10;
+        if (pre0 != 0)
+            drawLetter(g, font.letter[pre0], x);
+        auto pre1 = preDecimal - 10 * pre0;
+        drawLetter(g, font.letter[pre1], x);
+        if (postDecimal != 0) {
+            drawLetter(g, font.letter[font.Point], x);
+            drawLetter(g, font.letter[postDecimal], x);
+        }
+    }
+    void updatePercentImage(float normalized) {
+        auto percent = normalized * 100;
+        juce::Graphics g{ textImage };
+        g.setImageResamplingQuality(juce::Graphics::lowResamplingQuality);
+        auto x = 0;
+        drawLetter(g, font.letter[font.Start], x);
+        if (percent != 100) updateNumber(g, percent, x);
+        else {
+            drawLetter(g, font.letter[font.One], x);
+            drawLetter(g, font.letter[font.Zero], x);
+            drawLetter(g, font.letter[font.Zero], x);
+        }
+        drawLetter(g, font.letter[font.Percent], x);
+        drawLetter(g, font.letter[font.End], x);
+        scaleUp(x);
+    }
+    void updateFreqImage(float freq) {
+        juce::Graphics g{ textImage };
+        g.setImageResamplingQuality(juce::Graphics::lowResamplingQuality);
+        auto x = 0;
+        drawLetter(g, font.letter[font.Start], x);
+        updateNumber(g, freq, x);
+        drawLetter(g, font.letter[font.Hz], x);
+        drawLetter(g, font.letter[font.End], x);
+        scaleUp(x);
+    }
+
+    void drawLetter(juce::Graphics& g, const Letter ltr, int& x) {
+        g.drawImageAt(font.srcImage.getClippedImage({ ltr.x, 0, ltr.width, font.Height }), x, 0, false);
+        x += ltr.width;
+    }
+
+    void scaleUp(int x) {
+        juce::Rectangle<int> region(0, 0, x, font.Height);
+        auto w = (int)(x * upscaleFactor);
+        auto h = (int)(textImage.getHeight() * upscaleFactor);
+        upscaledTextImage = textImage.getClippedImage(region).rescaled(w, h, juce::Graphics::lowResamplingQuality);
+    }
+};
+struct ParameterTextFields {
+    ParameterTextFields(float upscale, int fps) :
+        font(),
+        textImage(initImage()),
+        textfields({
+            ParameterTextField(font, textImage, upscale, ParameterTextField::Percent),
+            ParameterTextField(font, textImage, upscale, ParameterTextField::Freq),
+            ParameterTextField(font, textImage, upscale, ParameterTextField::Percent)
+            }),
+        pos(0, 0),
+        lastValues({ -1, -1, -1 }),
+        curParamID(-1),
+        timeIdx(0), timeSize(Util::ms2frames(250, fps)),
+        mouseInBounds(false)
+    {}
+    // SET
+    void setPosition(juce::Point<int> p) { pos = p; }
+    void initParameterValues(const std::array<float, 4>& paramValues) {
+        for (auto i = 0; i < lastValues.size(); ++i) lastValues[i] = paramValues[i];
+    }
+    void enable() { mouseInBounds = true; }
+    void disable() { mouseInBounds = false; }
+    // PARAM
+    void updateParameters(const std::array<float, 4>& paramValues) {
+        if (mouseInBounds)
+            for (auto i = 0; i < lastValues.size(); ++i) {
+                if (lastValues[i] != paramValues[i]) {
+                    lastValues[i] = paramValues[i];
+                    curParamID = i;
+                    timeIdx = 0;
+                    textfields[i].updateParameterValue(paramValues[i]);
+                    return;
+                }
+            }
+        ++timeIdx;
+        if (timeIdx == timeSize)
+            curParamID = timeIdx = -1;
+    }
+
+    // GET
+    void draw(juce::Graphics& g) { if (curParamID != -1) textfields[curParamID].draw(g, pos); }
+private:
+    Font font;
+    juce::Image textImage;
+    std::array<ParameterTextField, 3> textfields;
+    juce::Point<int> pos;
+    std::array<float, 3> lastValues;
+    int curParamID, timeIdx, timeSize;
+    bool mouseInBounds;
+
+    juce::Image initImage() {
+        const int width = // construct longest word
+            font.letter[font.Start].width +
+            font.letter[font.Four].width * 3 +
+            font.letter[font.Point].width +
+            font.letter[font.Hz].width +
+            font.letter[font.End].width;
+        return juce::Image(juce::Image::ARGB, width, font.Height, true);
+    }
+
+    void updateParameter(const float value, const int id) { textfields[id].updateParameterValue(value); }
+};
+
 #include "AboutComponent.h"
+#include "CSlider.h"
 
 template<typename Float>
 struct Space :
@@ -131,183 +309,6 @@ struct Space :
     static constexpr int BgInterval = 1300;
     static constexpr double ShuttleFreq = .2;
     static constexpr double ShuttleAmp = 2.2;
-
-    struct Letter { int x, width; };
-    struct Font {
-        static constexpr int LetterCount = 15;
-        static constexpr int Height = 9;
-        enum { Zero, One, Two, Three, Four, Five, Six, Seven, Eight, Nine, Start, Hz, Percent, Point, End };
-
-        Font() :
-            letter(initLetter()),
-            srcImage(juce::ImageCache::getFromMemory(BinaryData::font_png, BinaryData::font_pngSize))
-        {}
-
-        const std::array<Letter, LetterCount> letter;
-        const juce::Image srcImage;
-    private:
-        const std::array<Letter, LetterCount> initLetter() {
-            std::array<Letter, LetterCount> ltr;
-            ltr[Start] = { 0, 2 };
-            ltr[Zero] = { 2, 4 };
-            ltr[One] = { 6, 3 };
-            ltr[Two] = { 9, 3 };
-            ltr[Three] = { 12, 3 };
-            ltr[Four] = { 15, 4 };
-            ltr[Five] = { 19, 3 };
-            ltr[Six] = { 22, 4 };
-            ltr[Seven] = { 26, 4 };
-            ltr[Eight] = { 30, 4 };
-            ltr[Nine] = { 34, 4 };
-            ltr[Hz] = { 38, 8 };
-            ltr[Percent] = { 46, 5 };
-            ltr[Point] = { 51, 2 };
-            ltr[End] = { 53, 1 };
-            return ltr;
-        }
-    };
-    struct ParameterTextField {
-        enum Type { Percent, Freq };
-
-        ParameterTextField(Font& font, juce::Image& textImage, float upscale, Type t) :
-            font(font),
-            textImage(textImage),
-            upscaledTextImage(),
-            upscaleFactor(upscale),
-            type(t)
-        {}
-        // PARAM
-        void updateParameterValue(float value) {
-            switch (type) {
-            case Percent: updatePercentImage(value); return;
-            case Freq: updateFreqImage(value); return;
-            }
-        }
-        // GET
-        void draw(juce::Graphics& g, juce::Point<int> p) {
-            g.drawImageAt(upscaledTextImage, p.getX() - upscaledTextImage.getWidth(), p.getY(), false);
-        }
-        Font& font;
-        juce::Image& textImage;
-        juce::Image upscaledTextImage;
-        juce::Rectangle<float> upscaledBounds;
-        float upscaleFactor;
-        Type type;
-    private:
-        void updateNumber(juce::Graphics& g, float value, int& x) {
-            auto preDecimal = int(value);
-            auto postDecimal = (int)((value - preDecimal) * 10);
-            auto pre0 = preDecimal / 10;
-            if (pre0 != 0)
-                drawLetter(g, font.letter[pre0], x);
-            auto pre1 = preDecimal - 10 * pre0;
-            drawLetter(g, font.letter[pre1], x);
-            if (postDecimal != 0) {
-                drawLetter(g, font.letter[font.Point], x);
-                drawLetter(g, font.letter[postDecimal], x);
-            }
-        }
-        void updatePercentImage(float normalized) {
-            auto percent = normalized * 100;
-            juce::Graphics g{ textImage };
-            g.setImageResamplingQuality(juce::Graphics::lowResamplingQuality);
-            auto x = 0;
-            drawLetter(g, font.letter[font.Start], x);
-            if(percent != 100) updateNumber(g, percent, x);
-            else {
-                drawLetter(g, font.letter[font.One], x);
-                drawLetter(g, font.letter[font.Zero], x);
-                drawLetter(g, font.letter[font.Zero], x);
-            }
-            drawLetter(g, font.letter[font.Percent], x);
-            drawLetter(g, font.letter[font.End], x);
-            scaleUp(x);
-        }
-        void updateFreqImage(float freq) {
-            juce::Graphics g{ textImage };
-            g.setImageResamplingQuality(juce::Graphics::lowResamplingQuality);
-            auto x = 0;
-            drawLetter(g, font.letter[font.Start], x);
-            updateNumber(g, freq, x);
-            drawLetter(g, font.letter[font.Hz], x);
-            drawLetter(g, font.letter[font.End], x);
-            scaleUp(x);
-        }
-
-        void drawLetter(juce::Graphics& g, const Letter ltr, int& x) {
-            g.drawImageAt(font.srcImage.getClippedImage({ ltr.x, 0, ltr.width, font.Height }), x, 0, false);
-            x += ltr.width;
-        }
-
-        void scaleUp(int x) {
-            juce::Rectangle<int> region(0, 0, x, font.Height);
-            auto w = (int)(x * upscaleFactor);
-            auto h = (int)(textImage.getHeight() * upscaleFactor);
-            upscaledTextImage = textImage.getClippedImage(region).rescaled(w, h, juce::Graphics::lowResamplingQuality);
-        }
-    };
-    struct ParameterTextFields {
-        ParameterTextFields(float upscale, int fps) :
-            font(),
-            textImage(initImage()),
-            textfields({
-                ParameterTextField(font, textImage, upscale, ParameterTextField::Percent),
-                ParameterTextField(font, textImage, upscale, ParameterTextField::Freq),
-                ParameterTextField(font, textImage, upscale, ParameterTextField::Percent)
-                }),
-            pos(0, 0),
-            lastValues({ -1, -1, -1 }),
-            curParamID(-1),
-            timeIdx(0), timeSize(fps),
-            mouseInBounds(false)
-        {}
-        // SET
-        void setPosition(juce::Point<int> p) { pos = p; }
-        void initParameterValues(std::array<float, 4>& paramValues) {
-            for (auto i = 0; i < lastValues.size(); ++i) lastValues[i] = paramValues[i];
-        }
-        void enable() { mouseInBounds = true; }
-        void disable() { mouseInBounds = false; }
-        // PARAM
-        void updateParameters(const std::array<float, 4>& paramValues) {
-            if(mouseInBounds)
-                for (auto i = 0; i < lastValues.size(); ++i) {
-                    if (lastValues[i] != paramValues[i]) {
-                        lastValues[i] = paramValues[i];
-                        curParamID = i;
-                        timeIdx = 0;
-                        textfields[i].updateParameterValue(paramValues[i]);
-                        return;
-                    }
-                }
-            ++timeIdx;
-            if (timeIdx == timeSize)
-                curParamID = timeIdx = -1;
-        }
-
-        // GET
-        void draw(juce::Graphics& g) { if (curParamID != -1) textfields[curParamID].draw(g, pos); }
-    private:
-        Font font;
-        juce::Image textImage;
-        std::array<ParameterTextField, 3> textfields;
-        juce::Point<int> pos;
-        std::array<float, 3> lastValues;
-        int curParamID, timeIdx, timeSize;
-        bool mouseInBounds;
-
-        juce::Image initImage() {
-            const int width = // construct longest word
-                font.letter[font.Start].width +
-                font.letter[font.Four].width * 3 +
-                font.letter[font.Point].width +
-                font.letter[font.Hz].width +
-                font.letter[font.End].width;
-            return juce::Image(juce::Image::ARGB, width, font.Height, true);
-        }
-
-        void updateParameter(const float value, const int id) { textfields[id].updateParameterValue(value); }
-    };
 
     struct Background {
         Background(Space& space) :
@@ -385,13 +386,14 @@ struct Space :
         {}
 
         void operator()(juce::Graphics& g) {
-            g.drawImageAt(uiImage, 76, 69, false);
+            g.setImageResamplingQuality(juce::Graphics::lowResamplingQuality);
+            g.drawImageAt(uiImage, 76, 63, false);
             g.drawImageAt(helpImage, 1, 117, false);
-            updateParam(g, space.processor.paramNormalized[PDepth], 90, 87);
-            updateParam(g, space.processor.paramNormalized[PFreq], 99, 87);
+            updateParam(g, space.processor.paramNormalized[PDepth], 90, 81);
+            updateParam(g, space.processor.paramNormalized[PFreq], 99, 81);
             checkChannelCount();
-            if (numChannels == 1) g.drawImageAt(widthDisabledImage, 107, 76, false);
-            else updateParam(g, space.processor.paramNormalized[PWidth], 108, 87);
+            if (numChannels == 1) g.drawImageAt(widthDisabledImage, 107, 67, false);
+            else updateParam(g, space.processor.paramNormalized[PWidth], 108, 81);
             checkLookahead();
             g.drawImageAt(studioImage, 86, 109, false);
             paintLFOs(g);
@@ -410,15 +412,31 @@ struct Space :
             if (changed) {
                 numChannels = curNumChannels;
                 if (numChannels == 1) {
-                    widthDisabledImage = juce::ImageCache::getFromMemory(BinaryData::widthDisabled_png, BinaryData::widthDisabled_pngSize);
                     lfoData.resize(numChannels, space.processor.getLFOValue(0));
+                    uiImage = juce::ImageCache::getFromMemory(BinaryData::ui_png, BinaryData::ui_pngSize);
+                    space.param[2].setEnabled(false);
+                    juce::Colour contour(0xff222034);
+                    juce::Colour grey(0xff9badb7);
+                    auto y = 7;
+                    auto x = 31;
+                    auto width = 6;
+                    auto height = 35;
+                    for (auto yy = 0; yy < height; ++yy) {
+                        auto yyy = y + yy;
+                        for (auto xx = 0; xx < width; ++xx) {
+                            auto xxx = x + xx;
+                            if (uiImage.getPixelAt(xxx, yyy) == contour)
+                                uiImage.setPixelAt(xxx, yyy, grey);
+                        }
+                    }  
                 }
                 else {
-                    widthDisabledImage = juce::Image();
                     lfoData.clear();
                     lfoData.reserve(2);
                     for (auto ch = 0; ch < 2; ++ch)
                         lfoData.emplace_back(space.processor.getLFOValue(ch));
+                    space.param[2].setEnabled(true);
+                    uiImage = juce::ImageCache::getFromMemory(BinaryData::ui_png, BinaryData::ui_pngSize);
                 }
             }
         }
@@ -444,82 +462,6 @@ struct Space :
         }
     };
 
-    struct Slider : public juce::Slider {
-        static constexpr double SensitiveSpeed = .002;
-
-        Slider(ParameterTextFields& p) :
-            paramText(p),
-            lastDragY(0),
-            dragIsStarting(false)
-        {
-            setSliderStyle(juce::Slider::SliderStyle::LinearVertical);
-            setTextBoxStyle(juce::Slider::NoTextBox, true, 0, 0);
-            setAlpha(0);
-            setVelocityModeParameters(3, 1, 0, false, juce::ModifierKeys::shiftModifier);
-        }
-        // SET
-        void setCursor(float upscaleFactor) {
-            const juce::MouseCursor cursor(Util::getUpscaledCursor(upscaleFactor), 0, 0);
-            setMouseCursor(cursor);
-        }
-        void mouseEnter(const juce::MouseEvent& evt) override {
-            paramText.enable();
-            juce::Slider::mouseEnter(evt);
-        }
-    private:
-        ParameterTextFields& paramText;
-        int lastDragY;
-        bool dragIsStarting;
-
-        void mouseWheelMove(const juce::MouseEvent& evt, const juce::MouseWheelDetails& wheel) override {
-            if (evt.mods.isShiftDown()) {
-                auto y = wheel.deltaY > 0 ? 1 : -1;
-                processSensitivity(y);
-                return;
-            }
-            juce::Slider::mouseWheelMove(evt, wheel);
-        }
-        void startedDragging() override {
-            juce::Slider::startedDragging();
-            dragIsStarting = true;
-        }
-        void mouseDown(const juce::MouseEvent& evt) override {
-            if(evt.mods.isShiftDown()) setSliderSnapsToMousePosition(false);
-            else setSliderSnapsToMousePosition(true);
-            juce::Slider::mouseDown(evt);
-        }
-        void mouseDrag(const juce::MouseEvent& evt) override {
-            if (evt.mods.isShiftDown()) {
-                auto distance = evt.getDistanceFromDragStartY();
-                int y;
-                if (dragIsStarting) {
-                    dragIsStarting = false;
-                    y = distance < 0 ? 1 : -1;
-                } 
-                else {
-                    
-                    if (lastDragY < distance) y = -1;
-                    else y = 1;
-                }
-                lastDragY = distance;
-                
-                processSensitivity(y);
-                return;
-            }
-            
-            juce::Slider::mouseDrag(evt);
-        }
-        void mouseMove(const juce::MouseEvent& evt) override {
-            juce::Point<int> pos = getBounds().getTopLeft() + evt.getPosition();
-            paramText.setPosition(pos);
-        }
-        
-        void processSensitivity(int y) {
-            auto rangedY = y * getRange().getLength();
-            auto slowTFDown = rangedY * SensitiveSpeed;
-            setValue(getValue() + slowTFDown);
-        }
-    };
     struct Button : public juce::ToggleButton {
         Button() {
             setAlpha(0);
@@ -540,7 +482,11 @@ struct Space :
         shuttle(*this),
         paramText(upscale, fps),
 
-        param{ paramText, paramText, paramText },
+        param{
+            CSlider(processor.apvts, tape::param::getID(tape::param::VibratoDepth)),
+            CSlider(processor.apvts, tape::param::getID(tape::param::VibratoFreq)),
+            CSlider(processor.apvts, tape::param::getID(tape::param::VibratoWidth))
+        },
         sAttach(),
         studioButton(),
         studioAttach(),
@@ -552,8 +498,10 @@ struct Space :
         shuttle.setLFO((Float)ShuttleFreq, (Float)ShuttleAmp);
         for (auto p = 0; p < SlidersCount; ++p) {
             addAndMakeVisible(param[p]);
-            sAttach[p] = std::make_unique<SAttach>(processor.apvts, tape::param::getID(p + 1), param[p]);
+            param[p].paramText = &paramText;
         }
+        param[PDepth].otherSlider = &param[PFreq];
+        param[PFreq].otherSlider = &param[PDepth];
         addAndMakeVisible(studioButton);
         studioAttach = std::make_unique<BAttach>(processor.apvts, tape::param::getID(tape::param::Lookahead), studioButton);
         paramText.initParameterValues(processor.paramValue);
@@ -571,12 +519,9 @@ struct Space :
         
         paramText.draw(g);
     }
-    void mouseMove(const juce::MouseEvent& evt) override { paramText.setPosition(evt.getPosition()); juce::Component::mouseMove(evt); }
-    void mouseEnter(const juce::MouseEvent& evt) override { paramText.enable(); juce::Component::mouseEnter(evt); }
-    void mouseExit(const juce::MouseEvent& evt) override { paramText.disable(); juce::Component::mouseExit(evt); }
     void buttonClicked(juce::Button* b) override {
         if(b == &aboutButton)
-            about.setVisible(aboutButton.getToggleState());
+            about.setVisible(true);
     }
     void update() {
         if (about.isVisible()) return;
@@ -592,16 +537,16 @@ struct Space :
     }
     void resized() override {
         bounds = getLocalBounds().toFloat();
-        auto y = 87 * upscaleFactor;
-        auto width = 4 * upscaleFactor;
-        auto height = 17 * upscaleFactor;
-        param[0].setBounds(90 * upscaleFactor, y, width, height);
-        param[1].setBounds(99 * upscaleFactor, y, width, height);
-        param[2].setBounds(108 * upscaleFactor, y, width, height);
-        auto x = 86 * upscaleFactor;
-        y = 109 * upscaleFactor;
-        width = 28 * upscaleFactor;
-        height = 8 * upscaleFactor;
+        auto y = 81 * upscaleFactor;
+        auto width = (1 + Util::SliderWidth) * upscaleFactor;
+        auto height = Util::SliderHeight * upscaleFactor;
+        param[PDepth].setBounds(89 * upscaleFactor, y, width, height);
+        param[PFreq].setBounds(98 * upscaleFactor, y, width, height);
+        param[PWidth].setBounds(107 * upscaleFactor, y, width, height);
+        auto x = 84 * upscaleFactor;
+        y = 108 * upscaleFactor;
+        width = 31 * upscaleFactor;
+        height = 11 * upscaleFactor;
         studioButton.setBounds(x, y, width, height);
         about.setBounds(getLocalBounds());
         aboutButton.setBounds(
@@ -622,7 +567,7 @@ private:
     Shuttle shuttle;
     ParameterTextFields paramText;
 
-    std::array<Slider, SlidersCount> param;
+    std::array<CSlider, SlidersCount> param;
     std::array<std::unique_ptr<SAttach>, SlidersCount> sAttach;
     Button studioButton;
     std::unique_ptr<BAttach> studioAttach;
@@ -653,35 +598,3 @@ private:
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Space)
 };
-
-/* TO DO
-
-Installer
-    because people might not know where vst3 is
-
-Slider
-    manchmal nicht responsive
-    sensitive mode
-        mausklick bleibt manchmal in sensitive stecken (kp ob immernoch)
-    find out if setValue() bad!
-
-TEST
-    LIVE
-        gitarristen 
-        synths      
-    DAWS
-	    cubase      CHECK 9.5, 10
-	    fl          CHECK
-	    ableton     
-	    bitwig            
-	    protools
-        studio one  
-*/
-
-/* IDEAS
-
-interpolation switch (lofi)
-combine depth and frequency for easier use.
-feedback?
-
-*/

@@ -14,7 +14,7 @@ public:
         image(),
         upscaleFactor(upscale),
 
-        discordLink("https://discord.com/users/631194999156899860"),
+        discordLink("https://discord.gg/4RvfrDEa"),
         githubLink("https://github.com/Mrugalla"),
         paypalLink("https://www.paypal.com/paypalme/alteoma/4.20"),
         juceLink("https://juce.com/"),

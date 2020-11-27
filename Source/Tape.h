@@ -12,8 +12,8 @@ namespace tape {
 	static constexpr int MaxInterpolationOrder = 4;
 	static constexpr int InterpolationOrderHalf = MaxInterpolationOrder / 2;
 	// CERTAINTY LFO & SMOOTH CONST
-	static constexpr float DepthDefault = .06f;
-	static constexpr float LFOFreqMin = .5f, LFOFreqMax = 13, LFOFreqDefault = 12.2f, LFOFreqInterval = .5f;
+	static constexpr float DepthDefault = .1f;
+	static constexpr float LFOFreqMin = .5f, LFOFreqMax = 13, LFOFreqDefault = 4.f, LFOFreqInterval = .5f;
 	static constexpr int SmoothOrderDefault = 3;
 	// DELAY CONST
 	static constexpr int DelaySizeInMS = 18; // 25
@@ -323,14 +323,14 @@ namespace tape {
 	};
 
 	namespace param {
-		enum ID { Lookahead, WowDepth, WowFreq, WowWidth, SlewCutoff };
+		enum ID { Lookahead, VibratoDepth, VibratoFreq, VibratoWidth, SlewCutoff };
 
 		static juce::String getName(const int i) {
 			switch (i) {
 			case ID::Lookahead: return "Lookahead";
-			case ID::WowDepth: return "Depth";
-			case ID::WowFreq: return "Freq";
-			case ID::WowWidth: return "Width";
+			case ID::VibratoDepth: return "Depth";
+			case ID::VibratoFreq: return "Freq";
+			case ID::VibratoWidth: return "Width";
 			case ID::SlewCutoff: return "Slew Cutoff";
 			}
 			return "";
@@ -343,11 +343,11 @@ namespace tape {
 			parameters.push_back(std::make_unique<juce::AudioParameterBool>(
 				getID(Lookahead), getName(Lookahead), true));
 			parameters.push_back(std::make_unique<juce::AudioParameterFloat>(
-				getID(WowDepth), getName(WowDepth), util::QuadraticBezierRange(0, 1, .3f), DepthDefault));
+				getID(VibratoDepth), getName(VibratoDepth), util::QuadraticBezierRange(0, 1, .3f), DepthDefault));
 			parameters.push_back(std::make_unique<juce::AudioParameterFloat>(
-				getID(WowFreq), getName(WowFreq), util::QuadraticBezierRange(LFOFreqMin, LFOFreqMax, .55f), LFOFreqDefault));
+				getID(VibratoFreq), getName(VibratoFreq), util::QuadraticBezierRange(LFOFreqMin, LFOFreqMax, .55f), LFOFreqDefault));
 			parameters.push_back(std::make_unique<juce::AudioParameterFloat>(
-				getID(WowWidth), getName(WowWidth), util::QuadraticBezierRange(0, 1, .4f), WowWidthDefault));
+				getID(VibratoWidth), getName(VibratoWidth), util::QuadraticBezierRange(0, 1, .4f), WowWidthDefault));
 			//parameters.push_back(std::make_unique<juce::AudioParameterFloat>(
 			//	getID(SlewCutoff), getName(SlewCutoff), util::LogRange(SlewFreqMin, SlewFreqMax), SlewFreqMax));
 
@@ -633,7 +633,7 @@ namespace tape {
 							c[i] = c[i - 1];
 				}
 			}
-			void upscaleCertainties(int order) {
+			void upscaleCertainties(const int order) {
 				size = order * CertaintiesPerCertainty;
 				if (order != 1) {
 					interpolation::Lagrange<Float> interpolate(CertaintiesPerCertainty);
@@ -670,7 +670,7 @@ namespace tape {
 		};
 	}
 
-	namespace wow {
+	namespace vibrato {
 		template<typename Float>
 		struct Phase {
 			Phase(const Utils<Float>& utils) :
@@ -983,8 +983,8 @@ namespace tape {
 		};
 
 		template<typename Float>
-		struct Wow {
-			Wow(Utils<Float>& utils) :
+		struct Vibrato {
+			Vibrato(Utils<Float>& utils) :
 				chModules(),
 				certainty(),
 				interpolation(),
@@ -1022,7 +1022,9 @@ namespace tape {
 				for (auto& ch : chModules)
 					ch.setFreq(freq);
 			}
-			void setWidth(const Float w) { widthProcessor.setWidth(w); }
+			void setWidth(const Float w) {
+				widthProcessor.setWidth(w);
+			}
 			// PROCESS
 			void processBlock(juce::AudioBuffer<float>& buffer) {
 				wIdx.processBlock();
@@ -1197,20 +1199,20 @@ namespace tape {
 	struct Tape {
 		Tape() :
 			utils(),
-			wow(utils),
+			vibrato(utils),
 			lookaheadEnabled(false)
 		{}
 		// SET
 		void prepareToPlay(const double sampleRate, juce::AudioProcessor* p, const int maxBufferSize, const int channelCount) {
 			if (utils.sampleRateChanged(sampleRate, p)) {
-				wow.init();
+				vibrato.init();
 				setLookaheadEnabled(lookaheadEnabled);
 			}
 			if (utils.maxBufferSizeChanged(maxBufferSize))
-				wow.setMaxBufferSize();
+				vibrato.setMaxBufferSize();
 
 			if(utils.numChannelsChanged(channelCount))
-				wow.setNumChannels();
+				vibrato.setNumChannels();
 		}
 		// PARAM
 		void setLookaheadEnabled(const bool enabled) {
@@ -1220,31 +1222,59 @@ namespace tape {
 				else utils.setLatency(0);
 			}
 		}
-		void setWowDepth(const Float depth) { wow.setDepth(depth); }
-		void setWowFreq(const Float freq) { wow.setFreq(freq); }
-		void setWowWidth(const Float width) { wow.setWidth(width); }
+		void setWowDepth(const Float depth) { vibrato.setDepth(depth); }
+		void setWowFreq(const Float freq) { vibrato.setFreq(freq); }
+		void setWowWidth(const Float width) { vibrato.setWidth(width); }
 		// PROCESS
 		void processBlock(juce::AudioBuffer<float>& buffer) {
 			utils.numSamples = buffer.getNumSamples();
-			wow.processBlock(buffer);
+			vibrato.processBlock(buffer);
 		}
 		void processBlockBypassed(juce::AudioBuffer<float>& buffer) {
 			utils.numSamples = buffer.getNumSamples();
-			wow.processBlockBypassed(buffer);
+			vibrato.processBlockBypassed(buffer);
 		}
 		// GET
-		const Float* getLFOValue(const int ch) const { return wow.getLFOValue(ch); }
+		const Float* getLFOValue(const int ch) const { return vibrato.getLFOValue(ch); }
 	private:
 		Utils<Float> utils;
-		wow::Wow<Float> wow;
+		vibrato::Vibrato<Float> vibrato;
 		bool lookaheadEnabled;
 	};
 }
 
 /* TO DO
 
-DAWS:
+BUGS:
+	FL Randomizer makes plugin freeze
+		processBlock not called anymore
+		parameters not shown above Randomize
+	STUDIO ONE v5.1 (S.B. Davis):
+		jiterry output
+		daw crashes when plugin is removed
+	STUDIO ONE
+		no mouseCursor shown
+
+IMPROVEMENTS:
+	parameter symbols unclear
+	Installer
+		because people might not know where vst3 is
+
+TEST:
+	LIVE
+		gitarristen
+		synths
+	DAWS
+		cubase      CHECK 9.5, 10
+		fl          CHECK
+		ableton
+		bitwig
+		protools
+		studio one  CHECK, but might not
+
+DAWS Debug:
 D:\Pogramme\Cubase 9.5\Cubase9.5.exe
 D:\Pogramme\FL Studio 20\FL64.exe
+D:\Pogramme\Studio One 5\Studio One.exe
 
 */

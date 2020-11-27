@@ -7,18 +7,19 @@
               pluginRTASCategory="32" pluginAAXCategory="32" cppLanguageStandard="17">
   <MAINGROUP id="V2oOlh" name="NEL-19">
     <GROUP id="{EB637F68-8B54-CF39-23F4-99282698FA6E}" name="Img">
-      <FILE id="sdR7hl" name="about.png" compile="0" resource="1" file="Source/Img/about.png"/>
-      <FILE id="VDzS2r" name="cursor.png" compile="0" resource="1" file="Source/Img/cursor.png"/>
-      <FILE id="XKQ4JT" name="font.png" compile="0" resource="1" file="Source/Img/font.png"/>
-      <FILE id="XfVq0Z" name="help.png" compile="0" resource="1" file="Source/Img/help.png"/>
-      <FILE id="l0oXF8" name="shuttle.png" compile="0" resource="1" file="Source/Img/shuttle.png"/>
-      <FILE id="w5b8UH" name="space1.png" compile="0" resource="1" file="Source/Img/space1.png"/>
-      <FILE id="rBJjjt" name="space2.png" compile="0" resource="1" file="Source/Img/space2.png"/>
-      <FILE id="KfNsMv" name="ui.png" compile="0" resource="1" file="Source/Img/ui.png"/>
-      <FILE id="Pr49mx" name="widthDisabled.png" compile="0" resource="1"
+      <FILE id="P8ggf0" name="about.png" compile="0" resource="1" file="Source/Img/about.png"/>
+      <FILE id="ok6eqm" name="cursor.png" compile="0" resource="1" file="Source/Img/cursor.png"/>
+      <FILE id="uTEAL3" name="font.png" compile="0" resource="1" file="Source/Img/font.png"/>
+      <FILE id="WJjcNq" name="help.png" compile="0" resource="1" file="Source/Img/help.png"/>
+      <FILE id="Y03fii" name="shuttle.png" compile="0" resource="1" file="Source/Img/shuttle.png"/>
+      <FILE id="Jab1HV" name="space1.png" compile="0" resource="1" file="Source/Img/space1.png"/>
+      <FILE id="KgjvZu" name="space2.png" compile="0" resource="1" file="Source/Img/space2.png"/>
+      <FILE id="ERISg7" name="ui.png" compile="0" resource="1" file="Source/Img/ui.png"/>
+      <FILE id="CGyibW" name="widthDisabled.png" compile="0" resource="1"
             file="Source/Img/widthDisabled.png"/>
     </GROUP>
     <GROUP id="{FF8BE835-9B90-31CB-45F4-D4B15FDEFD04}" name="Source">
+      <FILE id="Gi5j6T" name="CSlider.h" compile="0" resource="0" file="Source/CSlider.h"/>
       <FILE id="QSBzec" name="likelyRawData.txt" compile="0" resource="1"
             file="Source/likelyRawData.txt"/>
       <FILE id="H6HISf" name="Tape.h" compile="0" resource="0" file="Source/Tape.h"/>
