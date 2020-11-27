@@ -1231,6 +1231,7 @@ namespace tape {
 			vibrato.processBlock(buffer);
 		}
 		void processBlockBypassed(juce::AudioBuffer<float>& buffer) {
+			if (!lookaheadEnabled) return;
 			utils.numSamples = buffer.getNumSamples();
 			vibrato.processBlockBypassed(buffer);
 		}
