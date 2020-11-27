@@ -11,6 +11,7 @@ public:
 
     CSlider(juce::AudioProcessorValueTreeState& apvts, juce::String id) :
         otherSlider(nullptr),
+        paramText(nullptr),
         param(apvts.getParameter(id)),
         attach(*param, [this](float v) { updateValue(v); }, nullptr),
         dragStartValue(0),
@@ -21,15 +22,27 @@ public:
         setOpaque(false);
         setAlpha(0); // invisible because drawing is handled by UI in space.h
     }
+    // GET
+    const float getValue() const { return denormalize(param->getValue()); }
+    const float getValueNormalized() const { return param->getValue(); }
+
+    CSlider* otherSlider;
+    ParameterTextFields* paramText;
+private:
+    juce::RangedAudioParameter* param;
+    juce::ParameterAttachment attach;
+    float dragStartValue;
+    bool sensitiveDrag, linkedDrag;
+    
     void mouseDown(const juce::MouseEvent& evt) override {
         updateMods(evt.mods);
+        attach.beginGesture();
         if (linkedDrag) {
             dragStartValue = param->getValue();
             otherSlider->dragStartValue = otherSlider->param->getValue();
             otherSlider->attach.beginGesture();
         }
-        else if(sensitiveDrag) dragStartValue = param->getValue();
-        attach.beginGesture();
+        else if (sensitiveDrag) dragStartValue = param->getValue();
     }
     void mouseDrag(const juce::MouseEvent& evt) override {
         updateMods(evt.mods);
@@ -54,8 +67,7 @@ public:
                 otherSlider->attach.setValueAsPartOfGesture(otherSlider->denormalize(value));
             }
         }
-        paramText->setPosition(getBounds().getTopLeft() + evt.getPosition());
-        paramText->enable();
+        updateParamText(evt);
     }
     void mouseUp(const juce::MouseEvent& evt) override {
         updateMods(evt.mods);
@@ -73,19 +85,12 @@ public:
             value = juce::jlimit(0.f, 1.f, otherSlider->param->getValue() + direction * interval);
             otherSlider->attach.setValueAsCompleteGesture(otherSlider->denormalize(value));
         }
+        updateParamText(evt);
     }
     void mouseDoubleClick(const juce::MouseEvent& evt) override {
         attach.setValueAsCompleteGesture(param->getDefaultValue());
     }
 
-    CSlider* otherSlider;
-    ParameterTextFields* paramText;
-private:
-    juce::RangedAudioParameter* param;
-    juce::ParameterAttachment attach;
-    float dragStartValue;
-    bool sensitiveDrag, linkedDrag;
-    
     void updateMods(const juce::ModifierKeys& mods) {
         sensitiveDrag = mods.isShiftDown();
         linkedDrag = mods.isAltDown() && otherSlider != nullptr;
@@ -94,6 +99,10 @@ private:
     void updateValue(float value) {
         attach.setValueAsPartOfGesture(value);
     }
-    
+    void updateParamText(const juce::MouseEvent& evt) {
+        paramText->setPosition(getBounds().getTopLeft() + evt.getPosition());
+        paramText->enable();
+    }
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CSlider)
 };

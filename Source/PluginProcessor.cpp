@@ -17,14 +17,7 @@ Nel19AudioProcessor::Nel19AudioProcessor()
         apvts.getRawParameterValue(tape::param::getID(tape::param::ID::VibratoWidth)),
         apvts.getRawParameterValue(tape::param::getID(tape::param::ID::Lookahead))
         }),
-    paramRange({
-        apvts.getParameter(tape::param::getID(tape::param::ID::VibratoDepth)),
-        apvts.getParameter(tape::param::getID(tape::param::ID::VibratoFreq)),
-        apvts.getParameter(tape::param::getID(tape::param::ID::VibratoWidth))
-        }),
-    paramNormalized({ 0, 0, 0 }),
-    paramValue({-1, -1, -1, -1}),
-    tape()
+    tape(this)
 #endif
 {
 }
@@ -59,7 +52,7 @@ const juce::String Nel19AudioProcessor::getProgramName (int index) { return {}; 
 void Nel19AudioProcessor::changeProgramName (int, const juce::String&){}
 
 void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize) {
-    tape.prepareToPlay(sampleRate, this, maxBufferSize, getChannelCountOfBus(true, 0));
+    tape.prepareToPlay(sampleRate, maxBufferSize, getChannelCountOfBus(true, 0));
 }
 void Nel19AudioProcessor::releaseResources() {}
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -93,17 +86,10 @@ void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear(i, 0, buffer.getNumSamples());
 
-    paramValue[0] = param[0]->load(); // depth
-    tape.setWowDepth(paramValue[0]);
-    paramNormalized[0] = paramRange[0]->convertTo0to1(paramValue[0]);
-    paramValue[1] = param[1]->load(); // freq
-    tape.setWowFreq(paramValue[1]);
-    paramNormalized[1] = paramRange[1]->convertTo0to1(paramValue[1]);
-    paramValue[2] = param[2]->load(); // width
-    tape.setWowWidth(paramValue[2]);
-    paramNormalized[2] = paramRange[2]->convertTo0to1(paramValue[2]);
-    paramValue[3] = param[3]->load(); // lookahead
-    tape.setLookaheadEnabled((bool)paramValue[3]);
+    tape.setWowDepth(param[0]->load()); // depth
+    tape.setWowFreq(param[1]->load()); // freq
+    tape.setWowWidth(param[2]->load()); // width
+    tape.setLookaheadEnabled(param[3]->load() == 0 ? false : true); // lookahead
 
     tape.processBlock(buffer);
 }

@@ -269,6 +269,9 @@ namespace tape {
 
 	template<typename Float>
 	struct Utils {
+		Utils(juce::AudioProcessor* p) :
+			processor(p)
+		{}
 		// SET
 		bool numChannelsChanged(const int num) {
 			if (numChannels != num) {
@@ -277,8 +280,7 @@ namespace tape {
 			}
 			return false;
 		}
-		bool sampleRateChanged(const double sr, juce::AudioProcessor* p) {
-			processor = p;
+		bool sampleRateChanged(const double sr) {
 			if (sampleRate != sr) {
 				sampleRate = sr;
 
@@ -1197,14 +1199,14 @@ namespace tape {
 
 	template<typename Float>
 	struct Tape {
-		Tape() :
-			utils(),
+		Tape(juce::AudioProcessor* p) :
+			utils(p),
 			vibrato(utils),
 			lookaheadEnabled(false)
 		{}
 		// SET
-		void prepareToPlay(const double sampleRate, juce::AudioProcessor* p, const int maxBufferSize, const int channelCount) {
-			if (utils.sampleRateChanged(sampleRate, p)) {
+		void prepareToPlay(const double sampleRate, const int maxBufferSize, const int channelCount) {
+			if (utils.sampleRateChanged(sampleRate)) {
 				vibrato.init();
 				setLookaheadEnabled(lookaheadEnabled);
 			}
@@ -1247,6 +1249,8 @@ namespace tape {
 /* TO DO
 
 BUGS:
+	Custom Sliders
+		not responding if other plugin used sometimes
 	FL Randomizer makes plugin freeze
 		processBlock not called anymore
 		parameters not shown above Randomize
@@ -1257,6 +1261,7 @@ BUGS:
 		no mouseCursor shown
 
 IMPROVEMENTS:
+	rewrite tape so that processor in initializer
 	parameter symbols unclear
 	Installer
 		because people might not know where vst3 is

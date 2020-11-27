@@ -242,20 +242,21 @@ struct ParameterTextFields {
     {}
     // SET
     void setPosition(juce::Point<int> p) { pos = p; }
-    void initParameterValues(const std::array<float, 4>& paramValues) {
-        for (auto i = 0; i < lastValues.size(); ++i) lastValues[i] = paramValues[i];
+    void initParameterValues(std::array<float, 3> values) {
+        for (auto i = 0; i < lastValues.size(); ++i) lastValues[i] = values[i];
     }
     void enable() { mouseInBounds = true; }
     void disable() { mouseInBounds = false; }
     // PARAM
-    void updateParameters(const std::array<float, 4>& paramValues) {
+    void updateParameters(std::array<float, 3> values) {
         if (mouseInBounds)
             for (auto i = 0; i < lastValues.size(); ++i) {
-                if (lastValues[i] != paramValues[i]) {
-                    lastValues[i] = paramValues[i];
+                const auto value = values[i];
+                if (lastValues[i] != value) {
+                    lastValues[i] = value;
                     curParamID = i;
                     timeIdx = 0;
-                    textfields[i].updateParameterValue(paramValues[i]);
+                    textfields[i].updateParameterValue(value);
                     return;
                 }
             }
@@ -389,11 +390,11 @@ struct Space :
             g.setImageResamplingQuality(juce::Graphics::lowResamplingQuality);
             g.drawImageAt(uiImage, 76, 63, false);
             g.drawImageAt(helpImage, 1, 117, false);
-            updateParam(g, space.processor.paramNormalized[PDepth], 90, 81);
-            updateParam(g, space.processor.paramNormalized[PFreq], 99, 81);
+            updateParam(g, space.param[PDepth].getValueNormalized(), 90, 81);
+            updateParam(g, space.param[PFreq].getValueNormalized(), 99, 81);
             checkChannelCount();
             if (numChannels == 1) g.drawImageAt(widthDisabledImage, 107, 67, false);
-            else updateParam(g, space.processor.paramNormalized[PWidth], 108, 81);
+            else updateParam(g, space.param[PWidth].getValueNormalized(), 108, 81);
             checkLookahead();
             g.drawImageAt(studioImage, 86, 109, false);
             paintLFOs(g);
@@ -441,8 +442,8 @@ struct Space :
             }
         }
         void checkLookahead() {
-            if (studioEnabled != space.processor.paramValue[3]) {
-                studioEnabled = space.processor.paramValue[3];
+            if (studioEnabled != space.studioButton.getToggleState()) {
+                studioEnabled = space.studioButton.getToggleState();
                 if (studioEnabled) studioImage = Util::setStudioColour(uiImage, cEnabled);
                 else studioImage = Util::setStudioColour(uiImage, cDisabled);
             }
@@ -502,9 +503,13 @@ struct Space :
         }
         param[PDepth].otherSlider = &param[PFreq];
         param[PFreq].otherSlider = &param[PDepth];
+        paramText.initParameterValues(
+            { param[PDepth].getValue(),
+            param[PFreq].getValue(),
+            param[PWidth].getValue() }
+        );
         addAndMakeVisible(studioButton);
         studioAttach = std::make_unique<BAttach>(processor.apvts, tape::param::getID(tape::param::Lookahead), studioButton);
-        paramText.initParameterValues(processor.paramValue);
         addAndMakeVisible(about);
         addAndMakeVisible(aboutButton);
         aboutButton.addListener(this);
@@ -531,7 +536,11 @@ struct Space :
         shuttle(g);
         ui(g);
 
-        paramText.updateParameters(processor.paramValue);
+        paramText.updateParameters(
+            { param[PDepth].getValue(),
+            param[PFreq].getValue(),
+            param[PWidth].getValue() }
+        );
 
         repaint();
     }
@@ -598,3 +607,18 @@ private:
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Space)
 };
+
+/*
+
+problem: sliders not responding anymore if processBlock not called anymore
+
+cur solution: send array of slider values to paramText instead of paramValues from processor.
+
+problem: looks like shit, recreating the same array over and over again
+
+try next:
+    rewrite paramText so that it has CSlider-callback rather than adding paramText to CSlider,
+    then get values from within paramText
+
+    or make "global" values array for all subclasses that need values
+*/

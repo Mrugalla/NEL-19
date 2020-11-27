@@ -33,9 +33,6 @@ public:
 
     juce::AudioProcessorValueTreeState apvts;
     std::array<std::atomic<float>*, 4> param;
-    std::array<juce::RangedAudioParameter*, 3> paramRange;
-    std::array<float, 3> paramNormalized;
-    std::array<float, 4> paramValue;
 private:
     tape::Tape<double> tape;
 
