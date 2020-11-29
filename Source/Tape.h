@@ -408,8 +408,8 @@ namespace tape {
 		};
 
 		template<typename Float>
-		struct Spline : public Interpolation<Float> {
-			Spline(int size = 0) :
+		struct Cubic : public Interpolation<Float> {
+			Cubic(int size = 0) :
 				Interpolation<Float>(size, 4),
 				spline()
 			{
@@ -1048,11 +1048,11 @@ namespace tape {
 			const Float* getLFOValue(const int ch) const { return &chModules[ch].lfoValue; }
 			std::vector<Float> data;
 		private:
-			std::vector<MultiChannelModules<Float, interpolation::Spline<Float>>> chModules;
+			std::vector<MultiChannelModules<Float, interpolation::Cubic<Float>>> chModules;
 			certainty::Generator<Float> certainty;
-			interpolation::Spline<Float> interpolation;
+			interpolation::Cubic<Float> interpolation;
 			WIdx<Float> wIdx;
-			WidthProcessor<Float, interpolation::Spline<Float>> widthProcessor;
+			WidthProcessor<Float, interpolation::Cubic<Float>> widthProcessor;
 			Utils<Float>& utils;
 
 			// PARAM
@@ -1249,8 +1249,6 @@ namespace tape {
 /* TO DO
 
 BUGS:
-	Custom Sliders
-		not responding if other plugin used sometimes
 	FL Randomizer makes plugin freeze
 		processBlock not called anymore
 		parameters not shown above Randomize
@@ -1261,7 +1259,6 @@ BUGS:
 		no mouseCursor shown
 
 IMPROVEMENTS:
-	rewrite tape so that processor in initializer
 	parameter symbols unclear
 	Installer
 		because people might not know where vst3 is
@@ -1273,7 +1270,7 @@ TEST:
 	DAWS
 		cubase      CHECK 9.5, 10
 		fl          CHECK
-		ableton
+		ableton		CHECK (thx julian)
 		bitwig
 		protools
 		studio one  CHECK, but might not
