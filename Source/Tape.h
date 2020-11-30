@@ -1249,6 +1249,10 @@ namespace tape {
 /* TO DO
 
 BUGS:
+	mouse cursor drag modes buggy
+		if sensitive mode switched in drag
+			endGesture not always called correctly
+			sudden jumps appear
 	FL Randomizer makes plugin freeze
 		processBlock not called anymore
 		parameters not shown above Randomize
@@ -1259,6 +1263,12 @@ BUGS:
 		no mouseCursor shown
 
 IMPROVEMENTS:
+	add a manual (especially because of the ALT- and SHIFT-features)
+	temposync
+	multiband
+	mix
+	options menue, alternative design-parameter based
+	ctrl for link depth / freq same direction
 	parameter symbols unclear
 	Installer
 		because people might not know where vst3 is

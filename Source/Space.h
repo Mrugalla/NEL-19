@@ -476,6 +476,7 @@ struct Space :
     Space(Nel19AudioProcessor& processor, int framesPerSec, float upscale) :
         processor(processor),
         fps(framesPerSec), upscaleFactor(upscale),
+        cursors(makeCursors()),
         image(juce::Image::ARGB, Width, Width, true),
         bounds(),
         bg(*this),
@@ -514,7 +515,7 @@ struct Space :
         addAndMakeVisible(aboutButton);
         aboutButton.addListener(this);
         about.setVisible(false);
-        makeCursors();
+        setCursors();
         setOpaque(true);
     }
 
@@ -569,6 +570,7 @@ private:
     Nel19AudioProcessor& processor;
     int fps;
     float upscaleFactor;
+    std::array<juce::MouseCursor, 3> cursors; // 0 = disabled, 1 = enabled, 2 = invisible
     juce::Image image;
     juce::Rectangle<float> bounds;
     Background bg;
@@ -584,10 +586,9 @@ private:
     AboutComponent about;
     Button aboutButton;
 
-    void makeCursors() {
+    std::array<juce::MouseCursor, 3> makeCursors() {
         auto cursorImage = Util::getUpscaledCursor(upscaleFactor);
         const juce::MouseCursor mainCursor(cursorImage, 0, 0);
-        setMouseCursor(mainCursor);
 
         juce::Colour green(0xff37946e); // make on hover cursor
         juce::Colour yellow(0xfffffa8f);
@@ -597,28 +598,20 @@ private:
                     cursorImage.setPixelAt(x, y, yellow);
 
         const juce::MouseCursor hoverCursor(cursorImage, 0, 0);
+        
+        const juce::Image noImage(juce::Image::ARGB, 1, 1, true);
+        const juce::MouseCursor noCursor(noImage, 0, 0);
 
+        return { mainCursor, hoverCursor, noCursor };
+    }
+    void setCursors() {
+        setMouseCursor(cursors[0]);
         for (auto& p : param)
-            p.setMouseCursor(hoverCursor);
-        studioButton.setMouseCursor(hoverCursor);
-        aboutButton.setMouseCursor(hoverCursor);
-        about.setCursor(mainCursor, hoverCursor);
+            p.setCursors(&cursors[1], &cursors[2]);
+        studioButton.setMouseCursor(cursors[1]);
+        aboutButton.setMouseCursor(cursors[1]);
+        about.setCursor(cursors[0], cursors[1]);
     }
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Space)
 };
-
-/*
-
-problem: sliders not responding anymore if processBlock not called anymore
-
-cur solution: send array of slider values to paramText instead of paramValues from processor.
-
-problem: looks like shit, recreating the same array over and over again
-
-try next:
-    rewrite paramText so that it has CSlider-callback rather than adding paramText to CSlider,
-    then get values from within paramText
-
-    or make "global" values array for all subclasses that need values
-*/
