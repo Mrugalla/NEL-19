@@ -46,8 +46,8 @@ private:
     // mouse event handling
     void mouseDown(const juce::MouseEvent& evt) override {
         attach.beginGesture();
-        updateDragModes(evt);
         drag = true;
+        updateDragModes(evt);
     }
     void mouseDrag(const juce::MouseEvent& evt) override {
         updateDragModes(evt);
