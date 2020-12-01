@@ -1252,6 +1252,7 @@ BUGS:
 	mouse cursor drag modes buggy
 		if sensitive mode switched in drag
 			endGesture not always called correctly
+				if linkedDrag finished, then attempt to sensitive > crash
 			sudden jumps appear
 	FL Randomizer makes plugin freeze
 		processBlock not called anymore
