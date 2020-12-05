@@ -58,8 +58,8 @@ private:
     void mouseUp(const juce::MouseEvent& evt) override {
         attach.endGesture();
         drag = false;
-        if (sensitiveDrag) stoppedSensitiveDrag(evt);
-        if (linkedDrag) stoppedLinkedDrag();
+        if (sensitiveDrag) stopSensitiveDrag(evt);
+        if (linkedDrag) stopLinkedDrag();
     }
     void mouseWheelMove(const juce::MouseEvent& evt, const juce::MouseWheelDetails& wheel) override {
         if (drag) return;
@@ -81,48 +81,49 @@ private:
     const bool linkExists() const { return otherSlider != nullptr; }
     void updateDragModes(const juce::MouseEvent& evt) {
         if (drag) {
-            if (evt.mods.isShiftDown() && !sensitiveDrag) startedSensitiveDrag();
-            else if (!evt.mods.isShiftDown() && sensitiveDrag) stoppedSensitiveDrag(evt);
+            if (evt.mods.isShiftDown() && !sensitiveDrag) startSensitiveDrag();
+            else if (!evt.mods.isShiftDown() && sensitiveDrag) stopSensitiveDrag(evt);
             if (linkExists()) {
-                if (evt.mods.isAltDown() || evt.mods.isCtrlDown()) {
-                    if (!linkedDrag) startedLinkedDrag();
-                    if (linkedDragInv && evt.mods.isCtrlDown()) restartLinkedDrag(false);
-                    else if (!linkedDragInv && evt.mods.isAltDown()) restartLinkedDrag(true);
+                if (evt.mods.isAltDown()) {
+                    if (!linkedDrag) startLinkedDrag();
+                    if (!linkedDragInv) restartLinkedDrag(true);
                 }
-                //else
-                else if (!evt.mods.isAltDown() && !evt.mods.isCtrlDown())
-                    if (linkedDrag) stoppedLinkedDrag();
+                else if (evt.mods.isCtrlDown()) {
+                    if (!linkedDrag) startLinkedDrag();
+                    if (linkedDragInv && evt.mods.isCtrlDown()) restartLinkedDrag(false);
+                }
+                else if(linkedDrag) stopLinkedDrag();
             }
         }
         else {
             // mousewheel
             sensitiveDrag = evt.mods.isShiftDown();
-            linkedDrag = evt.mods.isAltDown() || evt.mods.isCtrlDown();
             linkedDragInv = evt.mods.isAltDown();
+            linkedDrag = linkedDragInv || evt.mods.isCtrlDown();
         }
     }
-    void startedSensitiveDrag() {
+    void startSensitiveDrag() {
         sensitiveDrag = true;
         dragStartValue = getValueNormalized();
         setCursorInvisible();
     }
-    void stoppedSensitiveDrag(const juce::MouseEvent& evt) {
+    void stopSensitiveDrag(const juce::MouseEvent& evt) {
         sensitiveDrag = false;
         resetCursor(evt);
     }
-    void startedLinkedDrag() {
+    void startLinkedDrag() {
         linkedDrag = true;
         otherSlider->dragStartValue = otherSlider->getValueNormalized();
         otherSlider->attach.beginGesture();
     }
-    void stoppedLinkedDrag() {
+    void stopLinkedDrag() {
         linkedDrag = false;
         otherSlider->attach.endGesture();
     }
     void restartLinkedDrag(const bool inverted) {
         linkedDragInv = inverted;
-        stoppedLinkedDrag();
-        startedLinkedDrag();
+        stopLinkedDrag();
+        startLinkedDrag();
     }
     void mouseDragNormal(const juce::MouseEvent& evt) {
         auto y = juce::jlimit(0, getHeight(), evt.getPosition().getY());
@@ -184,5 +185,6 @@ private:
 todo:
 
 - sudden jumps when drag mode changes within drag
+- crash on rare condition (mouseUp, endGesture)
 
 */

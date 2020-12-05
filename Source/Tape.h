@@ -1249,11 +1249,6 @@ namespace tape {
 /* TO DO
 
 BUGS:
-	mouse cursor drag modes buggy
-		if sensitive mode switched in drag
-			endGesture not always called correctly
-				if linkedDrag finished, then attempt to sensitive > crash
-			sudden jumps appear
 	FL Randomizer makes plugin freeze
 		processBlock not called anymore
 		parameters not shown above Randomize
@@ -1269,7 +1264,6 @@ IMPROVEMENTS:
 	multiband
 	mix
 	options menue, alternative design-parameter based
-	ctrl for link depth / freq same direction
 	parameter symbols unclear
 	Installer
 		because people might not know where vst3 is
@@ -1287,6 +1281,7 @@ TEST:
 		studio one  CHECK, but might not
 
 DAWS Debug:
+
 D:\Pogramme\Cubase 9.5\Cubase9.5.exe
 D:\Pogramme\FL Studio 20\FL64.exe
 D:\Pogramme\Studio One 5\Studio One.exe
