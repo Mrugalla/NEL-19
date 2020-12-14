@@ -1,7 +1,5 @@
 #pragma once
 #include <array>
-#include <functional>
-#include <chrono>
 
 namespace tape {
 	// MATH CONST
@@ -84,8 +82,9 @@ namespace tape {
 			auto* stream = new juce::MemoryInputStream(data, size, false);
 			juce::WavAudioFormat format;
 			auto* reader = format.createReaderFor(stream, true);
-			juce::AudioBuffer<float> buffer(1, reader->lengthInSamples);
-			if (reader) reader->read(buffer.getArrayOfWritePointers(), 1, 0, reader->lengthInSamples);
+			auto lengthInSamples = (int)reader->lengthInSamples;
+			juce::AudioBuffer<float> buffer(1, lengthInSamples);
+			if (reader) reader->read(buffer.getArrayOfWritePointers(), 1, 0, lengthInSamples);
 			delete reader;
 			return buffer;
 		}
@@ -290,7 +289,7 @@ namespace tape {
 				FsInv = (Float)1 / Fs;
 				Nyquist = Fs / 2;
 
-				setDelaySize(ms2samples(DelaySizeInMS));
+				setDelaySize((int)ms2samples(DelaySizeInMS));
 				return true;
 			}
 			return false;
@@ -382,7 +381,7 @@ namespace tape {
 		template<typename Float>
 		struct Int : public Interpolation<Float> {
 			Int(int size = 0) :
-				Interpolation<Float>(size)
+				Interpolation<Float>(size, 0)
 			{}
 			Float operator()(std::vector<Float>& data, Float idx) { return at(data, idx); }
 		};
@@ -1058,142 +1057,6 @@ namespace tape {
 			// PARAM
 			Float depth, freq;
 			bool lookaheadEnabled;
-		};
-	}
-
-	namespace slew {
-		template<typename Float>
-		struct SlewLimiter {
-			SlewLimiter(const Utils<Float>& utils) :
-				value(0),
-				cutoff(0),
-				utils(utils)
-			{}
-			// PARAM
-			void setCutoff(const Float c) { cutoff = c; }
-			// PROCESS
-			void processBlock(juce::AudioBuffer<float>& buffer, const int ch) {
-				auto samples = buffer.getWritePointer(ch, 0);
-				for (auto s = 0; s < utils.numSamples; ++s) {
-					auto distance = samples[s] - value;
-					auto difference = std::abs(distance);
-					if (cutoff < difference) {
-						if (distance < 0)
-							value -= cutoff;
-						else
-							value += cutoff;
-						samples[s] = value;
-					}
-					else
-						value = samples[s];
-				}
-			}
-			const float processSample(float sample) {
-				auto distance = sample - value;
-				auto difference = std::abs(distance);
-				if (cutoff < difference) {
-					if (distance < 0)
-						value -= cutoff;
-					else
-						value += cutoff;
-					sample = value;
-				}
-				else
-					value = sample;
-
-				return sample;
-			}
-		private:
-			Float value, cutoff;
-			const Utils<Float>& utils;
-		};
-
-		template<typename Float>
-		struct Slew {
-			struct Autogain {
-				static constexpr int Steps = 256;
-				static constexpr int StepsMax = Steps - 1;
-
-				Autogain(Slew& slew) :
-					data(),
-					interpolate(Steps),
-					slew(slew),
-					gain(0)
-				{}
-				// SET
-				void init() { data.resize(Steps, 0); }
-				void setNumChannels() {
-					auto buffer = util::load(
-						BinaryData::PinkNoise4410024_wav,
-						BinaryData::PinkNoise4410024_wavSize
-					);
-					auto numSamples = buffer.getNumSamples();
-					auto dryRms = buffer.getRMSLevel(0, 0, numSamples);
-					juce::AudioBuffer<float> nBuffer;
-					for (auto i = 0; i < Steps; ++i) {
-						auto x = (Float)i / StepsMax;
-						nBuffer.makeCopyOf(buffer, true);
-						auto freq = x * (SlewFreqMax - SlewFreqMin) + SlewFreqMin;
-						slew.setCutoff(freq, true);
-						auto samples = nBuffer.getWritePointer(0);
-						for (auto j = 0; j < numSamples; ++j)
-							samples[j] = slew.processSample(samples[j]);
-						auto rms = nBuffer.getRMSLevel(0, 0, numSamples);
-						data[i] = dryRms / rms;
-					}
-				}
-				// PARAM
-				void setCutoff(const Float c) {
-					auto cutoff = (c - SlewFreqMin) * SlewFreqMaxInv;
-					auto idx = StepsMax * cutoff;
-					gain = interpolate(data, idx);
-				}
-				// PROCESS
-				void processBlock(juce::AudioBuffer<float>& buffer) { buffer.applyGain(gain); }
-			private:
-				std::vector<Float> data;
-				interpolation::Linear<Float> interpolate;
-				Slew& slew;
-				float gain;
-			};
-
-			Slew(const Utils<Float>& utils) :
-				slew(),
-				autogain(*this),
-				utils(utils),
-				cutoff(-1)
-			{}
-			// SET
-			void init() { autogain.init(); }
-			void setNumChannels() {
-				slew.resize(utils.numChannels, utils);
-				autogain.setNumChannels();
-				setCutoff(cutoff, true);
-			}
-			// PARAM
-			void setCutoff(const Float c, const bool forceReset = false) {
-				if (cutoff != c || forceReset) {
-					cutoff = c;
-					auto inc = utils.hz2inc(cutoff) * 2;
-					for (auto& s : slew)
-						s.setCutoff(inc);
-					autogain.setCutoff(cutoff);
-				}
-			}
-			// PROCESS
-			void processBlock(juce::AudioBuffer<float>& buffer) {
-				for (auto ch = 0; ch < utils.numChannels; ++ch)
-					slew[ch].processBlock(buffer, ch);
-
-				autogain.processBlock(buffer);
-			}
-			const float processSample(const float sample) { return slew[0].processSample(sample); }
-		private:
-			std::vector<SlewLimiter<Float>> slew;
-			Autogain autogain;
-			const Utils<Float>& utils;
-
-			Float cutoff;
 		};
 	}
 

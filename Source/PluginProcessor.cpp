@@ -48,7 +48,7 @@ double Nel19AudioProcessor::getTailLengthSeconds() const { return 0.; }
 int Nel19AudioProcessor::getNumPrograms() { return 1; }
 int Nel19AudioProcessor::getCurrentProgram() { return 0; }
 void Nel19AudioProcessor::setCurrentProgram (int) {}
-const juce::String Nel19AudioProcessor::getProgramName (int index) { return {}; }
+const juce::String Nel19AudioProcessor::getProgramName (int) { return {}; }
 void Nel19AudioProcessor::changeProgramName (int, const juce::String&){}
 
 void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize) {

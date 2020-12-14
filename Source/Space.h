@@ -101,12 +101,12 @@ namespace Util {
 
     static juce::Image getUpscaledCursor(float upscaleFactor) {
         auto cursor = juce::ImageCache::getFromMemory(BinaryData::cursor_png, BinaryData::cursor_pngSize);
-        auto width = cursor.getWidth() * upscaleFactor;
-        auto height = cursor.getHeight() * upscaleFactor;
+        auto width = (int)(cursor.getWidth() * upscaleFactor);
+        auto height = (int)(cursor.getHeight() * upscaleFactor);
         juce::Image newCursor(juce::Image::ARGB, width, height, true);
         juce::Graphics g{ newCursor };
         g.setImageResamplingQuality(juce::Graphics::lowResamplingQuality);
-        g.drawImage(cursor, { 0.f, 0.f, width, height });
+        g.drawImage(cursor, {0.f, 0.f, (float)width, (float)height} );
         return newCursor;
     }
 }
@@ -473,7 +473,7 @@ struct Space :
         }
     };
 
-    Space(Nel19AudioProcessor& processor, int framesPerSec, float upscale) :
+    Space(Nel19AudioProcessor& processor, int framesPerSec, int upscale) :
         processor(processor),
         fps(framesPerSec), upscaleFactor(upscale),
         cursors(makeCursors()),
@@ -568,8 +568,7 @@ struct Space :
     }
 private:
     Nel19AudioProcessor& processor;
-    int fps;
-    float upscaleFactor;
+    int fps, upscaleFactor;
     std::array<juce::MouseCursor, 3> cursors; // 0 = disabled, 1 = enabled, 2 = invisible
     juce::Image image;
     juce::Rectangle<float> bounds;

@@ -9,8 +9,6 @@ class Nel19AudioProcessorEditor :
 {
 public:
     Nel19AudioProcessorEditor (Nel19AudioProcessor&);
-    ~Nel19AudioProcessorEditor() override;
-    void paint (juce::Graphics&) override;
     void resized() override;
     void timerCallback() override;
 private:

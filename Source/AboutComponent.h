@@ -35,7 +35,7 @@ public:
         g.drawImageAt(image, 0, 0, false);
     }
 
-    void mouseDown(const juce::MouseEvent& event) override { setVisible(false); }
+    void mouseDown(const juce::MouseEvent&) override { setVisible(false); }
 
     void resized() override {
         auto aboutImage = juce::ImageCache::getFromMemory(BinaryData::about_png, BinaryData::about_pngSize);
@@ -52,8 +52,8 @@ public:
         initBounds(paypalLink, 62, 116, 63, 7);
     }
 
-    void setCursor(const juce::MouseCursor& cursor, const juce::MouseCursor& linkCursor) {
-        setMouseCursor(cursor);
+    void setCursor(const juce::MouseCursor& crs, const juce::MouseCursor& linkCursor) {
+        setMouseCursor(crs);
         discordLink.setMouseCursor(linkCursor);
         githubLink.setMouseCursor(linkCursor);
         paypalLink.setMouseCursor(linkCursor);
@@ -64,7 +64,6 @@ public:
 private:
     juce::Image image;
     float upscaleFactor;
-
     Link discordLink, githubLink, paypalLink, juceLink, joshsLink, pnsLink;
 
     void initBounds(Link& button, int x, int y, int width, int height) {

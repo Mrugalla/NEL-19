@@ -1,5 +1,6 @@
 #pragma once
 #include <JuceHeader.h>
+#include <array>
 
 class CSlider :
     public juce::Component
@@ -22,7 +23,7 @@ public:
         setAlpha(0); // invisible because drawing is handled by UI in space.h
     }
     // SET
-    void setCursors(juce::MouseCursor* hover, juce::MouseCursor* invisible) {
+    void setCursors(const juce::MouseCursor* hover, const juce::MouseCursor* invisible) {
         setMouseCursor(*hover);
         cursors[0] = hover;
         cursors[1] = invisible;
@@ -36,7 +37,7 @@ public:
 private:
     juce::RangedAudioParameter* param;
     juce::ParameterAttachment attach;
-    std::array<juce::MouseCursor*, 2> cursors; // 0 = hover, 1 = invisible
+    std::array<const juce::MouseCursor*, 2> cursors; // 0 = hover, 1 = invisible
     float dragStartValue;
     bool sensitiveDrag, linkedDrag, linkedDragInv, drag;
     
@@ -75,7 +76,7 @@ private:
         }
         updateParamText(evt);
     }
-    void mouseDoubleClick(const juce::MouseEvent& evt) override { attach.setValueAsCompleteGesture(param->getDefaultValue()); }
+    void mouseDoubleClick(const juce::MouseEvent&) override { attach.setValueAsCompleteGesture(param->getDefaultValue()); }
 
     // mouse-Drag&Link-Helpers
     const bool linkExists() const { return otherSlider != nullptr; }
@@ -159,7 +160,7 @@ private:
         if (!sensitiveDrag) paramText->setPosition(getBounds().getTopLeft() + evt.getPosition());
         else paramText->setPosition(getPosition());
     }
-    const bool cursorInvisible() { return &getMouseCursor() != cursors[0]; }
+    bool cursorInvisible() { return &getMouseCursor() != cursors[0]; }
     void setCursorVisible(){ setMouseCursor(*cursors[0]); }
     void setCursorInvisible() { setMouseCursor(*cursors[1]); }
     void resetCursor(const juce::MouseEvent& evt) {
@@ -168,7 +169,7 @@ private:
             auto mouse = desktop.getMouseSource(i);
             if (*mouse == evt.source) {
                 juce::Point<float> respawnPoint(
-                    getScreenX() + getWidth() / 2,
+                    getScreenX() + (float)getWidth() / 2,
                     getScreenY() + getHeight() * (1 - getValueNormalized())
                 );
                 mouse->setScreenPosition(respawnPoint);
