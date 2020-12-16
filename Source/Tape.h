@@ -359,7 +359,7 @@ namespace tape {
 	namespace interpolation {
 		template<typename Float>
 		struct Interpolation {
-			Interpolation(int dataSize, int nn = 0) :
+			Interpolation(int dataSize, int nn) :
 				access(),
 				numNeighbors(nn)
 			{
@@ -372,7 +372,7 @@ namespace tape {
 					access[i] = i % size;
 			}
 			std::vector<int> access;
-			const int numNeighbors;
+			int numNeighbors;
 
 			const Float at(const std::vector<Float>& data, const int idx) const { return data[access[idx]]; }
 			const Float at(const std::vector<Float>& data, const Float idx) const { return at(data, (int)idx); }
