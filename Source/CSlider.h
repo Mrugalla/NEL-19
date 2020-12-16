@@ -160,7 +160,7 @@ private:
         if (!sensitiveDrag) paramText->setPosition(getBounds().getTopLeft() + evt.getPosition());
         else paramText->setPosition(getPosition());
     }
-    bool cursorInvisible() { return &getMouseCursor() != cursors[0]; }
+    bool cursorInvisible() { return getMouseCursor() != *cursors[0]; }
     void setCursorVisible(){ setMouseCursor(*cursors[0]); }
     void setCursorInvisible() { setMouseCursor(*cursors[1]); }
     void resetCursor(const juce::MouseEvent& evt) {
