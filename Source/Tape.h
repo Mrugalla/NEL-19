@@ -91,7 +91,7 @@ namespace tape {
 
 		template<typename Float>
 		static void shakerSort(std::vector<Float>& data) {
-			auto lenMax = data.size() - 2;
+			auto lenMax = (int)(data.size() - 2);
 			bool swapped;
 			do {
 				swapped = false;
@@ -111,7 +111,7 @@ namespace tape {
 		}
 		template<typename Float>
 		static void shakerSort2(std::vector<Float>& data) {
-			auto upperLimit = data.size() - 2;
+			auto upperLimit = (int)(data.size() - 2);
 			auto lowerLimit = 0;
 			auto tempLimit = 0;
 			bool swapped = false;
@@ -359,9 +359,9 @@ namespace tape {
 	namespace interpolation {
 		template<typename Float>
 		struct Interpolation {
-			Interpolation(int dataSize, int numNeighbors = 0) :
+			Interpolation(int dataSize, int nn = 0) :
 				access(),
-				numNeighbors(numNeighbors)
+				numNeighbors(nn)
 			{
 				if (dataSize != 0) resize(dataSize);
 			}
