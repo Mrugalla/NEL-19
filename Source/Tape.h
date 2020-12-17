@@ -372,7 +372,7 @@ namespace tape {
 					access[i] = i % size;
 			}
 			std::vector<int> access;
-			int numNeighbors;
+			const int numNeighbors;
 
 			const Float at(const std::vector<Float>& data, const int idx) const { return data[access[idx]]; }
 			const Float at(const std::vector<Float>& data, const Float idx) const { return at(data, (int)idx); }
@@ -383,7 +383,7 @@ namespace tape {
 			Int(int size = 0) :
 				Interpolation<Float>(size, 0)
 			{}
-			Float operator()(std::vector<Float>& data, Float idx) { return at(data, idx); }
+			Float operator()(std::vector<Float>& data, Float idx) { return this->at(data, idx); }
 		};
 
 		template<typename Float>
@@ -391,7 +391,7 @@ namespace tape {
 			Rint(int size = 0) :
 				Interpolation<Float>(size, 1)
 			{}
-			Float operator()(std::vector<Float>& data, Float idx) { return at(data, std::rint(idx)); }
+			Float operator()(std::vector<Float>& data, Float idx) { return this->at(data, std::rint(idx)); }
 		};
 
 		template<typename Float>
@@ -402,7 +402,7 @@ namespace tape {
 			Float operator()(std::vector<Float>& data, Float idx) {
 				auto iFloor = (int)idx;
 				auto mix = idx - iFloor;
-				return at(data, iFloor) + mix * (at(data, iFloor + 1) - at(data, iFloor));
+				return this->at(data, iFloor) + mix * (this->at(data, iFloor + 1) - this->at(data, iFloor));
 			}
 		};
 
@@ -420,8 +420,8 @@ namespace tape {
 				auto mix = idx - nIdx;
 				auto splIdx = int(SplineSize * mix);
 				Float y = 0;
-				for (auto n = 0; n < numNeighbors; ++n)
-					y += at(data, nIdx + n) * spline[n][splIdx];
+				for (auto n = 0; n < this->numNeighbors; ++n)
+					y += this->at(data, nIdx + n) * spline[n][splIdx];
 				return y;
 			}
 			void initSpecific(int size) {
@@ -454,13 +454,13 @@ namespace tape {
 
 			const Float operator()(const std::vector<Float>& data, const Float idx) const {
 				const auto iFloor = (int)idx;
-				auto p = at(data, iFloor);
-				for (auto j = 1; j < numNeighbors; ++j)
+				auto p = this->at(data, iFloor);
+				for (auto j = 1; j < this->numNeighbors; ++j)
 					p *= (idx - nbt[j].addFloorJ[iFloor]) * nbt[0].subIJInv[j];
 				Float yp = p;
-				for (auto i = 1; i < numNeighbors; ++i) {
-					p = at(data, iFloor + i);
-					for (auto j = 0; j < numNeighbors; ++j)
+				for (auto i = 1; i < this->numNeighbors; ++i) {
+					p = this->at(data, iFloor + i);
+					for (auto j = 0; j < this->numNeighbors; ++j)
 						if (j != i)
 							p *= (idx - nbt[j].addFloorJ[iFloor]) * nbt[i].subIJInv[j];
 					yp += p;
@@ -469,13 +469,13 @@ namespace tape {
 			}
 			const Float operator()(const std::vector<Float>& data, const Float idx, bool saved) const {
 				const auto iFloor = (int)((int)idx % data.size());
-				auto p = at(data, iFloor);
-				for (auto j = 1; j < numNeighbors; ++j)
+				auto p = this->at(data, iFloor);
+				for (auto j = 1; j < this->numNeighbors; ++j)
 					p *= (idx - nbt[j].addFloorJ[iFloor]) * nbt[0].subIJInv[j];
 				Float yp = p;
-				for (auto i = 1; i < numNeighbors; ++i) {
-					p = at(data, iFloor + i);
-					for (auto j = 0; j < numNeighbors; ++j)
+				for (auto i = 1; i < this->numNeighbors; ++i) {
+					p = this->at(data, iFloor + i);
+					for (auto j = 0; j < this->numNeighbors; ++j)
 						if (j != i)
 							p *= (idx - nbt[j].addFloorJ[iFloor]) * nbt[i].subIJInv[j];
 					yp += p;
@@ -483,11 +483,11 @@ namespace tape {
 				return yp;
 			}
 			void initSpecific(int size) {
-				nbt.resize(numNeighbors);
-				for (auto n = 0; n < numNeighbors; ++n) {
+				nbt.resize(this->numNeighbors);
+				for (auto n = 0; n < this->numNeighbors; ++n) {
 					nbt[n].subIJInv.clear();
-					nbt[n].subIJInv.reserve(numNeighbors);
-					for (auto j = 0; j < numNeighbors; ++j)
+					nbt[n].subIJInv.reserve(this->numNeighbors);
+					for (auto j = 0; j < this->numNeighbors; ++j)
 						if (n != j) nbt[n].subIJInv.emplace_back((Float)1 / (n - j));
 						else nbt[n].subIJInv.emplace_back(0);
 
