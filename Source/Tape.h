@@ -374,6 +374,8 @@ namespace tape {
 			std::vector<int> access;
 			const int numNeighbors;
 
+			void initSpecific(int) {};
+
 			const Float at(const std::vector<Float>& data, const int idx) const { return data[access[idx]]; }
 			const Float at(const std::vector<Float>& data, const Float idx) const { return at(data, (int)idx); }
 		};
@@ -391,7 +393,7 @@ namespace tape {
 			Rint(int size = 0) :
 				Interpolation<Float>(size, 1)
 			{}
-			Float operator()(std::vector<Float>& data, Float idx) { return this->at(data, std::rint(idx)); }
+			const Float operator()(const std::vector<Float>& data, const Float idx) { return this->at(data, std::rint(idx)); }
 		};
 
 		template<typename Float>
@@ -399,7 +401,7 @@ namespace tape {
 			Linear(int size = 0) :
 				Interpolation<Float>(size, 1)
 			{}
-			Float operator()(std::vector<Float>& data, Float idx) {
+			const Float operator()(const std::vector<Float>& data, const Float idx) {
 				auto iFloor = (int)idx;
 				auto mix = idx - iFloor;
 				return this->at(data, iFloor) + mix * (this->at(data, iFloor + 1) - this->at(data, iFloor));
@@ -415,7 +417,7 @@ namespace tape {
 				if (size != 0) initSpecific(size);
 			}
 
-			const Float operator()(const std::vector<Float>& data, const Float idx) const {
+			Float operator()(std::vector<Float>& data, Float idx) const {
 				auto nIdx = (int)idx;
 				auto mix = idx - nIdx;
 				auto splIdx = int(SplineSize * mix);
@@ -452,7 +454,7 @@ namespace tape {
 				if (size != 0) initSpecific(size);
 			}
 
-			const Float operator()(const std::vector<Float>& data, const Float idx) const {
+			Float operator()(std::vector<Float>& data, Float idx) const {
 				const auto iFloor = (int)idx;
 				auto p = this->at(data, iFloor);
 				for (auto j = 1; j < this->numNeighbors; ++j)
@@ -467,7 +469,7 @@ namespace tape {
 				}
 				return yp;
 			}
-			const Float operator()(const std::vector<Float>& data, const Float idx, bool saved) const {
+			Float operator()(std::vector<Float>& data, Float idx, bool saved) const {
 				const auto iFloor = (int)((int)idx % data.size());
 				auto p = this->at(data, iFloor);
 				for (auto j = 1; j < this->numNeighbors; ++j)
@@ -878,7 +880,7 @@ namespace tape {
 				buffer.resize(utils.delaySize, 0);
 			}
 			// PROCESS
-			void processBlock(juce::AudioBuffer<float>& b, const int* wIdx, const std::vector<Float>& rIdx, const Interpolation& interpolate, const int ch) {
+			void processBlock(juce::AudioBuffer<float>& b, const int* wIdx, const std::vector<Float>& rIdx, Interpolation& interpolate, const int ch) {
 				auto samples = b.getWritePointer(ch, 0);
 				for (auto s = 0; s < utils.numSamples; ++s) {
 					buffer[wIdx[s]] = samples[s];
@@ -907,6 +909,10 @@ namespace tape {
 				delay(utils),
 				utils(utils)
 			{
+				setMaxBufferSize();
+			}
+			// SET
+			void setMaxBufferSize() {
 				data.resize(utils.maxBufferSize, 0);
 				rIdx.setMaxBufferSize(utils.maxBufferSize);
 			}
@@ -923,7 +929,7 @@ namespace tape {
 			}
 			void saveLFOValue() { lfoValue = data[utils.numSamples - 1]; }
 			void upscaleLFO() { seq.scaleForDelay(data.data()); }
-			void processBlock(juce::AudioBuffer<float>& buffer, const int* wIdx, const Interpolation& interpolate, const int ch) {
+			void processBlock(juce::AudioBuffer<float>& buffer, const int* wIdx, Interpolation& interpolate, const int ch) {
 				//seq.playback(buffer, data, ch);
 				if(utils.processor->getLatencySamples() != 0) rIdx.processBlock(data, wIdx); // LOOKAHEAD ENABLED
 				else rIdx.processBlockWithLatencyReduction(data, wIdx); // LOOKAHEAD DISABLED
@@ -1010,6 +1016,7 @@ namespace tape {
 			void setMaxBufferSize() {
 				data.resize(utils.maxBufferSize, 0);
 				wIdx.setMaxBufferSize();
+				for (auto& ch : chModules) ch.setMaxBufferSize();
 			}
 			// PARAM
 			void setDepth(const Float d) {
