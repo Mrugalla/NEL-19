@@ -290,6 +290,8 @@ namespace tape {
 				Nyquist = Fs / 2;
 
 				setDelaySize((int)ms2samples(DelaySizeInMS));
+
+				maxBufferSize = 0;
 				return true;
 			}
 			return false;
@@ -370,11 +372,12 @@ namespace tape {
 				access.resize(accessSize, 0);
 				for (auto i = 0; i < accessSize; ++i)
 					access[i] = i % size;
+				initSpecific(size);
 			}
 			std::vector<int> access;
 			const int numNeighbors;
 
-			void initSpecific(int) {};
+			virtual void initSpecific(int){}
 
 			const Float at(const std::vector<Float>& data, const int idx) const { return data[access[idx]]; }
 			const Float at(const std::vector<Float>& data, const Float idx) const { return at(data, (int)idx); }
@@ -426,7 +429,7 @@ namespace tape {
 					y += this->at(data, nIdx + n) * spline[n][splIdx];
 				return y;
 			}
-			void initSpecific(int size) {
+			void initSpecific(int size) override {
 				for (auto& spl : spline) spl.resize(SplineSize, 0);
 				for (auto i = 0; i < SplineSize; ++i) {
 					Float x = (Float)i / SplineSize;
@@ -484,7 +487,7 @@ namespace tape {
 				}
 				return yp;
 			}
-			void initSpecific(int size) {
+			void initSpecific(int size) override {
 				nbt.resize(this->numNeighbors);
 				for (auto n = 0; n < this->numNeighbors; ++n) {
 					nbt[n].subIJInv.clear();
@@ -877,8 +880,10 @@ namespace tape {
 				buffer(),
 				utils(utils)
 			{
-				buffer.resize(utils.delaySize, 0);
+				setSampleRate();
 			}
+			// SET
+			void setSampleRate() { buffer.resize(utils.delaySize, 0); }
 			// PROCESS
 			void processBlock(juce::AudioBuffer<float>& b, const int* wIdx, const std::vector<Float>& rIdx, Interpolation& interpolate, const int ch) {
 				auto samples = b.getWritePointer(ch, 0);
@@ -912,6 +917,7 @@ namespace tape {
 				setMaxBufferSize();
 			}
 			// SET
+			void setSampleRate() { delay.setSampleRate(); }
 			void setMaxBufferSize() {
 				data.resize(utils.maxBufferSize, 0);
 				rIdx.setMaxBufferSize(utils.maxBufferSize);
@@ -957,7 +963,7 @@ namespace tape {
 				width(0), dest((Float)WowWidthDefault)
 			{}
 			// SET
-			void init() { smooth.setInertiaInHz(20); }
+			void setSampleRate() { smooth.setInertiaInHz(20); }
 			// PARAM
 			void setWidth(Float w) { dest = w; }
 			// PROCESS
@@ -1003,10 +1009,11 @@ namespace tape {
 				lookaheadEnabled(false)
 			{}
 			// SET
-			void init() {
-				widthProcessor.init();
+			void setSampleRate() {
+				widthProcessor.setSampleRate();
 				interpolation.resize(utils.delaySize);
-				interpolation.initSpecific(utils.delaySize);
+				for (auto& ch : chModules)
+					ch.setSampleRate();
 			}
 			void setNumChannels() {
 				chModules.resize(utils.numChannels, { utils, certainty });
@@ -1076,9 +1083,10 @@ namespace tape {
 		{}
 		// SET
 		void prepareToPlay(const double sampleRate, const int maxBufferSize, const int channelCount) {
+			//setLookaheadEnabled(lookaheadEnabled);
 			if (utils.sampleRateChanged(sampleRate)) {
-				vibrato.init();
-				setLookaheadEnabled(lookaheadEnabled);
+				//vibrato.init();
+				vibrato.setSampleRate();
 			}
 			if (utils.maxBufferSizeChanged(maxBufferSize))
 				vibrato.setMaxBufferSize();
@@ -1090,8 +1098,8 @@ namespace tape {
 		void setLookaheadEnabled(const bool enabled) {
 			if (lookaheadEnabled != enabled) {
 				lookaheadEnabled = enabled;
-				if(lookaheadEnabled) utils.setLatency(utils.delayCenter);
-				else utils.setLatency(0);
+				auto latency = lookaheadEnabled ? 1 : 0;
+				utils.setLatency(latency * utils.delayCenter);
 			}
 		}
 		void setWowDepth(const Float depth) { vibrato.setDepth(depth); }
@@ -1139,15 +1147,11 @@ IMPROVEMENTS:
 		because people might not know where vst3 is
 
 TEST:
-	LIVE
-		gitarristen
-		synths
 	DAWS
 		cubase      CHECK 9.5, 10
 		fl          CHECK
 		ableton		CHECK (thx julian)
 		bitwig
-		protools
 		studio one  CHECK, but might not
 
 DAWS Debug:
@@ -1155,5 +1159,8 @@ DAWS Debug:
 D:\Pogramme\Cubase 9.5\Cubase9.5.exe
 D:\Pogramme\FL Studio 20\FL64.exe
 D:\Pogramme\Studio One 5\Studio One.exe
+
+C:\Users\Eine Alte Oma\Documents\CPP\vst3sdk\out\build\x64-Debug (default)\bin\validator.exe
+-e "C:/Program Files/Common Files/VST3/NEL-19.vst3"
 
 */

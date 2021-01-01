@@ -79,10 +79,10 @@ bool Nel19AudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) co
 }
 #endif
 void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) {
-    if (buffer.getNumSamples() == 0) return;
     juce::ScopedNoDenormals noDenormals;
     const auto totalNumInputChannels  = getTotalNumInputChannels();
     const auto totalNumOutputChannels = getTotalNumOutputChannels();
+    if (buffer.getNumSamples() == 0) return;
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear(i, 0, buffer.getNumSamples());
 
@@ -94,6 +94,7 @@ void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     tape.processBlock(buffer);
 }
 void Nel19AudioProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) {
+    if (buffer.getNumSamples() == 0) return;
     tape.processBlockBypassed(buffer);
 }
 bool Nel19AudioProcessor::hasEditor() const { return true; }
