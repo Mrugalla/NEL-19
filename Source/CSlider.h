@@ -23,10 +23,11 @@ public:
         setAlpha(0); // invisible because drawing is handled by UI in space.h
     }
     // SET
-    void setCursors(const juce::MouseCursor* hover, const juce::MouseCursor* invisible) {
+    void setCursors(const juce::MouseCursor* hover, const juce::MouseCursor* invisible, const juce::MouseCursor* cursorDisabled) {
         setMouseCursor(*hover);
         cursors[0] = hover;
         cursors[1] = invisible;
+        cursors[2] = cursorDisabled;
     }
     // GET
     const float getValue() const { return denormalize(param->getValue()); }
@@ -37,7 +38,7 @@ public:
 private:
     juce::RangedAudioParameter* param;
     juce::ParameterAttachment attach;
-    std::array<const juce::MouseCursor*, 2> cursors; // 0 = hover, 1 = invisible
+    std::array<const juce::MouseCursor*, 3> cursors; // 0 = hover, 1 = invisible, 2 = disabled
     float dragStartValue;
     bool sensitiveDrag, linkedDrag, linkedDragInv, drag;
     
@@ -45,6 +46,11 @@ private:
     const float denormalize(const float normalized) const { return param->getNormalisableRange().convertFrom0to1(normalized); }
 
     // mouse event handling
+    void mouseEnter(const juce::MouseEvent&) override {
+        const auto& c = getMouseCursor();
+        if(isEnabled() && c == *cursors[2]) setMouseCursor(*cursors[0]);
+        else if(!isEnabled() && c == *cursors[0]) setMouseCursor(*cursors[2]);
+    }
     void mouseDown(const juce::MouseEvent& evt) override {
         attach.beginGesture();
         drag = true;
@@ -152,7 +158,7 @@ private:
     
     // other stuff
     void updateParamText(const juce::MouseEvent& evt) {
-        if (linkedDrag) {
+        if (linkedDrag || !isEnabled()) {
             paramText->disable();
             return;
         }
@@ -186,6 +192,5 @@ private:
 todo:
 
 - sudden jumps when drag mode changes within drag
-- crash on rare condition (mouseUp, endGesture)
 
 */

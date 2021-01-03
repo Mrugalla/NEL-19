@@ -383,7 +383,7 @@ struct Space :
             widthDisabledImage(),
             helpImage(juce::ImageCache::getFromMemory(BinaryData::help_png, BinaryData::help_pngSize)),
             cursorImage(Util::getUpscaledCursor(space.upscaleFactor)),
-            studioEnabled(1), numChannels(0)
+            studioEnabled(1), numChannels(-1)
         {}
 
         void operator()(juce::Graphics& g) {
@@ -393,7 +393,8 @@ struct Space :
             updateParam(g, space.param[PDepth].getValueNormalized(), 90, 81);
             updateParam(g, space.param[PFreq].getValueNormalized(), 99, 81);
             checkChannelCount();
-            if (numChannels == 1) g.drawImageAt(widthDisabledImage, 107, 67, false);
+            if (numChannels == 1)
+                updateParam(g, 0, 108, 81);
             else updateParam(g, space.param[PWidth].getValueNormalized(), 108, 81);
             checkLookahead();
             g.drawImageAt(studioImage, 86, 109, false);
@@ -414,7 +415,7 @@ struct Space :
                 numChannels = curNumChannels;
                 if (numChannels == 1) {
                     lfoData.resize(numChannels, space.processor.getLFOValue(0));
-                    uiImage = juce::ImageCache::getFromMemory(BinaryData::ui_png, BinaryData::ui_pngSize);
+                    uiImage = juce::ImageCache::getFromMemory(BinaryData::ui_png, BinaryData::ui_pngSize).createCopy();
                     space.param[2].setEnabled(false);
                     juce::Colour contour(0xff222034);
                     juce::Colour grey(0xff9badb7);
@@ -606,7 +607,7 @@ private:
     void setCursors() {
         setMouseCursor(cursors[0]);
         for (auto& p : param)
-            p.setCursors(&cursors[1], &cursors[2]);
+            p.setCursors(&cursors[1], &cursors[2], &cursors[0]);
         studioButton.setMouseCursor(cursors[1]);
         aboutButton.setMouseCursor(cursors[1]);
         about.setCursor(cursors[0], cursors[1]);
