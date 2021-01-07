@@ -54,6 +54,7 @@ private:
     void mouseDown(const juce::MouseEvent& evt) override {
         attach.beginGesture();
         drag = true;
+        dragStartValue = getValueNormalized();
         updateDragModes(evt);
     }
     void mouseDrag(const juce::MouseEvent& evt) override {
@@ -65,6 +66,10 @@ private:
     void mouseUp(const juce::MouseEvent& evt) override {
         attach.endGesture();
         drag = false;
+        if (!evt.mouseWasDraggedSinceMouseDown()) {
+            const auto value = 1.f - (float)evt.getPosition().y / getHeight();
+            attach.setValueAsCompleteGesture(denormalize(value));
+        }
         if (sensitiveDrag) stopSensitiveDrag(evt);
         if (linkedDrag) stopLinkedDrag();
     }
@@ -133,8 +138,9 @@ private:
         startLinkedDrag();
     }
     void mouseDragNormal(const juce::MouseEvent& evt) {
-        auto y = juce::jlimit(0, getHeight(), evt.getPosition().getY());
-        auto value = 1.f - (float)y / getHeight();
+        const auto distance = evt.getDistanceFromDragStartY();
+        const auto distanceRelative = (float)-distance / getHeight();
+        auto value = juce::jlimit(0.f, 1.f, dragStartValue + distanceRelative);
         attach.setValueAsPartOfGesture(denormalize(value));
         if (linkedDrag) {
             auto yOff = (float)evt.getDistanceFromDragStartY();
@@ -192,5 +198,6 @@ private:
 todo:
 
 - sudden jumps when drag mode changes within drag
+- sudden jump on drag start even if not just click
 
 */
