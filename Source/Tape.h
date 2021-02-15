@@ -14,11 +14,8 @@ namespace tape {
 	static constexpr float LFOFreqMin = .5f, LFOFreqMax = 13, LFOFreqDefault = 4.f, LFOFreqInterval = .5f;
 	static constexpr int SmoothOrderDefault = 3;
 	// DELAY CONST
-	static constexpr int DelaySizeInMS = 18; // 25
+	static constexpr int DelaySizeInMS = 3;
 	static constexpr float WowWidthDefault = 0.f;
-	// SLEW CONST
-	static constexpr int SlewFreqMin = 20, SlewFreqMax = 20000;
-	static constexpr double SlewFreqMaxInv = 1. / SlewFreqMax;
 
 	namespace util {
 		static juce::NormalisableRange<float> PowX2Range(float min, float max) {
@@ -346,14 +343,12 @@ namespace tape {
 			parameters.push_back(std::make_unique<juce::AudioParameterBool>(
 				getID(Lookahead), getName(Lookahead), true));
 			parameters.push_back(std::make_unique<juce::AudioParameterFloat>(
-				getID(VibratoDepth), getName(VibratoDepth), util::QuadraticBezierRange(0, 1, .3f), DepthDefault));
+				getID(VibratoDepth), getName(VibratoDepth), util::QuadraticBezierRange(0, 1, .51f), DepthDefault));
 			parameters.push_back(std::make_unique<juce::AudioParameterFloat>(
-				getID(VibratoFreq), getName(VibratoFreq), util::QuadraticBezierRange(LFOFreqMin, LFOFreqMax, .55f), LFOFreqDefault));
+				getID(VibratoFreq), getName(VibratoFreq), util::QuadraticBezierRange(LFOFreqMin, LFOFreqMax, .51f), LFOFreqDefault));
 			parameters.push_back(std::make_unique<juce::AudioParameterFloat>(
-				getID(VibratoWidth), getName(VibratoWidth), util::QuadraticBezierRange(0, 1, .4f), WowWidthDefault));
-			//parameters.push_back(std::make_unique<juce::AudioParameterFloat>(
-			//	getID(SlewCutoff), getName(SlewCutoff), util::LogRange(SlewFreqMin, SlewFreqMax), SlewFreqMax));
-
+				getID(VibratoWidth), getName(VibratoWidth), util::QuadraticBezierRange(0, 1, .3f), WowWidthDefault));
+			
 			return { parameters.begin(), parameters.end() };
 		}
 	};

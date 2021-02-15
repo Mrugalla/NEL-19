@@ -12,6 +12,7 @@ class AboutComponent :
 public:
     AboutComponent(float upscale) :
         image(),
+        vstLogo(juce::ImageCache::getFromMemory(BinaryData::vst3_logo_small_png, BinaryData::vst3_logo_small_pngSize)),
         upscaleFactor(upscale),
 
         discordLink("https://discord.gg/zEXr94u8yR"),
@@ -33,6 +34,13 @@ public:
     void paint(juce::Graphics& g) override {
         g.setImageResamplingQuality(juce::Graphics::lowResamplingQuality);
         g.drawImageAt(image, 0, 0, false);
+        juce::Rectangle<float> logoBounds(
+            2,
+            2,
+            vstLogo.getWidth() * .6f,
+            vstLogo.getHeight() * .6f
+        );
+        g.drawImage(vstLogo, logoBounds);
     }
 
     void mouseDown(const juce::MouseEvent&) override { setVisible(false); }
@@ -62,7 +70,7 @@ public:
         pnsLink.setMouseCursor(linkCursor);
     }
 private:
-    juce::Image image;
+    juce::Image image, vstLogo;
     float upscaleFactor;
     Link discordLink, githubLink, paypalLink, juceLink, joshsLink, pnsLink;
 

@@ -15,6 +15,8 @@
       <FILE id="Jab1HV" name="space1.png" compile="0" resource="1" file="Source/Img/space1.png"/>
       <FILE id="KgjvZu" name="space2.png" compile="0" resource="1" file="Source/Img/space2.png"/>
       <FILE id="ERISg7" name="ui.png" compile="0" resource="1" file="Source/Img/ui.png"/>
+      <FILE id="e3uEiq" name="vst3_logo_small.png" compile="0" resource="1"
+            file="Source/Img/vst3_logo_small.png"/>
       <FILE id="CGyibW" name="widthDisabled.png" compile="0" resource="1"
             file="Source/Img/widthDisabled.png"/>
     </GROUP>
