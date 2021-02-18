@@ -1131,17 +1131,18 @@ BUGS:
 	STUDIO ONE
 		no mouseCursor shown
 
-IMPROVEMENTS:
+ADD FEATURES:
 	add a manual (especially because of the ALT- and SHIFT-features)
 	temposync
 	multiband
 	mix
 	options menue, alternative design-parameter based
 	parameter symbols unclear
+	oversampling
 	Installer
 		because people might not know where vst3 is
 
-TEST:
+TESTED:
 	DAWS
 		cubase      CHECK 9.5, 10
 		fl          CHECK
