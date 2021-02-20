@@ -495,7 +495,8 @@ struct Space :
         studioAttach(),
 
         about(upscale),
-        aboutButton()
+        aboutButton(),
+        midiLearnButton(processor.tape, upscale)
     {
         bg.setInterval(BgInterval);
         shuttle.setLFO((Float)ShuttleFreq, (Float)ShuttleAmp);
@@ -516,6 +517,7 @@ struct Space :
         addAndMakeVisible(aboutButton);
         aboutButton.addListener(this);
         about.setVisible(false);
+        addAndMakeVisible(midiLearnButton);
         setCursors();
         setOpaque(true);
     }
@@ -543,6 +545,7 @@ struct Space :
             param[PFreq].getValue(),
             param[PWidth].getValue() }
         );
+        midiLearnButton.update();
 
         repaint();
     }
@@ -566,6 +569,8 @@ struct Space :
             (int)(7 * upscaleFactor),
             (int)(10 * upscaleFactor)
         );
+
+        midiLearnButton.setBounds(85 * upscaleFactor, 4 * upscaleFactor, 38 * upscaleFactor, 11 * upscaleFactor);
     }
 private:
     Nel19AudioProcessor& processor;
@@ -585,6 +590,8 @@ private:
 
     AboutComponent about;
     Button aboutButton;
+
+    MidiLearnButton<Float> midiLearnButton;
 
     std::array<juce::MouseCursor, 3> makeCursors() {
         auto cursorImage = Util::getUpscaledCursor(upscaleFactor);

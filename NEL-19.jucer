@@ -4,13 +4,19 @@
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginFormats="buildStandalone,buildVST3"
               pluginName="NEL-19" pluginDesc="Random Vibrato For Time Travellers"
               pluginManufacturer="Florian Mrugalla" pluginVST3Category="Modulation"
-              pluginRTASCategory="32" pluginAAXCategory="32" cppLanguageStandard="17">
+              pluginRTASCategory="32" pluginAAXCategory="32" cppLanguageStandard="17"
+              pluginCharacteristicsValue="pluginWantsMidiIn">
   <MAINGROUP id="V2oOlh" name="NEL-19">
     <GROUP id="{EB637F68-8B54-CF39-23F4-99282698FA6E}" name="Img">
       <FILE id="P8ggf0" name="about.png" compile="0" resource="1" file="Source/Img/about.png"/>
       <FILE id="ok6eqm" name="cursor.png" compile="0" resource="1" file="Source/Img/cursor.png"/>
       <FILE id="uTEAL3" name="font.png" compile="0" resource="1" file="Source/Img/font.png"/>
       <FILE id="WJjcNq" name="help.png" compile="0" resource="1" file="Source/Img/help.png"/>
+      <FILE id="jb6qnT" name="midiCC.png" compile="0" resource="1" file="Source/Img/midiCC.png"/>
+      <FILE id="XxVIot" name="midiLearn.png" compile="0" resource="1" file="Source/Img/midiLearn.png"/>
+      <FILE id="rNfcmo" name="midiLearning.png" compile="0" resource="1"
+            file="Source/Img/midiLearning.png"/>
+      <FILE id="FwF1RF" name="midiPitch.png" compile="0" resource="1" file="Source/Img/midiPitch.png"/>
       <FILE id="Y03fii" name="shuttle.png" compile="0" resource="1" file="Source/Img/shuttle.png"/>
       <FILE id="Jab1HV" name="space1.png" compile="0" resource="1" file="Source/Img/space1.png"/>
       <FILE id="KgjvZu" name="space2.png" compile="0" resource="1" file="Source/Img/space2.png"/>

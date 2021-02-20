@@ -194,6 +194,65 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CSlider)
 };
 
+template<typename Float>
+struct MidiLearnButton :
+    public juce::Component
+{
+    enum ImageID { Learn, Learning, CC, Pitch };
+
+    MidiLearnButton(tape::Tape<Float>& tape, int upscale) :
+        ml(tape.getMidiLearn()),
+        images{
+            juce::ImageCache::getFromMemory(BinaryData::midiLearn_png, BinaryData::midiLearn_pngSize),
+            juce::ImageCache::getFromMemory(BinaryData::midiLearning_png, BinaryData::midiLearning_pngSize),
+            juce::ImageCache::getFromMemory(BinaryData::midiCC_png, BinaryData::midiCC_pngSize),
+            juce::ImageCache::getFromMemory(BinaryData::midiPitch_png, BinaryData::midiPitch_pngSize)
+        }
+    {
+        for (auto& i : images)
+            i = i.rescaled(i.getWidth() * upscale, i.getHeight() * upscale, juce::Graphics::lowResamplingQuality);
+    }
+    ~MidiLearnButton() {
+        using namespace tape;
+        if (ml.state == MidiLearn<Float>::State::Learning)
+            ml.state = MidiLearn<Float>::State::Off;
+    }
+    void update() {
+        using namespace tape;
+        if (ml.state == MidiLearn<Float>::State::Learned)
+            repaint();
+    }
+
+    tape::MidiLearn<Float>& ml;
+    std::array<juce::Image, 4> images;
+private:
+
+    void mouseUp(const juce::MouseEvent& evt) override {
+        using namespace tape;
+        if (ml.state == MidiLearn<Float>::State::Learning) ml.state = MidiLearn<Float>::State::Off;
+        else ml.state = MidiLearn<Float>::State::Learning;
+        repaint();
+    }
+    
+    void paint(juce::Graphics& g) override {
+        using namespace tape;
+        switch (ml.state) {
+        case MidiLearn<Float>::State::Off: g.drawImageAt(images[ImageID::Learn], 0, 0, false);
+            break;
+        case MidiLearn<Float>::State::Learning: g.drawImageAt(images[ImageID::Learning], 0, 0, false);
+            break;
+        case MidiLearn<Float>::State::Learned:
+            switch (ml.type) {
+            case MidiLearn<Float>::Type::Controller: g.drawImageAt(images[ImageID::CC], 0, 0, false);
+                break;
+            case MidiLearn<Float>::Type::PitchWheel: g.drawImageAt(images[ImageID::Pitch], 0, 0, false);
+                break;
+            }
+            break;
+        }
+    }
+};
+
 /*
 todo:
 

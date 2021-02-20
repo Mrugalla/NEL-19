@@ -33,7 +33,6 @@ public:
 
     juce::AudioProcessorValueTreeState apvts;
     std::array<std::atomic<float>*, 4> param;
-private:
     tape::Tape<double> tape;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Nel19AudioProcessor)

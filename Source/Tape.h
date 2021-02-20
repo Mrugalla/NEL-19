@@ -14,7 +14,7 @@ namespace tape {
 	static constexpr float LFOFreqMin = .5f, LFOFreqMax = 13, LFOFreqDefault = 4.f, LFOFreqInterval = .5f;
 	static constexpr int SmoothOrderDefault = 3;
 	// DELAY CONST
-	static constexpr int DelaySizeInMS = 3;
+	static constexpr float DelaySizeInMS = 5.f;
 	static constexpr float WowWidthDefault = 0.f;
 
 	namespace util {
@@ -286,7 +286,7 @@ namespace tape {
 				FsInv = (Float)1 / Fs;
 				Nyquist = Fs / 2;
 
-				setDelaySize((int)ms2samples(DelaySizeInMS));
+				setDelaySize(static_cast<int>(ms2samples(DelaySizeInMS)));
 
 				maxBufferSize = 0;
 				return true;
@@ -671,6 +671,155 @@ namespace tape {
 		};
 	}
 
+	template<typename Float>
+	struct Smooth {
+		Smooth(const Utils<Float>& utils, Float start = 0) :
+			utils(utils),
+			value(start),
+			inertia(1)
+		{}
+		// SET / PARAM
+		void setInertiaInMs(Float ms) { inertia = (Float)1 / utils.ms2samples(ms); }
+		void setInertiaInHz(Float hz) { inertia = utils.hz2inc(hz); }
+		void setInertiaInSamples(Float smpls) { inertia = (Float)1 / smpls; }
+		// PROCESS
+		const Float operator()(const Float x) {
+			value += inertia * (x - value);
+			return value;
+		}
+	private:
+		const Utils<Float>& utils;
+		Float value, inertia;
+	};
+
+	template<typename Float>
+	struct MultiOrderSmooth {
+		MultiOrderSmooth(const Utils<Float>& u, const int order = 1) :
+			smooth(),
+			utils(u)
+		{
+			setOrder(order);
+		}
+		// SET / PARAM
+		void setOrder(int o) { smooth.resize(o, { utils, 0 }); }
+		void setInertiaInMs(Float ms) {
+			for (auto& s : smooth)
+				s.setInertiaInMs(ms);
+		}
+		void setInertiaInHz(Float hz) {
+			for (auto& s : smooth)
+				s.setInertiaInHz(hz);
+		}
+		void setInertiaInSamples(Float smpls) {
+			for (auto& s : smooth)
+				s.setInertiaInSamples(smpls);
+		}
+		// PROCESS
+		void processBlock(std::vector<Float>& data) {
+			for (auto d = 0; d < utils.numSamples; ++d)
+				for (auto& s : smooth)
+					data[d] = s(data[d]);
+		}
+	private:
+		std::vector<Smooth<Float>> smooth;
+		const Utils<Float>& utils;
+	};
+
+	template<typename Float>
+	struct MidiLearn {
+		enum class State { Off, Learning, Learned };
+		enum class Type { Controller, PitchWheel };
+		MidiLearn(const Utils<Float>& u) :
+			buffer(),
+			utils(u),
+			smooth(u, 3),
+			curValue(0),
+			state(State::Off),
+			type(Type::Controller),
+			controllerNumber(0)
+		{}
+		// SET
+		void setState(State s) { state = s; }
+		void setSampleRate() { smooth.setInertiaInMs(DelaySizeInMS); }
+		void setMaxBufferSize() { buffer.resize(utils.maxBufferSize, 0); }
+		// PROCESS
+		void processBlock(const juce::MidiBuffer& midiBuffer) {
+			switch (state) {
+			case State::Off: return;
+			case State::Learned: processBlockLearned(midiBuffer); return;
+			}
+		}
+		// GET
+		State& getState() { return state; }
+		Type& getType() { return type; }
+		int& getControllerNumber() { return controllerNumber; }
+
+		std::vector<Float> buffer;
+		const Utils<Float>& utils;
+		MultiOrderSmooth<Float> smooth;
+		Float curValue;
+		State state;
+		Type type;
+		int controllerNumber;
+
+		void processBlockLearning(const juce::MidiBuffer& midiBuffer) {
+			for (auto& m : midiBuffer)
+				if (processMessageLearning(m.getMessage())) return;
+		}
+		bool processMessageLearning(juce::MidiMessage& msg) {
+			if (msg.isController()) {
+				type = Type::Controller;
+				controllerNumber = msg.getControllerNumber();
+				state = State::Learned;
+				return true;
+			}
+			else if (msg.isPitchWheel()) {
+				type = Type::PitchWheel;
+				state = State::Learned;
+				return true;
+			}
+			return false;
+		}
+		void processBlockLearned(const juce::MidiBuffer& midiBuffer) {
+			auto sample = 0;
+			switch (type) {
+			case Type::Controller:
+				for (auto& m : midiBuffer)
+					processController(m.getMessage(), sample);
+				break;
+			case Type::PitchWheel:
+				for (auto& m : midiBuffer)
+					processPW(m.getMessage(), sample);
+				break;
+			}
+			while (sample < utils.numSamples) {
+				buffer[sample] = curValue;
+				++sample;
+			}
+			smooth.processBlock(buffer);
+		}
+		void processController(juce::MidiMessage& msg, int& sample) {
+			if (!msg.isController() || msg.getControllerNumber() != controllerNumber) return;
+			auto timeStamp = msg.getTimeStamp();
+			while (sample < timeStamp) {
+				buffer[sample] = curValue;
+				++sample;
+			}
+			curValue = static_cast<Float>(msg.getControllerValue()) / 127;
+			buffer[sample] = curValue = 2 * curValue - 1;
+		}
+		void processPW(juce::MidiMessage& msg, int& sample) {
+			if (!msg.isPitchWheel()) return;
+			auto timeStamp = msg.getTimeStamp();
+			while (sample < timeStamp) {
+				buffer[sample] = curValue;
+				++sample;
+			}
+			curValue = static_cast<Float>(msg.getPitchWheelValue() - 128) / 16255;
+			buffer[sample] = curValue = 2 * curValue - 1;
+		}
+	};
+
 	namespace vibrato {
 		template<typename Float>
 		struct Phase {
@@ -691,60 +840,6 @@ namespace tape {
 			Float phase;
 		private:
 			Float inc;
-			const Utils<Float>& utils;
-		};
-
-		template<typename Float>
-		struct Smooth {
-			Smooth(const Utils<Float>& utils, Float start = 0) :
-				utils(utils),
-				value(start),
-				inertia(1)
-			{}
-			// SET / PARAM
-			void setInertiaInMs(Float ms) { inertia = (Float)1 / utils.ms2samples(ms); }
-			void setInertiaInHz(Float hz) { inertia = utils.hz2inc(hz); }
-			void setInertiaInSamples(Float smpls) { inertia = (Float)1 / smpls; }
-			// PROCESS
-			const Float operator()(const Float x) {
-				value += inertia * (x - value);
-				return value;
-			}
-		private:
-			const Utils<Float>& utils;
-			Float value, inertia;
-		};
-
-		template<typename Float>
-		struct MultiOrderSmooth {
-			MultiOrderSmooth(const Utils<Float>& utils, const int order = 1) :
-				smooth(),
-				utils(utils)
-			{
-				setOrder(order);
-			}
-			// SET / PARAM
-			void setOrder(int o) { smooth.resize(o, { utils, 0 }); }
-			void setInertiaInMs(Float ms) {
-				for (auto& s : smooth)
-					s.setInertiaInMs(ms);
-			}
-			void setInertiaInHz(Float hz) {
-				for (auto& s : smooth)
-					s.setInertiaInHz(hz);
-			}
-			void setInertiaInSamples(Float smpls) {
-				for (auto& s : smooth)
-					s.setInertiaInSamples(smpls);
-			}
-			// PROCESS
-			void processBlock(std::vector<Float>& data) {
-				for (auto d = 0; d < utils.numSamples; ++d)
-					for (auto& s : smooth)
-						data[d] = s(data[d]);
-			}
-		private:
-			std::vector<Smooth<Float>> smooth;
 			const Utils<Float>& utils;
 		};
 
@@ -798,6 +893,9 @@ namespace tape {
 			void synthesizeBlock(std::vector<Float>& data, const certainty::Term term) {
 				synthesizeRandomValues(data, term);
 			}
+			void smoothen(std::vector<Float>& data) {
+				smooth.processBlock(data);
+			}
 			void scaleForDelay(Float* data) {
 				juce::FloatVectorOperations::multiply(data, utils.maxDelayTime, utils.numSamples);
 				juce::FloatVectorOperations::add(data, utils.delayCenter, utils.numSamples);
@@ -829,7 +927,6 @@ namespace tape {
 					}
 					data[s] = curValue;
 				}
-				smooth.processBlock(data);
 			}
 		};
 
@@ -930,6 +1027,15 @@ namespace tape {
 			}
 			void saveLFOValue() { lfoValue = data[utils.numSamples - 1]; }
 			void upscaleLFO() { seq.scaleForDelay(data.data()); }
+			void addMidiMessagesToDelay(const std::vector<Float>& midiBuffer) {
+				juce::FloatVectorOperations::add(data.data(), midiBuffer.data(), utils.numSamples);
+			}
+			void smoothenDelay() { seq.smoothen(data); }
+			void clampDelay() {
+				for (auto s = 0; s < utils.numSamples; ++s)
+					if (data[s] < 0) data[s] = MaxInterpolationOrder;
+					else if (data[s] > utils.delayMax) data[s] = utils.delayMax;
+			}
 			void processBlock(juce::AudioBuffer<float>& buffer, const int* wIdx, Interpolation& interpolate, const int ch) {
 				//seq.playback(buffer, data, ch);
 				if(utils.processor->getLatencySamples() != 0) rIdx.processBlock(data, wIdx); // LOOKAHEAD ENABLED
@@ -982,6 +1088,7 @@ namespace tape {
 			void processWidthEnabled(std::vector<MultiChannelModules<Float, Interpolation>>& chModules, const std::vector<Float>& widthData) {
 				for (auto ch = 1; ch < utils.numChannels; ++ch) {
 					chModules[ch].synthesizeLFO();
+					chModules[ch].smoothenDelay();
 					chModules[ch].mixLFO(chModules[0].data.data(), widthData);
 					chModules[ch].saveLFOValue();
 					chModules[ch].upscaleLFO();
@@ -992,13 +1099,14 @@ namespace tape {
 
 		template<typename Float>
 		struct Vibrato {
-			Vibrato(Utils<Float>& utils) :
+			Vibrato(Utils<Float>& u, MidiLearn<Float>& ml) :
 				chModules(),
 				certainty(),
 				interpolation(),
-				wIdx(utils),
-				widthProcessor(utils),
-				utils(utils),
+				wIdx(u),
+				widthProcessor(u),
+				utils(u),
+				midiLearn(ml),
 
 				depth(1), freq((Float)LFOFreqDefault),
 				lookaheadEnabled(false)
@@ -1039,10 +1147,15 @@ namespace tape {
 			void processBlock(juce::AudioBuffer<float>& buffer) {
 				wIdx.processBlock();
 				chModules[0].synthesizeLFO();
+				chModules[0].smoothenDelay();
+				if (midiLearn.state == MidiLearn<Float>::State::Learned)
+					chModules[0].addMidiMessagesToDelay(midiLearn.buffer);
 				chModules[0].saveLFOValue();
 				widthProcessor(data, chModules);
-				for (auto ch = 0; ch < utils.numChannels; ++ch)
+				for (auto ch = 0; ch < utils.numChannels; ++ch) {
+					chModules[ch].clampDelay();
 					chModules[ch].processBlock(buffer, wIdx.data.data(), interpolation, ch);
+				}
 			}
 			void processBlockBypassed(juce::AudioBuffer<float>& buffer) {
 				wIdx.processBlock();
@@ -1062,6 +1175,7 @@ namespace tape {
 			WIdx<Float> wIdx;
 			WidthProcessor<Float, interpolation::Cubic<Float>> widthProcessor;
 			Utils<Float>& utils;
+			MidiLearn<Float>& midiLearn;
 
 			// PARAM
 			Float depth, freq;
@@ -1073,7 +1187,8 @@ namespace tape {
 	struct Tape {
 		Tape(juce::AudioProcessor* p) :
 			utils(p),
-			vibrato(utils),
+			midiLearn(utils),
+			vibrato(utils, midiLearn),
 			lookaheadEnabled(false)
 		{}
 		// SET
@@ -1082,10 +1197,12 @@ namespace tape {
 			if (utils.sampleRateChanged(sampleRate)) {
 				//vibrato.init();
 				vibrato.setSampleRate();
+				midiLearn.setSampleRate();
 			}
-			if (utils.maxBufferSizeChanged(maxBufferSize))
+			if (utils.maxBufferSizeChanged(maxBufferSize)) {
 				vibrato.setMaxBufferSize();
-
+				midiLearn.setMaxBufferSize();
+			}
 			if(utils.numChannelsChanged(channelCount))
 				vibrato.setNumChannels();
 		}
@@ -1101,8 +1218,13 @@ namespace tape {
 		void setWowFreq(const Float freq) { vibrato.setFreq(freq); }
 		void setWowWidth(const Float width) { vibrato.setWidth(width); }
 		// PROCESS
-		void processBlock(juce::AudioBuffer<float>& buffer) {
+		void processBlockMIDI(const juce::MidiBuffer& midiBuffer) {
+			if(midiLearn.state == MidiLearn<Float>::State::Learning)
+				midiLearn.processBlockLearning(midiBuffer);
+		}
+		void processBlock(juce::AudioBuffer<float>& buffer, const juce::MidiBuffer& midiBuffer) {
 			utils.numSamples = buffer.getNumSamples();
+			midiLearn.processBlock(midiBuffer);
 			vibrato.processBlock(buffer);
 		}
 		void processBlockBypassed(juce::AudioBuffer<float>& buffer) {
@@ -1112,8 +1234,10 @@ namespace tape {
 		}
 		// GET
 		const Float* getLFOValue(const int ch) const { return vibrato.getLFOValue(ch); }
+		MidiLearn<Float>& getMidiLearn() { return midiLearn; }
 	private:
 		Utils<Float> utils;
+		MidiLearn<Float> midiLearn;
 		vibrato::Vibrato<Float> vibrato;
 		bool lookaheadEnabled;
 	};
