@@ -14,7 +14,7 @@ namespace tape {
 	static constexpr float LFOFreqMin = .5f, LFOFreqMax = 13, LFOFreqDefault = 4.f, LFOFreqInterval = .5f;
 	static constexpr int SmoothOrderDefault = 3;
 	// DELAY CONST
-	static constexpr float DelaySizeInMS = 5.f;
+	static constexpr float DelaySizeInMS = 5.f, DelaySizeInMSMin = 2, DelaySizeInMSMax = 1000;
 	static constexpr float WowWidthDefault = 0.f;
 
 	namespace util {
@@ -266,18 +266,23 @@ namespace tape {
 	template<typename Float>
 	struct Utils {
 		Utils(juce::AudioProcessor* p) :
-			processor(p)
+			processor(p),
+			sampleRate(1),
+			Fs(1), FsInv(1), Nyquist(1),
+			delaySizeInMs(DelaySizeInMS),
+			numChannels(0), numSamples(0), maxBufferSize(0),
+			maxDelayTime(1), delaySize(1), delayMax(1), delayCenter(1), delayLatency(1)
 		{}
 		// SET
-		bool numChannelsChanged(const int num) {
-			if (numChannels != num) {
+		bool numChannelsChanged(const int num, bool forcedUpdate = false) {
+			if (numChannels != num || forcedUpdate) {
 				numChannels = num;
 				return true;
 			}
 			return false;
 		}
-		bool sampleRateChanged(const double sr) {
-			if (sampleRate != sr) {
+		bool sampleRateChanged(const double sr, bool forcedUpdate = false) {
+			if (sampleRate != sr || forcedUpdate) {
 				sampleRate = sr;
 
 				numChannels = numSamples = 0;
@@ -286,16 +291,24 @@ namespace tape {
 				FsInv = (Float)1 / Fs;
 				Nyquist = Fs / 2;
 
-				setDelaySize(static_cast<int>(ms2samples(DelaySizeInMS)));
+				setDelaySize(static_cast<int>(ms2samples(delaySizeInMs)));
 
 				maxBufferSize = 0;
 				return true;
 			}
 			return false;
 		}
-		bool maxBufferSizeChanged(const int b) {
-			if (maxBufferSize != b) {
+		bool maxBufferSizeChanged(const int b, bool forcedUpdate = false) {
+			if (maxBufferSize != b || forcedUpdate) {
 				maxBufferSize = b;
+				return true;
+			}
+			return false;
+		}
+		bool delaySizeChanged(float s) {
+			if (delaySizeInMs != s) {
+				delaySizeInMs = s;
+				setDelaySize(static_cast<int>(ms2samples(delaySizeInMs)));
 				return true;
 			}
 			return false;
@@ -305,6 +318,7 @@ namespace tape {
 		juce::AudioProcessor* processor;
 		double sampleRate = 0;
 		Float Fs, FsInv, Nyquist;
+		float delaySizeInMs;
 		int numChannels, numSamples, maxBufferSize;
 
 		const Float ms2samples(const Float ms) const { return ms * Fs / 1000; }
@@ -323,7 +337,7 @@ namespace tape {
 	};
 
 	namespace param {
-		enum ID { Lookahead, VibratoDepth, VibratoFreq, VibratoWidth, SlewCutoff };
+		enum ID { Lookahead, VibratoDepth, VibratoFreq, VibratoWidth, VibratoDelaySize };
 
 		static juce::String getName(const int i) {
 			switch (i) {
@@ -331,7 +345,7 @@ namespace tape {
 			case ID::VibratoDepth: return "Depth";
 			case ID::VibratoFreq: return "Freq";
 			case ID::VibratoWidth: return "Width";
-			case ID::SlewCutoff: return "Slew Cutoff";
+			case ID::VibratoDelaySize: return "DelaySize";
 			}
 			return "";
 		}
@@ -348,6 +362,9 @@ namespace tape {
 				getID(VibratoFreq), getName(VibratoFreq), util::QuadraticBezierRange(LFOFreqMin, LFOFreqMax, .51f), LFOFreqDefault));
 			parameters.push_back(std::make_unique<juce::AudioParameterFloat>(
 				getID(VibratoWidth), getName(VibratoWidth), util::QuadraticBezierRange(0, 1, .3f), WowWidthDefault));
+			parameters.push_back(std::make_unique<juce::AudioParameterFloat>(
+				getID(VibratoDelaySize), getName(VibratoDelaySize),
+				juce::NormalisableRange<float>(DelaySizeInMSMin, DelaySizeInMSMax), DelaySizeInMS));
 			
 			return { parameters.begin(), parameters.end() };
 		}
@@ -740,7 +757,7 @@ namespace tape {
 		{}
 		// SET
 		void setState(State s) { state = s; }
-		void setSampleRate() { smooth.setInertiaInMs(DelaySizeInMS); }
+		void setSampleRate() { smooth.setInertiaInHz(17); }
 		void setMaxBufferSize() { buffer.resize(utils.maxBufferSize, 0); }
 		// PROCESS
 		void processBlock(const juce::MidiBuffer& midiBuffer) {
@@ -1192,23 +1209,21 @@ namespace tape {
 			lookaheadEnabled(false)
 		{}
 		// SET
-		void prepareToPlay(const double sampleRate, const int maxBufferSize, const int channelCount) {
-			//setLookaheadEnabled(lookaheadEnabled);
-			if (utils.sampleRateChanged(sampleRate)) {
-				//vibrato.init();
+		void prepareToPlay(const double sampleRate, const int maxBufferSize, const int channelCount, bool forcedUpdate = false) {
+			if (utils.sampleRateChanged(sampleRate, forcedUpdate)) {
 				vibrato.setSampleRate();
 				midiLearn.setSampleRate();
 			}
-			if (utils.maxBufferSizeChanged(maxBufferSize)) {
+			if (utils.maxBufferSizeChanged(maxBufferSize, forcedUpdate)) {
 				vibrato.setMaxBufferSize();
 				midiLearn.setMaxBufferSize();
 			}
-			if(utils.numChannelsChanged(channelCount))
+			if(utils.numChannelsChanged(channelCount, forcedUpdate))
 				vibrato.setNumChannels();
 		}
 		// PARAM
-		void setLookaheadEnabled(const bool enabled) {
-			if (lookaheadEnabled != enabled) {
+		void setLookaheadEnabled(const bool enabled, bool forcedUpdate = false) {
+			if (lookaheadEnabled != enabled || forcedUpdate) {
 				lookaheadEnabled = enabled;
 				auto latency = lookaheadEnabled ? 1 : 0;
 				utils.setLatency(latency * utils.delayCenter);
@@ -1217,6 +1232,12 @@ namespace tape {
 		void setWowDepth(const Float depth) { vibrato.setDepth(depth); }
 		void setWowFreq(const Float freq) { vibrato.setFreq(freq); }
 		void setWowWidth(const Float width) { vibrato.setWidth(width); }
+		void setWowDelaySize(float s) {
+			if (utils.delaySizeChanged(s)) {
+				prepareToPlay(utils.sampleRate, utils.maxBufferSize, utils.numChannels, true);
+				setLookaheadEnabled(true, true);
+			}
+		}
 		// PROCESS
 		void processBlockMIDI(const juce::MidiBuffer& midiBuffer) {
 			if(midiLearn.state == MidiLearn<Float>::State::Learning)
@@ -1256,6 +1277,7 @@ BUGS:
 		no mouseCursor shown
 
 ADD FEATURES:
+	Sinc Interpolation
 	add a manual (especially because of the ALT- and SHIFT-features)
 	temposync
 	multiband

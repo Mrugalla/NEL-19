@@ -15,7 +15,8 @@ Nel19AudioProcessor::Nel19AudioProcessor()
         apvts.getRawParameterValue(tape::param::getID(tape::param::ID::VibratoDepth)),
         apvts.getRawParameterValue(tape::param::getID(tape::param::ID::VibratoFreq)),
         apvts.getRawParameterValue(tape::param::getID(tape::param::ID::VibratoWidth)),
-        apvts.getRawParameterValue(tape::param::getID(tape::param::ID::Lookahead))
+        apvts.getRawParameterValue(tape::param::getID(tape::param::ID::Lookahead)),
+        apvts.getRawParameterValue(tape::param::getID(tape::param::ID::VibratoDelaySize))
         }),
     tape(this)
 #endif
@@ -91,6 +92,7 @@ void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     tape.setWowFreq(param[1]->load()); // freq
     tape.setWowWidth(param[2]->load()); // width
     tape.setLookaheadEnabled(param[3]->load() == 0 ? false : true); // lookahead
+    tape.setWowDelaySize(param[4]->load()); // delay size in ms
 
     tape.processBlock(buffer, midi);
 }

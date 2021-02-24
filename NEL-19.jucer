@@ -9,6 +9,7 @@
   <MAINGROUP id="V2oOlh" name="NEL-19">
     <GROUP id="{EB637F68-8B54-CF39-23F4-99282698FA6E}" name="Img">
       <FILE id="P8ggf0" name="about.png" compile="0" resource="1" file="Source/Img/about.png"/>
+      <FILE id="z8LSlW" name="bufferSize.png" compile="0" resource="1" file="Source/Img/bufferSize.png"/>
       <FILE id="ok6eqm" name="cursor.png" compile="0" resource="1" file="Source/Img/cursor.png"/>
       <FILE id="uTEAL3" name="font.png" compile="0" resource="1" file="Source/Img/font.png"/>
       <FILE id="WJjcNq" name="help.png" compile="0" resource="1" file="Source/Img/help.png"/>

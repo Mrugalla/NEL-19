@@ -253,10 +253,168 @@ private:
     }
 };
 
+struct BufferSizeTextField :
+    public juce::Component,
+    public juce::KeyListener
+{
+    enum class State{ Fixed, Typing };
+
+    BufferSizeTextField(juce::AudioProcessorValueTreeState& apvts, juce::String id, int upscale) :
+        param(apvts.getParameter(id)),
+        attach(*param, [this](float v) { attach.setValueAsCompleteGesture(v); }, nullptr),
+        image(juce::ImageCache::getFromMemory(BinaryData::bufferSize_png, BinaryData::bufferSize_pngSize)),
+        txtImage(juce::Image::ARGB, 26, 7, true),
+        font(),
+        state(State::Fixed),
+        text(),
+        upscaleFactor(upscale)
+    {
+        addKeyListener(this);
+        setWantsKeyboardFocus(true);
+        attach.sendInitialUpdate();
+        makeTxtImage();
+    }
+    // SET
+    void setCursors(const juce::MouseCursor* hover) { setMouseCursor(*hover); }
+
+    juce::RangedAudioParameter* param;
+    juce::ParameterAttachment attach;
+    juce::Image image, txtImage;
+    Font font;
+    State state;
+    juce::String text;
+    int upscaleFactor, txtImageX;
+private:
+    void paint(juce::Graphics& g) override {
+        g.setImageResamplingQuality(juce::Graphics::lowResamplingQuality);
+        g.drawImage(image, getLocalBounds().toFloat(), juce::RectanglePlacement::fillDestination, false);
+        drawTxtImage(g);
+    }
+
+    void mouseUp(const juce::MouseEvent& evt) override {
+        switch (state) {
+        case State::Fixed:
+            state = State::Typing;
+            text = "";
+            makeTxtImageEmpty();
+            break;
+        case State::Typing:
+            state = State::Fixed;
+            updateValue();
+            break;
+        }
+        repaint();
+    }
+    bool updateValue() {
+        if (!numeric(text[0])) return false;
+        bool decimals = false;
+        for (auto i = 1; i < text.length(); ++i)
+            if (text[i] == '.')
+                if (decimals) return false;
+                else decimals = true;
+            else if (!numeric(text[i])) return false;
+        auto newValue = text.getFloatValue();
+        auto clamped = clamp(newValue);
+        attach.setValueAsCompleteGesture(clamped);
+        return true;
+    }
+    float clamp(float v) {
+        const auto& n = param->getNormalisableRange();
+        return juce::jlimit(n.start, n.end, v);
+    }
+    bool numeric(juce::juce_wchar c) {
+        return c == '0' || c == '1' || c == '2' || c == '3' || c == '4' || c == '5' || c == '6' || c == '7' || c == '8' || c == '9';
+    }
+
+    void makeTxtImage(float value) {
+        auto str = static_cast<juce::String>(value);
+        txtImage.clear(txtImage.getBounds());
+        juce::Graphics gT{ txtImage };
+        auto x = 0;
+        auto ltr = font.letter[font.Start];
+        for (auto i = 0; i < str.length(); ++i) {
+            ltr = font.getLetter(str[i]);
+            gT.drawImageAt(font.srcImage.getClippedImage({ ltr.x, 1, ltr.width, 7 }), x, 0, false);
+            x += ltr.width;
+        }
+        const auto widthHalf = 14;
+        const auto marginX = 2;
+        txtImageX = marginX + widthHalf - x / 2 - 1;
+        for (auto yy = 0; yy < txtImage.getHeight(); ++yy)
+            for (auto xx = 0; xx < txtImage.getWidth(); ++xx)
+                if (txtImage.getPixelAt(xx, yy) == juce::Colour(0xff37946e))
+                    txtImage.setPixelAt(xx, yy, juce::Colour(0x00000000));
+    }
+    void makeTxtImageEmpty() {
+        txtImage.clear(txtImage.getBounds());
+        juce::Graphics gT{ txtImage };
+        auto x = 0;
+        auto ltr = font.letter[font.Point];
+        for (auto i = 0; i < 3; ++i) {
+            gT.drawImageAt(font.srcImage.getClippedImage({ ltr.x, 1, ltr.width, 7 }), x, 0, false);
+            x += ltr.width;
+        }
+        const auto widthHalf = 14;
+        const auto marginX = 2;
+        txtImageX = marginX + widthHalf - x / 2 - 1;
+        for (auto yy = 0; yy < txtImage.getHeight(); ++yy)
+            for (auto xx = 0; xx < txtImage.getWidth(); ++xx)
+                if (txtImage.getPixelAt(xx, yy) == juce::Colour(0xff37946e))
+                    txtImage.setPixelAt(xx, yy, juce::Colour(0x00000000));
+    }
+    void drawTxtImage(juce::Graphics& g) {
+        g.drawImage(txtImage, juce::Rectangle<float>(
+            txtImageX * upscaleFactor,
+            7 * upscaleFactor,
+            26 * upscaleFactor,
+            7 * upscaleFactor),
+            juce::RectanglePlacement::fillDestination);
+    }
+    void makeTxtImage() {
+        auto value = param->convertFrom0to1(param->getValue());
+        makeTxtImage(value);
+    }
+
+    bool keyPressed(const juce::KeyPress& key, Component*) override {
+        if (state != State::Typing) return false;
+        if (key == juce::KeyPress::returnKey) {
+            state = State::Fixed;
+            updateValue();
+            makeTxtImage();
+            repaint();
+            return true;
+        }
+        else if (key == juce::KeyPress::escapeKey) {
+            state = State::Fixed;
+            makeTxtImage();
+            repaint();
+            return true;
+        }
+        else if (key == juce::KeyPress::backspaceKey) {
+            text = text.substring(0, text.length() - 1);
+            makeTxtImage(text.getFloatValue());
+            repaint();
+            return true;
+        }
+        else {
+            text += key.getTextDescription();
+            makeTxtImage(text.getFloatValue());
+            repaint();
+            return true;
+        }
+        return false;
+    }
+    bool keyStateChanged(bool, Component*) override { return false; }
+};
+
 /*
 todo:
 
-- sudden jumps when drag mode changes within drag
-- sudden jump on drag start even if not just click
+CSlider
+    - sudden jumps when drag mode changes within drag
+    - sudden jump on drag start even if not just click
+
+BufferSizeTextField
+    - can't write letters
 
 */

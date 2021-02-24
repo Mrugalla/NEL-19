@@ -122,6 +122,23 @@ struct Font {
         srcImage(juce::ImageCache::getFromMemory(BinaryData::font_png, BinaryData::font_pngSize))
     {}
 
+    const Letter getLetter(const juce::juce_wchar chr) {
+        switch (chr) {
+        case '0': return letter[Zero];
+        case '1': return letter[One];
+        case '2': return letter[Two];
+        case '3': return letter[Three];
+        case '4': return letter[Four];
+        case '5': return letter[Five];
+        case '6': return letter[Six];
+        case '7': return letter[Seven];
+        case '8': return letter[Eight];
+        case '9': return letter[Nine];
+        case ' ': return letter[Start];
+        case '.': return letter[Point];
+        }
+    }
+
     const std::array<Letter, LetterCount> letter;
     const juce::Image srcImage;
 private:
@@ -458,7 +475,8 @@ struct Space :
         }
         void paintLFOs(juce::Graphics& g) {
             for (auto ch = 0; ch < numChannels; ++ch) {
-                const auto x = int(1 + Util::LFOMidX + *lfoData[ch] * Util::LFOWidthHalf);
+                const auto wave = juce::jlimit(static_cast<Float>(-.9), static_cast<Float>(.9), *lfoData[ch]);
+                const auto x = static_cast<int>(Util::LFOMidX + wave * Util::LFOWidthHalf);
                 g.fillRect(juce::Rectangle<int>(x, Util::LFOY, 1, Util::LFOHeight));
             }
         }
@@ -496,7 +514,9 @@ struct Space :
 
         about(upscale),
         aboutButton(),
-        midiLearnButton(processor.tape, upscale)
+
+        midiLearnButton(processor.tape, upscale),
+        bufferSizeTextField(processor.apvts, tape::param::getID(tape::param::ID::VibratoDelaySize), upscaleFactor)
     {
         bg.setInterval(BgInterval);
         shuttle.setLFO((Float)ShuttleFreq, (Float)ShuttleAmp);
@@ -518,6 +538,7 @@ struct Space :
         aboutButton.addListener(this);
         about.setVisible(false);
         addAndMakeVisible(midiLearnButton);
+        addAndMakeVisible(bufferSizeTextField);
         setCursors();
         setOpaque(true);
     }
@@ -571,6 +592,7 @@ struct Space :
         );
 
         midiLearnButton.setBounds(85 * upscaleFactor, 4 * upscaleFactor, 38 * upscaleFactor, 11 * upscaleFactor);
+        bufferSizeTextField.setBounds(4 * upscaleFactor, 4 * upscaleFactor, 30 * upscaleFactor, 15 * upscaleFactor);
     }
 private:
     Nel19AudioProcessor& processor;
@@ -592,6 +614,7 @@ private:
     Button aboutButton;
 
     MidiLearnButton<Float> midiLearnButton;
+    BufferSizeTextField bufferSizeTextField;
 
     std::array<juce::MouseCursor, 3> makeCursors() {
         auto cursorImage = Util::getUpscaledCursor(upscaleFactor);
@@ -618,6 +641,8 @@ private:
         studioButton.setMouseCursor(cursors[1]);
         aboutButton.setMouseCursor(cursors[1]);
         about.setCursor(cursors[0], cursors[1]);
+        midiLearnButton.setMouseCursor(cursors[1]);
+        bufferSizeTextField.setMouseCursor(cursors[1]);
     }
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Space)
