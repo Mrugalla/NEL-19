@@ -13,6 +13,7 @@ NEL-19 has:
 - STUDIO-Button. Enables Lookahead.
 - Buffersize-Textfield. Buffersizes between 1-7ms are rather subtle and have low latency. Everything else is for creative use up to 1000ms.
 - MIDI Learn-Button. Use either pitchbend- or midi CC to control the vibrato manually in addition to the randomizer.
+- Vibrato Visualizer. It shows what the internal delay is currently doing.
 
 Here are a bunch of videos, where you can check out the plugin in action and topics around it:
 https://youtu.be/TVq6FPY_8pU
