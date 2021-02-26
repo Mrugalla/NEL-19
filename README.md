@@ -20,9 +20,7 @@ https://youtu.be/TVq6FPY_8pU
 Join my plugin's discord to discuss feature requests, bugs and to get informed about updates:
 https://discord.gg/EEnSNuKZCh
 
-FAQ:
-
----
+------------------------FAQ:------------------------
 
 Is there a chance to get a MAC version?
 
@@ -63,6 +61,30 @@ Put the frequency to 4-6hz, since that's supposed to be the wow-rate, dial in so
 
 ---
 
-I have a cool idea for a feature.
+How do I use the MIDI Learn feature?
+
+You basically just hit that button, then turn a knob on your master keyboard or use the pitchbend wheel, while having some midi track routed to the plugin and it will notice and remember that until you close the DAW. (I'll implement a feature that remembers that in the future)
+
+---
+
+I am a developer and I want to know how to use your dsp code in my own plugins.
+
+Go to Source/Tape.h. It has all the important stuff.
+
+---
+
+I think you are really cool and I want to support you by transfering money to your paypal.
+
+Nice, thxx. https://www.paypal.com/paypalme/alteoma
+
+---
+
+I think you are really cool and I want to support you, but I don't want to give you money.
+
+Ok :D Maybe make a cool video about the plugin and share it on tiktok or something.
+
+---
+
+I have a cool idea for a feature or for a workflow improvement.
 
 I love that! Come to my discord pls.
