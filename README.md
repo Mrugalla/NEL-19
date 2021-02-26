@@ -88,3 +88,9 @@ Ok :D Maybe make a cool video about the plugin and share it on tiktok or somethi
 I have a cool idea for a feature or for a workflow improvement.
 
 I love that! Come to my discord pls.
+
+---
+
+Your plugin sucks because I either can't install it or I used it and don't like it.
+
+Even though I definitely consider this plugin a rather solid release, I do plan to extend its features a lot in the future. So maybe it will stop to suck for you some time.
