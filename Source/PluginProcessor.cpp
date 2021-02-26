@@ -10,15 +10,16 @@ Nel19AudioProcessor::Nel19AudioProcessor()
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
-                       ), apvts(*this, nullptr, "parameters", tape::param::createParameters()),
+                       ),
+    apvts(*this, nullptr, "parameters", tape::param::createParameters()),
     param({
         apvts.getRawParameterValue(tape::param::getID(tape::param::ID::VibratoDepth)),
         apvts.getRawParameterValue(tape::param::getID(tape::param::ID::VibratoFreq)),
         apvts.getRawParameterValue(tape::param::getID(tape::param::ID::VibratoWidth)),
-        apvts.getRawParameterValue(tape::param::getID(tape::param::ID::Lookahead)),
-        apvts.getRawParameterValue(tape::param::getID(tape::param::ID::VibratoDelaySize))
+        apvts.getRawParameterValue(tape::param::getID(tape::param::ID::Lookahead))
         }),
-    tape(this)
+    tape(this),
+    buffersReallocating(false)
 #endif
 {
 }
@@ -52,8 +53,12 @@ void Nel19AudioProcessor::setCurrentProgram (int) {}
 const juce::String Nel19AudioProcessor::getProgramName (int) { return {}; }
 void Nel19AudioProcessor::changeProgramName (int, const juce::String&){}
 
-void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize) {
+void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize) {    
     tape.prepareToPlay(sampleRate, maxBufferSize, getChannelCountOfBus(true, 0));
+    auto delaySizeInMs = static_cast<float>(
+        apvts.state.getChildWithName("DelaySizeInMs").getProperty("DelaySizeInMs", tape::DelaySizeInMS)
+    );
+    tape.setWowDelaySize(delaySizeInMs);
 }
 void Nel19AudioProcessor::releaseResources() {}
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -80,6 +85,7 @@ bool Nel19AudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) co
 }
 #endif
 void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) {
+    if (buffersReallocating) return;
     juce::ScopedNoDenormals noDenormals;
     const auto totalNumInputChannels  = getTotalNumInputChannels();
     const auto totalNumOutputChannels = getTotalNumOutputChannels();
@@ -92,11 +98,11 @@ void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     tape.setWowFreq(param[1]->load()); // freq
     tape.setWowWidth(param[2]->load()); // width
     tape.setLookaheadEnabled(param[3]->load() == 0 ? false : true); // lookahead
-    tape.setWowDelaySize(param[4]->load()); // delay size in ms
 
     tape.processBlock(buffer, midi);
 }
 void Nel19AudioProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) {
+    if (buffersReallocating) return;
     if (buffer.getNumSamples() == 0) return;
     tape.processBlockBypassed(buffer);
 }

@@ -137,6 +137,7 @@ struct Font {
         case ' ': return letter[Start];
         case '.': return letter[Point];
         }
+        return letter[0];
     }
 
     const std::array<Letter, LetterCount> letter;
@@ -516,7 +517,7 @@ struct Space :
         aboutButton(),
 
         midiLearnButton(processor.tape, upscale),
-        bufferSizeTextField(processor.apvts, tape::param::getID(tape::param::ID::VibratoDelaySize), upscaleFactor)
+        bufferSizeTextField(processor, "DelaySizeInMs", upscaleFactor)
     {
         bg.setInterval(BgInterval);
         shuttle.setLFO((Float)ShuttleFreq, (Float)ShuttleAmp);
@@ -554,7 +555,15 @@ struct Space :
             about.setVisible(true);
     }
     void update() {
-        if (about.isVisible()) return;
+        if (about.isVisible()) {
+            midiLearnButton.setVisible(false);
+            bufferSizeTextField.setVisible(false);
+            return;
+        }
+        else {
+            midiLearnButton.setVisible(true);
+            bufferSizeTextField.setVisible(true);
+        }
         juce::Graphics g{ image };
         g.setImageResamplingQuality(juce::Graphics::lowResamplingQuality);
         bg(g);
@@ -614,7 +623,7 @@ private:
     Button aboutButton;
 
     MidiLearnButton<Float> midiLearnButton;
-    BufferSizeTextField bufferSizeTextField;
+    BufferSizeTextField<Float> bufferSizeTextField;
 
     std::array<juce::MouseCursor, 3> makeCursors() {
         auto cursorImage = Util::getUpscaledCursor(upscaleFactor);

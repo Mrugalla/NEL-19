@@ -253,36 +253,48 @@ private:
     }
 };
 
+template<typename Float>
 struct BufferSizeTextField :
     public juce::Component,
     public juce::KeyListener
 {
     enum class State{ Fixed, Typing };
 
-    BufferSizeTextField(juce::AudioProcessorValueTreeState& apvts, juce::String id, int upscale) :
-        param(apvts.getParameter(id)),
-        attach(*param, [this](float v) { attach.setValueAsCompleteGesture(v); }, nullptr),
+    BufferSizeTextField(Nel19AudioProcessor& p, juce::String paramID, int upscale) :
+        audioProcessor(p),
+        valueTree(),
+        id(paramID),
         image(juce::ImageCache::getFromMemory(BinaryData::bufferSize_png, BinaryData::bufferSize_pngSize)),
         txtImage(juce::Image::ARGB, 26, 7, true),
         font(),
         state(State::Fixed),
         text(),
+        bufferSizeInMs(tape::DelaySizeInMS),
         upscaleFactor(upscale)
     {
+        valueTree = p.apvts.state.getChildWithName(id);
+        if (!valueTree.isValid()) {
+            valueTree = juce::ValueTree(id);
+            p.apvts.state.appendChild(valueTree, nullptr);
+            updateBuffers();
+        }
+
         addKeyListener(this);
         setWantsKeyboardFocus(true);
-        attach.sendInitialUpdate();
+        bufferSizeInMs = static_cast<float>(valueTree.getProperty(id));
         makeTxtImage();
     }
     // SET
     void setCursors(const juce::MouseCursor* hover) { setMouseCursor(*hover); }
 
-    juce::RangedAudioParameter* param;
-    juce::ParameterAttachment attach;
+    Nel19AudioProcessor& audioProcessor;
+    juce::ValueTree valueTree;
+    juce::Identifier id;
     juce::Image image, txtImage;
     Font font;
     State state;
     juce::String text;
+    float bufferSizeInMs;
     int upscaleFactor, txtImageX;
 private:
     void paint(juce::Graphics& g) override {
@@ -314,14 +326,11 @@ private:
                 else decimals = true;
             else if (!numeric(text[i])) return false;
         auto newValue = text.getFloatValue();
-        auto clamped = clamp(newValue);
-        attach.setValueAsCompleteGesture(clamped);
+        bufferSizeInMs = clamp(newValue);
+        updateBuffers();
         return true;
     }
-    float clamp(float v) {
-        const auto& n = param->getNormalisableRange();
-        return juce::jlimit(n.start, n.end, v);
-    }
+    float clamp(float v) { return juce::jlimit(tape::DelaySizeInMSMin, tape::DelaySizeInMSMax, v); }
     bool numeric(juce::juce_wchar c) {
         return c == '0' || c == '1' || c == '2' || c == '3' || c == '4' || c == '5' || c == '6' || c == '7' || c == '8' || c == '9';
     }
@@ -370,10 +379,7 @@ private:
             7 * upscaleFactor),
             juce::RectanglePlacement::fillDestination);
     }
-    void makeTxtImage() {
-        auto value = param->convertFrom0to1(param->getValue());
-        makeTxtImage(value);
-    }
+    void makeTxtImage() { makeTxtImage(bufferSizeInMs); }
 
     bool keyPressed(const juce::KeyPress& key, Component*) override {
         if (state != State::Typing) return false;
@@ -405,6 +411,14 @@ private:
         return false;
     }
     bool keyStateChanged(bool, Component*) override { return false; }
+
+    void updateBuffers() {
+        valueTree.removeAllProperties(nullptr);
+        valueTree.setProperty(id, bufferSizeInMs, nullptr);
+        audioProcessor.buffersReallocating = true;
+        audioProcessor.tape.setWowDelaySize(bufferSizeInMs);
+        audioProcessor.buffersReallocating = false;
+    }
 };
 
 /*
@@ -417,4 +431,6 @@ CSlider
 BufferSizeTextField
     - can't write letters
 
+MIDILearnButton
+    - remember midi learn modulator
 */

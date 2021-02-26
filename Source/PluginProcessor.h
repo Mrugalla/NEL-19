@@ -32,8 +32,9 @@ public:
     const double* getLFOValue(const int ch) const { return tape.getLFOValue(ch); }
 
     juce::AudioProcessorValueTreeState apvts;
-    std::array<std::atomic<float>*, 5> param;
+    std::array<std::atomic<float>*, 4> param;
     tape::Tape<double> tape;
+    bool buffersReallocating;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Nel19AudioProcessor)
 };

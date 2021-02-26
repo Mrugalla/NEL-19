@@ -14,7 +14,7 @@ namespace tape {
 	static constexpr float LFOFreqMin = .5f, LFOFreqMax = 13, LFOFreqDefault = 4.f, LFOFreqInterval = .5f;
 	static constexpr int SmoothOrderDefault = 3;
 	// DELAY CONST
-	static constexpr float DelaySizeInMS = 5.f, DelaySizeInMSMin = 2, DelaySizeInMSMax = 1000;
+	static constexpr float DelaySizeInMS = 2.f, DelaySizeInMSMin = 1, DelaySizeInMSMax = 1000;
 	static constexpr float WowWidthDefault = 0.f;
 
 	namespace util {
@@ -337,7 +337,7 @@ namespace tape {
 	};
 
 	namespace param {
-		enum ID { Lookahead, VibratoDepth, VibratoFreq, VibratoWidth, VibratoDelaySize };
+		enum ID { Lookahead, VibratoDepth, VibratoFreq, VibratoWidth };
 
 		static juce::String getName(const int i) {
 			switch (i) {
@@ -345,7 +345,6 @@ namespace tape {
 			case ID::VibratoDepth: return "Depth";
 			case ID::VibratoFreq: return "Freq";
 			case ID::VibratoWidth: return "Width";
-			case ID::VibratoDelaySize: return "DelaySize";
 			}
 			return "";
 		}
@@ -362,9 +361,6 @@ namespace tape {
 				getID(VibratoFreq), getName(VibratoFreq), util::QuadraticBezierRange(LFOFreqMin, LFOFreqMax, .51f), LFOFreqDefault));
 			parameters.push_back(std::make_unique<juce::AudioParameterFloat>(
 				getID(VibratoWidth), getName(VibratoWidth), util::QuadraticBezierRange(0, 1, .3f), WowWidthDefault));
-			parameters.push_back(std::make_unique<juce::AudioParameterFloat>(
-				getID(VibratoDelaySize), getName(VibratoDelaySize),
-				juce::NormalisableRange<float>(DelaySizeInMSMin, DelaySizeInMSMax), DelaySizeInMS));
 			
 			return { parameters.begin(), parameters.end() };
 		}
@@ -1270,20 +1266,27 @@ BUGS:
 	FL Randomizer makes plugin freeze
 		processBlock not called anymore
 		parameters not shown above Randomize
-	STUDIO ONE v5.1 (S.B. Davis):
+	STUDIO ONE v5.1 (SB Dvs):
 		jiterry output
 		daw crashes when plugin is removed
 	STUDIO ONE
 		no mouseCursor shown
+	REAPER (F Mry):
+		plugin doesn't show up
 
 ADD FEATURES:
-	Sinc Interpolation
-	add a manual (especially because of the ALT- and SHIFT-features)
+	Add Interpolation Parameter
+		No, Int, Rint, Lin, Cubic, Sinc
+	add a manual
+		install issues
+		the parameters
+		use case examples
+		the ALT- and SHIFT-features
 	temposync
 	multiband
 	mix
-	options menue, alternative design-parameter based
-	parameter symbols unclear
+	options menue
+		alternative design-parameter based
 	oversampling
 	Installer
 		because people might not know where vst3 is
@@ -1293,8 +1296,8 @@ TESTED:
 		cubase      CHECK 9.5, 10
 		fl          CHECK
 		ableton		CHECK (thx julian)
-		bitwig
-		studio one  CHECK, but might not
+		bitwig		NOT CHECKED YET
+		studio one  CHECK
 
 DAWS Debug:
 
@@ -1304,5 +1307,8 @@ D:\Pogramme\Studio One 5\Studio One.exe
 
 C:\Users\Eine Alte Oma\Documents\CPP\vst3sdk\out\build\x64-Debug (default)\bin\validator.exe
 -e "C:/Program Files/Common Files/VST3/NEL-19.vst3"
+
+DOWNLOAD C++17 AT:
+https://support.microsoft.com/en-us/topic/the-latest-supported-visual-c-downloads-2647da03-1eea-4433-9aff-95f26a218cc0
 
 */
