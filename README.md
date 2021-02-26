@@ -73,6 +73,12 @@ Go to Source/Tape.h. It has all the important stuff.
 
 ---
 
+Can I recruit you as a dsp developer for my own VST project?
+
+I'd be happy to apply for such jobs in the future, but I'm still spending most of my time studying for university and spend my entire free time learning about dsp, so having another side job would be too much for me now. I hope I remember to update this when my situation has changed^^
+
+---
+
 I think you are really cool and I want to support you by transfering money to your paypal.
 
 Nice, thxx. https://www.paypal.com/paypalme/alteoma
