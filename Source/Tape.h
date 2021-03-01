@@ -513,6 +513,72 @@ namespace tape {
 		private:
 			std::vector<NeighborTables> nbt;
 		};
+
+		template<typename Float>
+		class Lanczos : public Interpolation<Float> {
+			struct SincLUT {
+				static constexpr int SincResolution = 1 << 9;
+				SincLUT(int a) :
+					sincLUT(),
+					alpha(a)
+				{
+					max = alpha * Pi;
+					sincLUT[0] = 1;
+					for (auto i = 1; i < sincLUT.size(); ++i) {
+						auto x = static_cast<Float>(i) / SincResolution;
+						auto mapped = x * alpha * Pi;
+						sincLUT[i] = sinc(mapped);
+					}
+				}
+				Float operator[](Float idx) {
+					auto normal = std::abs(idx / max);
+					auto mapped = static_cast<int>(normal * SincResolution);
+					return sincLUT[mapped];
+				}
+			private:
+				std::array<Float, SincResolution + 1> sincLUT;
+				Float max;
+				int alpha;
+
+				Float sinc(Float xPi) { return std::sin(xPi) / xPi; }
+			};
+		public:
+			Lanczos(int size = 0) :
+				Interpolation<Float>(size, MaxInterpolationOrder),
+				sincLUT(this->numNeighbors),
+				alpha(this->numNeighbors)
+			{
+				if (size != 0) initSpecific(size);
+			}
+			Float operator()(std::vector<Float>& data, Float idx) {
+				auto iFloor = int(idx);
+				auto x = idx - iFloor;
+
+				Float sum = 0;
+				for (auto i = -alpha + 1; i < alpha; ++i) {
+					int iLegal = i + iFloor;
+					if(iLegal < 0) iLegal += data.size();
+
+					auto xi = x - i;
+					if (xi == 0) xi = 1;
+					else if (x > -alpha && x < alpha) {
+						auto xPi = xi * Pi;
+						xi = sincLUT[xPi] * sincLUT[xPi / alpha];
+					}
+					else xi = 0;
+
+					sum += this->at(data, iLegal) * xi;
+				}
+				return sum;
+			}
+
+			void initSpecific(int size) override {
+
+			}
+		private:
+			SincLUT sincLUT;
+			int alpha;
+		};
 	}
 
 	namespace certainty {
@@ -1182,11 +1248,11 @@ namespace tape {
 			const Float* getLFOValue(const int ch) const { return &chModules[ch].lfoValue; }
 			std::vector<Float> data;
 		private:
-			std::vector<MultiChannelModules<Float, interpolation::Cubic<Float>>> chModules;
+			std::vector<MultiChannelModules<Float, interpolation::Lanczos<Float>>> chModules;
 			certainty::Generator<Float> certainty;
-			interpolation::Cubic<Float> interpolation;
+			interpolation::Lanczos<Float> interpolation;
 			WIdx<Float> wIdx;
-			WidthProcessor<Float, interpolation::Cubic<Float>> widthProcessor;
+			WidthProcessor<Float, interpolation::Lanczos<Float>> widthProcessor;
 			Utils<Float>& utils;
 			MidiLearn<Float>& midiLearn;
 
@@ -1272,19 +1338,21 @@ BUGS:
 	STUDIO ONE
 		no mouseCursor shown
 	REAPER (F Mry):
-		plugin doesn't show up
+		plugin doesn't show up (maybe missing dependencies)
 
 ADD FEATURES:
 	Add Interpolation Parameter
-		No, Int, Rint, Lin, Cubic, Sinc
+		Int, Lin, Cubic, Lagrange, Sinc
 	add a manual
 		install issues
 		the parameters
 		use case examples
-		the ALT- and SHIFT-features
+		the ALT- and SHIFT-features (or ditch them because they kinda suck)
 	temposync
+	multiple vibratos for chorus?
 	multiband
 	mix
+	monoizer for stereowidth-slider to flanger?
 	options menue
 		alternative design-parameter based
 	oversampling

@@ -200,37 +200,56 @@ struct MidiLearnButton :
 {
     enum ImageID { Learn, Learning, CC, Pitch };
 
-    MidiLearnButton(tape::Tape<Float>& tape, int upscale) :
+    MidiLearnButton(tape::Tape<Float>& tape, juce::AudioProcessorValueTreeState& apvts, juce::String paramID, int upscale) :
         ml(tape.getMidiLearn()),
-        images{
+        id(paramID), idType("Type"), idCC("CC"),
+        valueTree(),
+        images {
             juce::ImageCache::getFromMemory(BinaryData::midiLearn_png, BinaryData::midiLearn_pngSize),
             juce::ImageCache::getFromMemory(BinaryData::midiLearning_png, BinaryData::midiLearning_pngSize),
             juce::ImageCache::getFromMemory(BinaryData::midiCC_png, BinaryData::midiCC_pngSize),
             juce::ImageCache::getFromMemory(BinaryData::midiPitch_png, BinaryData::midiPitch_pngSize)
-        }
+        },
+        state(ml.getState())
     {
         for (auto& i : images)
             i = i.rescaled(i.getWidth() * upscale, i.getHeight() * upscale, juce::Graphics::lowResamplingQuality);
+        
+        valueTree = apvts.state.getChildWithName(id);
+        if (!valueTree.isValid()) {
+            valueTree = juce::ValueTree(id);
+            apvts.state.appendChild(valueTree, nullptr);
+            updateVT();
+        }
     }
     ~MidiLearnButton() {
         using namespace tape;
-        if (ml.state == MidiLearn<Float>::State::Learning)
+        if (ml.state == MidiLearn<Float>::State::Learning) {
             ml.state = MidiLearn<Float>::State::Off;
+            updateVT();
+        }   
     }
     void update() {
         using namespace tape;
-        if (ml.state == MidiLearn<Float>::State::Learned)
-            repaint();
+        if(state == MidiLearn<Float>::State::Learning)
+            if (ml.state == MidiLearn<Float>::State::Learned) {
+                state = ml.state;
+                updateVT();
+                repaint();
+            }
     }
 
     tape::MidiLearn<Float>& ml;
+    juce::Identifier id, idType, idCC;
+    juce::ValueTree valueTree;
     std::array<juce::Image, 4> images;
+    typename tape::MidiLearn<Float>::State state;
 private:
-
     void mouseUp(const juce::MouseEvent& evt) override {
         using namespace tape;
-        if (ml.state == MidiLearn<Float>::State::Learning) ml.state = MidiLearn<Float>::State::Off;
-        else ml.state = MidiLearn<Float>::State::Learning;
+        if (ml.state == MidiLearn<Float>::State::Learning) ml.state = state = MidiLearn<Float>::State::Off;
+        else ml.state = state = MidiLearn<Float>::State::Learning;
+        updateVT();
         repaint();
     }
     
@@ -250,6 +269,13 @@ private:
             }
             break;
         }
+    }
+
+    void updateVT() {
+        valueTree.removeAllProperties(nullptr);
+        valueTree.setProperty(id, static_cast<int>(ml.getState()), nullptr);
+        valueTree.setProperty(idType, static_cast<int>(ml.type), nullptr);
+        valueTree.setProperty(idCC, ml.controllerNumber, nullptr);
     }
 };
 
@@ -284,8 +310,6 @@ struct BufferSizeTextField :
         bufferSizeInMs = static_cast<float>(valueTree.getProperty(id));
         makeTxtImage();
     }
-    // SET
-    void setCursors(const juce::MouseCursor* hover) { setMouseCursor(*hover); }
 
     Nel19AudioProcessor& audioProcessor;
     juce::ValueTree valueTree;
@@ -430,7 +454,4 @@ CSlider
 
 BufferSizeTextField
     - can't write letters
-
-MIDILearnButton
-    - remember midi learn modulator
 */

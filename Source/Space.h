@@ -516,7 +516,7 @@ struct Space :
         about(upscale),
         aboutButton(),
 
-        midiLearnButton(processor.tape, upscale),
+        midiLearnButton(processor.tape, processor.apvts, "MIDILearn", upscale),
         bufferSizeTextField(processor, "DelaySizeInMs", upscaleFactor)
     {
         bg.setInterval(BgInterval);

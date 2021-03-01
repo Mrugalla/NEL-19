@@ -59,6 +59,20 @@ void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize) {
         apvts.state.getChildWithName("DelaySizeInMs").getProperty("DelaySizeInMs", tape::DelaySizeInMS)
     );
     tape.setWowDelaySize(delaySizeInMs);
+
+    auto state = static_cast<int>(
+        apvts.state.getChildWithName("MIDILearn").getProperty("MIDILearn", 0)
+    );
+    auto& ml = tape.getMidiLearn();
+    ml.setState(static_cast<tape::MidiLearn<double>::State>(state));
+    auto type = static_cast<int>(
+        apvts.state.getChildWithName("MIDILearn").getProperty("Type", 0)
+    );
+    ml.type = static_cast<tape::MidiLearn<double>::Type>(type);
+    auto cc = static_cast<int>(
+        apvts.state.getChildWithName("MIDILearn").getProperty("CC", 0)
+    );
+    ml.controllerNumber = cc;
 }
 void Nel19AudioProcessor::releaseResources() {}
 #ifndef JucePlugin_PreferredChannelConfigurations
