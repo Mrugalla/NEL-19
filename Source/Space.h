@@ -517,7 +517,8 @@ struct Space :
         aboutButton(),
 
         midiLearnButton(processor.tape, processor.apvts, "MIDILearn", upscale),
-        bufferSizeTextField(processor, "DelaySizeInMs", upscaleFactor)
+        bufferSizeTextField(processor, "DelaySizeInMs", upscaleFactor),
+        qualitySelector(processor, "Interpolation")
     {
         bg.setInterval(BgInterval);
         shuttle.setLFO((Float)ShuttleFreq, (Float)ShuttleAmp);
@@ -540,6 +541,7 @@ struct Space :
         about.setVisible(false);
         addAndMakeVisible(midiLearnButton);
         addAndMakeVisible(bufferSizeTextField);
+        addAndMakeVisible(qualitySelector);
         setCursors();
         setOpaque(true);
     }
@@ -602,6 +604,12 @@ struct Space :
 
         midiLearnButton.setBounds(85 * upscaleFactor, 4 * upscaleFactor, 38 * upscaleFactor, 11 * upscaleFactor);
         bufferSizeTextField.setBounds(4 * upscaleFactor, 4 * upscaleFactor, 30 * upscaleFactor, 15 * upscaleFactor);
+        qualitySelector.setBounds(
+            bufferSizeTextField.getX(),
+            bufferSizeTextField.getBottom() + 2 * upscaleFactor,
+            bufferSizeTextField.getWidth(),
+            bufferSizeTextField.getHeight()
+        );
     }
 private:
     Nel19AudioProcessor& processor;
@@ -624,6 +632,7 @@ private:
 
     MidiLearnButton<Float> midiLearnButton;
     BufferSizeTextField<Float> bufferSizeTextField;
+    QualitySelector<Float> qualitySelector;
 
     std::array<juce::MouseCursor, 3> makeCursors() {
         auto cursorImage = Util::getUpscaledCursor(upscaleFactor);
@@ -652,6 +661,7 @@ private:
         about.setCursor(cursors[0], cursors[1]);
         midiLearnButton.setMouseCursor(cursors[1]);
         bufferSizeTextField.setMouseCursor(cursors[1]);
+        qualitySelector.setMouseCursor(cursors[1]);
     }
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Space)

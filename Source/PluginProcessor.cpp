@@ -19,7 +19,7 @@ Nel19AudioProcessor::Nel19AudioProcessor()
         apvts.getRawParameterValue(tape::param::getID(tape::param::ID::Lookahead))
         }),
     tape(this),
-    buffersReallocating(false)
+    buffersReallocating(false), interpolationChanging(false)
 #endif
 {
 }
@@ -73,6 +73,11 @@ void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize) {
         apvts.state.getChildWithName("MIDILearn").getProperty("CC", 0)
     );
     ml.controllerNumber = cc;
+
+    auto defaultInterpolation = static_cast<int>(tape::Interpolator<double>::Type::Lanczos);
+    auto interpolationType = static_cast<int>(apvts.state.getChildWithName("Interpolation").getProperty("Interpolation", defaultInterpolation));
+    auto& interpolator = tape.getInterpolator();
+    interpolator.setType(static_cast<typename tape::Interpolator<double>::Type>(interpolationType), true);
 }
 void Nel19AudioProcessor::releaseResources() {}
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -100,6 +105,13 @@ bool Nel19AudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) co
 #endif
 void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) {
     if (buffersReallocating) return;
+    if (interpolationChanging) {
+        auto interpolationType = static_cast<int>(apvts.state.getChildWithName("Interpolation").getProperty("Interpolation", 0));
+        auto& interpolator = tape.getInterpolator();
+        interpolator.setType(static_cast<typename tape::Interpolator<double>::Type>(interpolationType), true);
+        interpolationChanging = false;
+        return;
+    }
     juce::ScopedNoDenormals noDenormals;
     const auto totalNumInputChannels  = getTotalNumInputChannels();
     const auto totalNumOutputChannels = getTotalNumOutputChannels();

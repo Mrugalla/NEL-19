@@ -366,7 +366,7 @@ namespace tape {
 		}
 	};
 
-	namespace interpolation {
+	namespace interpolation { // DISCONTINUED!!
 		template<typename Float>
 		struct Interpolation {
 			Interpolation(int dataSize, int nn) :
@@ -580,6 +580,161 @@ namespace tape {
 			int alpha;
 		};
 	}
+
+	template<typename Float>
+	struct Interpolator {
+		enum class Type { Int, Lin, Cubic, Lanczos };
+
+		Interpolator(Type t = Type::Lanczos) :
+			sinc(MaxInterpolationOrder),
+			spline(),
+			alpha(MaxInterpolationOrder),
+			type(t)
+		{
+			setType(t, true);
+		}
+		// PARAM
+		void setType(Type t, bool forced = false) {
+			if (type != t || forced) {
+				type = t;
+				switch (type) {
+					case Type::Int:
+						initCubic(true); initLanczos(true);
+						return;
+					case Type::Lin:
+						initCubic(true); initLanczos(true);
+						return;
+					case Type::Cubic:
+						initCubic(); initLanczos(true);
+						return;
+					case Type::Lanczos:
+						initCubic(true); initLanczos();
+						return;
+				}
+			}
+		}
+		// PROCESS
+		const Float process(const std::vector<Float>& buffer, const Float idx) const {
+			switch (type) {
+			case Type::Int: return processInt(buffer, idx);
+			case Type::Lin: return processLin(buffer, idx);
+			case Type::Cubic: return processCubic(buffer, idx);
+			case Type::Lanczos: return processLanczos(buffer, idx);
+			}
+
+			return 0;
+		}
+	private:
+		// INT INTERPOLATION STUFF
+		const Float processInt(const std::vector<Float>& buffer, const Float idx) const {
+			return buffer[static_cast<int>(idx)];
+		}
+		// LINEAR INTERPOLATION STUFF
+		const Float processLin(const std::vector<Float>& buffer, const Float idx) const {
+			auto f = static_cast<int>(idx);
+			auto c = (f + 1) % buffer.size();
+			auto x = idx - f;
+			return buffer[f] + x * (buffer[c] - buffer[f]);
+		}
+		// CUBIC SPLINE INTERPOLATION STUFF
+		void initCubic(bool flush = false) {
+			if (flush) {
+				for (auto& spl : spline)
+					spl.resize(0);
+				return;
+			}
+			for (auto& spl : spline) spl.resize(SplineSize, 0);
+			for (auto i = 0; i < SplineSize; ++i) {
+				auto x = static_cast<Float>(i) / SplineSize;
+				spline[0][i] = (-std::pow(x, 3) + 2 * std::pow(x, 2) - x) / 2;
+				spline[1][i] = (3 * std::pow(x, 3) - 5 * std::pow(x, 2) + 2) / 2;
+				spline[2][i] = (-3 * std::pow(x, 3) + 4 * std::pow(x, 2) + x) / 2;
+				spline[3][i] = (std::pow(x, 3) - std::pow(x, 2)) / 2;
+			}
+		}
+		const Float processCubic(const std::vector<Float>& buffer, const Float idx) const {
+			int n[4];
+			n[1] = static_cast<int>(idx);
+			n[0] = n[1] - 1;
+			n[2] = n[1] + 1;
+			n[3] = n[1] + 2;
+			if (n[0] < 0) n[0] += buffer.size();
+			else if (n[3] >= buffer.size()) {
+				n[3] -= buffer.size();
+				if (n[2] >= buffer.size())
+					n[2] -= buffer.size();
+			}
+			auto x = idx - n[1];
+			auto splIdx = static_cast<int>(SplineSize * x);
+			Float y = 0;
+			for (auto i = 0; i < 4; ++i)
+				y += buffer[n[i]] * spline[i][splIdx];
+			return y;
+		}
+		// LAGRANGE INTERPOLATION STUFF
+		// ...not implemented yet...
+		// LANCZOS SINC INTERPOLATION STUFF
+		struct SincLUT {
+			static constexpr int SincResolution = 1 << 9;
+			SincLUT(int a) :
+				lut(),
+				alpha(a)
+			{}
+			void init(bool flush) {
+				lut.clear();
+				if (flush) return;
+				const auto size = SincResolution + 1;
+				lut.reserve(size);
+				max = alpha * Pi;
+				lut.emplace_back(1);
+				for (auto i = 1; i < size; ++i) {
+					auto x = static_cast<Float>(i) / SincResolution;
+					auto mapped = x * alpha * Pi;
+					lut.emplace_back(sinc(mapped));
+				}
+			}
+			const Float operator[](const Float idx) const {
+				auto normal = std::abs(idx / max);
+				auto mapped = static_cast<int>(normal * SincResolution);
+				return lut[mapped];
+			}
+		private:
+			std::vector<Float> lut;
+			Float max;
+			int alpha;
+
+			Float sinc(Float xPi) { return std::sin(xPi) / xPi; }
+		};
+		void initLanczos(bool flush = false) { sinc.init(flush); }
+		const Float processLanczos(const std::vector<Float>& buffer, const Float idx) const {
+			auto iFloor = static_cast<int>(idx);
+			auto x = idx - iFloor;
+
+			Float sum = 0;
+			for (auto i = -alpha + 1; i < alpha; ++i) {
+				int iLegal = i + iFloor;
+				if (iLegal < 0) iLegal += buffer.size();
+				else if (iLegal >= buffer.size()) iLegal -= buffer.size();
+
+				auto xi = x - i;
+				if (xi == 0) xi = 1;
+				else if (x > -alpha && x < alpha) {
+					auto xPi = xi * Pi;
+					xi = sinc[xPi] * sinc[xPi / alpha];
+				}
+				else xi = 0;
+
+				sum += buffer[iLegal] * xi;
+			}
+			return sum;
+		}
+	private:
+		SincLUT sinc;
+		std::array<std::vector<Float>, 4> spline;
+		int alpha;
+	public:
+		Type type;
+	};
 
 	namespace certainty {
 		enum Term {
@@ -1045,7 +1200,7 @@ namespace tape {
 			const Utils<Float>& utils;
 		};
 
-		template<typename Float, class Interpolation>
+		template<typename Float>
 		struct FFDelay {
 			FFDelay(const Utils<Float>& utils) :
 				buffer(),
@@ -1056,18 +1211,18 @@ namespace tape {
 			// SET
 			void setSampleRate() { buffer.resize(utils.delaySize, 0); }
 			// PROCESS
-			void processBlock(juce::AudioBuffer<float>& b, const int* wIdx, const std::vector<Float>& rIdx, Interpolation& interpolate, const int ch) {
+			void processBlock(juce::AudioBuffer<float>& b, const int* wIdx, const std::vector<Float>& rIdx, const Interpolator<Float> interpolator, const int ch) {
 				auto samples = b.getWritePointer(ch, 0);
 				for (auto s = 0; s < utils.numSamples; ++s) {
 					buffer[wIdx[s]] = samples[s];
-					samples[s] = interpolate(buffer, rIdx[s]);
+					samples[s] = interpolator.process(buffer, rIdx[s]);
 				}
 			}
 			void processBlock(juce::AudioBuffer<float>& b, const int* wIdx, const std::vector<Float>& rIdx, const int ch) {
 				auto samples = b.getWritePointer(ch, 0);
 				for (auto s = 0; s < utils.numSamples; ++s) {
 					buffer[wIdx[s]] = samples[s];
-					samples[s] = buffer[(int)rIdx[s]];
+					samples[s] = buffer[static_cast<int>(rIdx[s])];
 				}
 			}
 		private:
@@ -1075,7 +1230,7 @@ namespace tape {
 			const Utils<Float>& utils;
 		};
 
-		template<typename Float, class Interpolation>
+		template<typename Float>
 		struct MultiChannelModules {
 			MultiChannelModules(Utils<Float>& utils, certainty::Generator<Float>& certainty) :
 				data(),
@@ -1115,11 +1270,11 @@ namespace tape {
 					if (data[s] < 0) data[s] = MaxInterpolationOrder;
 					else if (data[s] > utils.delayMax) data[s] = utils.delayMax;
 			}
-			void processBlock(juce::AudioBuffer<float>& buffer, const int* wIdx, Interpolation& interpolate, const int ch) {
+			void processBlock(juce::AudioBuffer<float>& buffer, const int* wIdx, const Interpolator<Float>& interpolator, const int ch) {
 				//seq.playback(buffer, data, ch);
 				if(utils.processor->getLatencySamples() != 0) rIdx.processBlock(data, wIdx); // LOOKAHEAD ENABLED
 				else rIdx.processBlockWithLatencyReduction(data, wIdx); // LOOKAHEAD DISABLED
-				delay.processBlock(buffer, wIdx, data, interpolate, ch);
+				delay.processBlock(buffer, wIdx, data, interpolator, ch);
 			}
 			void processBlock(juce::AudioBuffer<float>& buffer, const int* wIdx, const int ch) {
 				rIdx.processBlock(data, wIdx);
@@ -1131,11 +1286,11 @@ namespace tape {
 		private:
 			CertaintySequencer<Float> seq;
 			RIdx<Float> rIdx;
-			FFDelay<Float, Interpolation> delay;
+			FFDelay<Float> delay;
 			const Utils<Float>& utils;
 		};
 
-		template<typename Float, class Interpolation>
+		template<typename Float>
 		struct WidthProcessor {
 			WidthProcessor(const Utils<Float>& utils) :
 				utils(utils),
@@ -1147,7 +1302,7 @@ namespace tape {
 			// PARAM
 			void setWidth(Float w) { dest = w; }
 			// PROCESS
-			void operator()(std::vector<Float>& data, std::vector<MultiChannelModules<Float, Interpolation>>& chModules) {
+			void operator()(std::vector<Float>& data, std::vector<MultiChannelModules<Float>>& chModules) {
 				for (auto s = 0; s < utils.numSamples; ++s) data[s] = dest;
 				smooth.processBlock(data); // smoothen width transitions
 
@@ -1161,10 +1316,10 @@ namespace tape {
 			MultiOrderSmooth<Float> smooth;
 			Float width, dest;
 
-			void processWidthDisabled(std::vector<MultiChannelModules<Float, Interpolation>>& chModules) {
+			void processWidthDisabled(std::vector<MultiChannelModules<Float>>& chModules) {
 				chModules[0].upscaleLFO();
 			}
-			void processWidthEnabled(std::vector<MultiChannelModules<Float, Interpolation>>& chModules, const std::vector<Float>& widthData) {
+			void processWidthEnabled(std::vector<MultiChannelModules<Float>>& chModules, const std::vector<Float>& widthData) {
 				for (auto ch = 1; ch < utils.numChannels; ++ch) {
 					chModules[ch].synthesizeLFO();
 					chModules[ch].smoothenDelay();
@@ -1179,9 +1334,9 @@ namespace tape {
 		template<typename Float>
 		struct Vibrato {
 			Vibrato(Utils<Float>& u, MidiLearn<Float>& ml) :
+				interpolator(),
 				chModules(),
 				certainty(),
-				interpolation(),
 				wIdx(u),
 				widthProcessor(u),
 				utils(u),
@@ -1193,7 +1348,7 @@ namespace tape {
 			// SET
 			void setSampleRate() {
 				widthProcessor.setSampleRate();
-				interpolation.resize(utils.delaySize);
+				//interpolation.resize(utils.delaySize);
 				for (auto& ch : chModules)
 					ch.setSampleRate();
 			}
@@ -1222,6 +1377,7 @@ namespace tape {
 			void setWidth(const Float w) {
 				widthProcessor.setWidth(w);
 			}
+			void setInterpolationType(typename Interpolator<Float>::Type t, bool forced = false) { interpolator.setType(t, forced); }
 			// PROCESS
 			void processBlock(juce::AudioBuffer<float>& buffer) {
 				wIdx.processBlock();
@@ -1233,7 +1389,7 @@ namespace tape {
 				widthProcessor(data, chModules);
 				for (auto ch = 0; ch < utils.numChannels; ++ch) {
 					chModules[ch].clampDelay();
-					chModules[ch].processBlock(buffer, wIdx.data.data(), interpolation, ch);
+					chModules[ch].processBlock(buffer, wIdx.data.data(), interpolator, ch);
 				}
 			}
 			void processBlockBypassed(juce::AudioBuffer<float>& buffer) {
@@ -1247,12 +1403,13 @@ namespace tape {
 			// GET
 			const Float* getLFOValue(const int ch) const { return &chModules[ch].lfoValue; }
 			std::vector<Float> data;
+			Interpolator<Float>& getInterpolator() { return interpolator; }
 		private:
-			std::vector<MultiChannelModules<Float, interpolation::Lanczos<Float>>> chModules;
+			Interpolator<Float> interpolator;
+			std::vector<MultiChannelModules<Float>> chModules;
 			certainty::Generator<Float> certainty;
-			interpolation::Lanczos<Float> interpolation;
 			WIdx<Float> wIdx;
-			WidthProcessor<Float, interpolation::Lanczos<Float>> widthProcessor;
+			WidthProcessor<Float> widthProcessor;
 			Utils<Float>& utils;
 			MidiLearn<Float>& midiLearn;
 
@@ -1318,6 +1475,7 @@ namespace tape {
 		// GET
 		const Float* getLFOValue(const int ch) const { return vibrato.getLFOValue(ch); }
 		MidiLearn<Float>& getMidiLearn() { return midiLearn; }
+		Interpolator<Float>& getInterpolator() { return vibrato.getInterpolator(); }
 	private:
 		Utils<Float> utils;
 		MidiLearn<Float> midiLearn;

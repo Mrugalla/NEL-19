@@ -18,6 +18,11 @@
       <FILE id="rNfcmo" name="midiLearning.png" compile="0" resource="1"
             file="Source/Img/midiLearning.png"/>
       <FILE id="FwF1RF" name="midiPitch.png" compile="0" resource="1" file="Source/Img/midiPitch.png"/>
+      <FILE id="OYyAbL" name="qCubic.png" compile="0" resource="1" file="Source/Img/qCubic.png"/>
+      <FILE id="aMX7FG" name="qInt.png" compile="0" resource="1" file="Source/Img/qInt.png"/>
+      <FILE id="eUGIq1" name="qLin.png" compile="0" resource="1" file="Source/Img/qLin.png"/>
+      <FILE id="vaRcae" name="qSinc.png" compile="0" resource="1" file="Source/Img/qSinc.png"/>
+      <FILE id="otiKKg" name="quality.png" compile="0" resource="1" file="Source/Img/quality.png"/>
       <FILE id="Y03fii" name="shuttle.png" compile="0" resource="1" file="Source/Img/shuttle.png"/>
       <FILE id="Jab1HV" name="space1.png" compile="0" resource="1" file="Source/Img/space1.png"/>
       <FILE id="KgjvZu" name="space2.png" compile="0" resource="1" file="Source/Img/space2.png"/>

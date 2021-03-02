@@ -445,6 +445,99 @@ private:
     }
 };
 
+template<typename Float>
+struct QualitySelector :
+    public juce::Component {
+
+    QualitySelector(Nel19AudioProcessor& p, juce::String tID) :
+        processor(p),
+        interpolator(p.tape.getInterpolator()),
+        img(juce::Image::ARGB, 1, 1, true),
+        valueTree(),
+        id(tID)
+    {
+        valueTree = p.apvts.state.getChildWithName(id);
+        if (!valueTree.isValid()) {
+            valueTree = juce::ValueTree(id);
+            p.apvts.state.appendChild(valueTree, nullptr);
+        }
+
+        updateImg();
+    }
+private:
+    void paint(juce::Graphics& g) {
+        g.setImageResamplingQuality(juce::Graphics::lowResamplingQuality);
+        g.drawImage(img, getLocalBounds().toFloat(), juce::RectanglePlacement::fillDestination, false);
+    }
+
+    void mouseUp(const juce::MouseEvent& evt) override {
+        if (evt.mouseWasDraggedSinceMouseDown()) return;
+        typename tape::Interpolator<Float>::Type type = interpolator.type;
+        auto tInt = static_cast<int>(type);
+        if (evt.mods.isRightButtonDown()) {
+            --tInt;
+            if (tInt < 0)
+                tInt = static_cast<int>(typename tape::Interpolator<Float>::Type::Lanczos);
+        }
+        else {
+            ++tInt;
+            if (tInt > static_cast<int>(typename tape::Interpolator<Float>::Type::Lanczos))
+                tInt = 0;
+        }
+        type = static_cast<typename tape::Interpolator<Float>::Type>(tInt);
+        updateImg(type);
+        valueTree.removeAllProperties(nullptr);
+        valueTree.setProperty(id, tInt, nullptr);
+        processor.interpolationChanging = true;
+        repaint();
+    }
+
+    void updateImg(typename tape::Interpolator<Float>::Type type) {
+        img = juce::ImageCache::getFromMemory(BinaryData::quality_png, BinaryData::quality_pngSize).createCopy();
+        juce::Graphics g{ img };
+        g.setImageResamplingQuality(juce::Graphics::lowResamplingQuality);
+        switch (type) {
+        case tape::Interpolator<Float>::Type::Int:
+            g.drawImageAt(juce::ImageCache::getFromMemory(BinaryData::qInt_png, BinaryData::qInt_pngSize), 0, 0, false);
+            break;
+        case tape::Interpolator<Float>::Type::Lin:
+            g.drawImageAt(juce::ImageCache::getFromMemory(BinaryData::qLin_png, BinaryData::qLin_pngSize), 0, 0, false);
+            break;
+        case tape::Interpolator<Float>::Type::Cubic:
+            g.drawImageAt(juce::ImageCache::getFromMemory(BinaryData::qCubic_png, BinaryData::qCubic_pngSize), 0, 0, false);
+            break;
+        case tape::Interpolator<Float>::Type::Lanczos:
+            g.drawImageAt(juce::ImageCache::getFromMemory(BinaryData::qSinc_png, BinaryData::qSinc_pngSize), 0, 0, false);
+            break;
+        }
+    }
+    void updateImg() {
+        img = juce::ImageCache::getFromMemory(BinaryData::quality_png, BinaryData::quality_pngSize).createCopy();
+        juce::Graphics g{ img };
+        g.setImageResamplingQuality(juce::Graphics::lowResamplingQuality);
+        switch (interpolator.type) {
+        case tape::Interpolator<Float>::Type::Int:
+            g.drawImageAt(juce::ImageCache::getFromMemory(BinaryData::qInt_png, BinaryData::qInt_pngSize), 0, 0, false);
+            break;
+        case tape::Interpolator<Float>::Type::Lin:
+            g.drawImageAt(juce::ImageCache::getFromMemory(BinaryData::qLin_png, BinaryData::qLin_pngSize), 0, 0, false);
+            break;
+        case tape::Interpolator<Float>::Type::Cubic:
+            g.drawImageAt(juce::ImageCache::getFromMemory(BinaryData::qCubic_png, BinaryData::qCubic_pngSize), 0, 0, false);
+            break;
+        case tape::Interpolator<Float>::Type::Lanczos:
+            g.drawImageAt(juce::ImageCache::getFromMemory(BinaryData::qSinc_png, BinaryData::qSinc_pngSize), 0, 0, false);
+            break;
+        }
+    }
+
+    Nel19AudioProcessor& processor;
+    tape::Interpolator<Float>& interpolator;
+    juce::Image img;
+    juce::ValueTree valueTree;
+    juce::Identifier id;
+};
+
 /*
 todo:
 
