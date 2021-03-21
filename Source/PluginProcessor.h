@@ -1,6 +1,6 @@
 #pragma once
 #include <JuceHeader.h>
-#include "Tape.h"
+#include "DSP.h"
 
 class Nel19AudioProcessor :
     public juce::AudioProcessor {
@@ -28,13 +28,13 @@ public:
     void changeProgramName (int index, const juce::String& newName) override;
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
-
-    const double* getLFOValue(const int ch) const { return tape.getLFOValue(ch); }
+    void processParameters();
 
     juce::AudioProcessorValueTreeState apvts;
-    std::array<std::atomic<float>*, 4> param;
-    tape::Tape<double> tape;
-    bool buffersReallocating, interpolationChanging;
+    std::vector<std::atomic<float>*> params;
+    nelDSP::Nel19 nel19;
+
+    int curDepthMaxIdx;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Nel19AudioProcessor)
 };

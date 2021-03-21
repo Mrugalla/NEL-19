@@ -8,36 +8,22 @@
               pluginCharacteristicsValue="pluginWantsMidiIn">
   <MAINGROUP id="V2oOlh" name="NEL-19">
     <GROUP id="{EB637F68-8B54-CF39-23F4-99282698FA6E}" name="Img">
-      <FILE id="P8ggf0" name="about.png" compile="0" resource="1" file="Source/Img/about.png"/>
-      <FILE id="z8LSlW" name="bufferSize.png" compile="0" resource="1" file="Source/Img/bufferSize.png"/>
       <FILE id="ok6eqm" name="cursor.png" compile="0" resource="1" file="Source/Img/cursor.png"/>
-      <FILE id="uTEAL3" name="font.png" compile="0" resource="1" file="Source/Img/font.png"/>
-      <FILE id="WJjcNq" name="help.png" compile="0" resource="1" file="Source/Img/help.png"/>
-      <FILE id="jb6qnT" name="midiCC.png" compile="0" resource="1" file="Source/Img/midiCC.png"/>
-      <FILE id="XxVIot" name="midiLearn.png" compile="0" resource="1" file="Source/Img/midiLearn.png"/>
-      <FILE id="rNfcmo" name="midiLearning.png" compile="0" resource="1"
-            file="Source/Img/midiLearning.png"/>
-      <FILE id="FwF1RF" name="midiPitch.png" compile="0" resource="1" file="Source/Img/midiPitch.png"/>
-      <FILE id="OYyAbL" name="qCubic.png" compile="0" resource="1" file="Source/Img/qCubic.png"/>
-      <FILE id="aMX7FG" name="qInt.png" compile="0" resource="1" file="Source/Img/qInt.png"/>
-      <FILE id="eUGIq1" name="qLin.png" compile="0" resource="1" file="Source/Img/qLin.png"/>
-      <FILE id="vaRcae" name="qSinc.png" compile="0" resource="1" file="Source/Img/qSinc.png"/>
-      <FILE id="otiKKg" name="quality.png" compile="0" resource="1" file="Source/Img/quality.png"/>
       <FILE id="Y03fii" name="shuttle.png" compile="0" resource="1" file="Source/Img/shuttle.png"/>
-      <FILE id="Jab1HV" name="space1.png" compile="0" resource="1" file="Source/Img/space1.png"/>
-      <FILE id="KgjvZu" name="space2.png" compile="0" resource="1" file="Source/Img/space2.png"/>
-      <FILE id="ERISg7" name="ui.png" compile="0" resource="1" file="Source/Img/ui.png"/>
       <FILE id="e3uEiq" name="vst3_logo_small.png" compile="0" resource="1"
             file="Source/Img/vst3_logo_small.png"/>
-      <FILE id="CGyibW" name="widthDisabled.png" compile="0" resource="1"
-            file="Source/Img/widthDisabled.png"/>
     </GROUP>
     <GROUP id="{FF8BE835-9B90-31CB-45F4-D4B15FDEFD04}" name="Source">
-      <FILE id="Gi5j6T" name="CSlider.h" compile="0" resource="0" file="Source/CSlider.h"/>
+      <FILE id="LCWf9f" name="Shuttle.h" compile="0" resource="0" file="Source/Shuttle.h"/>
+      <FILE id="B2ClOc" name="TitleEditor.h" compile="0" resource="0" file="Source/TitleEditor.h"/>
+      <FILE id="vzEU0y" name="SpaceEditor.h" compile="0" resource="0" file="Source/SpaceEditor.h"/>
+      <FILE id="jOZ35F" name="ParametersEditor.h" compile="0" resource="0"
+            file="Source/ParametersEditor.h"/>
+      <FILE id="BV1aaM" name="SettingsEditor.h" compile="0" resource="0"
+            file="Source/SettingsEditor.h"/>
+      <FILE id="KYcS3B" name="DSP.h" compile="0" resource="0" file="Source/DSP.h"/>
       <FILE id="QSBzec" name="likelyRawData.txt" compile="0" resource="1"
             file="Source/likelyRawData.txt"/>
-      <FILE id="H6HISf" name="Tape.h" compile="0" resource="0" file="Source/Tape.h"/>
-      <FILE id="KetJlW" name="Space.h" compile="0" resource="0" file="Source/Space.h"/>
       <FILE id="CXcBUZ" name="AboutComponent.h" compile="0" resource="0"
             file="Source/AboutComponent.h"/>
       <FILE id="oVPJjY" name="PluginProcessor.cpp" compile="1" resource="0"

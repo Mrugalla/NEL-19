@@ -11,17 +11,18 @@ Nel19AudioProcessor::Nel19AudioProcessor()
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
                        ),
-    apvts(*this, nullptr, "parameters", tape::param::createParameters()),
-    param({
-        apvts.getRawParameterValue(tape::param::getID(tape::param::ID::VibratoDepth)),
-        apvts.getRawParameterValue(tape::param::getID(tape::param::ID::VibratoFreq)),
-        apvts.getRawParameterValue(tape::param::getID(tape::param::ID::VibratoWidth)),
-        apvts.getRawParameterValue(tape::param::getID(tape::param::ID::Lookahead))
-        }),
-    tape(this),
-    buffersReallocating(false), interpolationChanging(false)
+    apvts(*this, nullptr, "parameters", nelDSP::param::createParameters()),
+    params(),
+    nel19(this),
+    curDepthMaxIdx(0)
 #endif
 {
+    params.push_back(apvts.getRawParameterValue(nelDSP::param::getID(nelDSP::param::ID::DepthMax)));
+    params.push_back(apvts.getRawParameterValue(nelDSP::param::getID(nelDSP::param::ID::Depth)));
+    params.push_back(apvts.getRawParameterValue(nelDSP::param::getID(nelDSP::param::ID::Freq)));
+    params.push_back(apvts.getRawParameterValue(nelDSP::param::getID(nelDSP::param::ID::LRMS)));
+    params.push_back(apvts.getRawParameterValue(nelDSP::param::getID(nelDSP::param::ID::Width)));
+    params.push_back(apvts.getRawParameterValue(nelDSP::param::getID(nelDSP::param::ID::Mix)));
 }
 Nel19AudioProcessor::~Nel19AudioProcessor(){}
 const juce::String Nel19AudioProcessor::getName() const { return JucePlugin_Name; }
@@ -54,30 +55,21 @@ const juce::String Nel19AudioProcessor::getProgramName (int) { return {}; }
 void Nel19AudioProcessor::changeProgramName (int, const juce::String&){}
 
 void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize) {    
-    tape.prepareToPlay(sampleRate, maxBufferSize, getChannelCountOfBus(true, 0));
-    auto delaySizeInMs = static_cast<float>(
-        apvts.state.getChildWithName("DelaySizeInMs").getProperty("DelaySizeInMs", tape::DelaySizeInMS)
-    );
-    tape.setWowDelaySize(delaySizeInMs);
-
+    nel19.prepareToPlay(sampleRate, maxBufferSize, getChannelCountOfBus(true, 0));
+    /*
     auto state = static_cast<int>(
         apvts.state.getChildWithName("MIDILearn").getProperty("MIDILearn", 0)
     );
-    auto& ml = tape.getMidiLearn();
-    ml.setState(static_cast<tape::MidiLearn<double>::State>(state));
+    auto& ml = nel19.getMidiLearn();
+    ml.setState(static_cast<nelDSP::MidiLearn::State>(state));
     auto type = static_cast<int>(
         apvts.state.getChildWithName("MIDILearn").getProperty("Type", 0)
     );
-    ml.type = static_cast<tape::MidiLearn<double>::Type>(type);
+    ml.type = static_cast<nelDSP::MidiLearn::Type>(type);
     auto cc = static_cast<int>(
         apvts.state.getChildWithName("MIDILearn").getProperty("CC", 0)
     );
-    ml.controllerNumber = cc;
-
-    auto defaultInterpolation = static_cast<int>(tape::Interpolator<double>::Type::Lanczos);
-    auto interpolationType = static_cast<int>(apvts.state.getChildWithName("Interpolation").getProperty("Interpolation", defaultInterpolation));
-    auto& interpolator = tape.getInterpolator();
-    interpolator.setType(static_cast<typename tape::Interpolator<double>::Type>(interpolationType), true);
+    ml.controllerNumber = cc; */
 }
 void Nel19AudioProcessor::releaseResources() {}
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -103,34 +95,40 @@ bool Nel19AudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) co
   #endif
 }
 #endif
-void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) {
-    if (buffersReallocating) return;
-    if (interpolationChanging) {
-        auto interpolationType = static_cast<int>(apvts.state.getChildWithName("Interpolation").getProperty("Interpolation", 0));
-        auto& interpolator = tape.getInterpolator();
-        interpolator.setType(static_cast<typename tape::Interpolator<double>::Type>(interpolationType), true);
-        interpolationChanging = false;
-        return;
+void Nel19AudioProcessor::processParameters() {
+    const auto depthMaxIdx = static_cast<int>(params[static_cast<int>(nelDSP::param::ID::DepthMax)]->load());
+    if (depthMaxIdx != curDepthMaxIdx) {
+        curDepthMaxIdx = depthMaxIdx;
+        const auto p = apvts.getParameter(nelDSP::param::getID(nelDSP::param::ID::DepthMax));
+        const auto depthMaxInMs = p->getCurrentValueAsText().getFloatValue();
+        nel19.setDepthMax(depthMaxInMs);
     }
-    juce::ScopedNoDenormals noDenormals;
-    const auto totalNumInputChannels  = getTotalNumInputChannels();
-    const auto totalNumOutputChannels = getTotalNumOutputChannels();
-    tape.processBlockMIDI(midi);
+    nel19.setDepth(params[static_cast<int>(nelDSP::param::ID::Depth)]->load());
+    nel19.setFreq(params[static_cast<int>(nelDSP::param::ID::Freq)]->load());
+    nel19.setLRMS(params[static_cast<int>(nelDSP::param::ID::LRMS)]->load());
+    nel19.setWidth(params[static_cast<int>(nelDSP::param::ID::Width)]->load());
+    nel19.setMix(params[static_cast<int>(nelDSP::param::ID::Mix)]->load());
+}
+void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) {
     if (buffer.getNumSamples() == 0) return;
+    juce::ScopedNoDenormals noDenormals;
+    const auto totalNumInputChannels = getTotalNumInputChannels();
+    const auto totalNumOutputChannels = getTotalNumOutputChannels();
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear(i, 0, buffer.getNumSamples());
 
-    tape.setWowDepth(param[0]->load()); // depth
-    tape.setWowFreq(param[1]->load()); // freq
-    tape.setWowWidth(param[2]->load()); // width
-    tape.setLookaheadEnabled(param[3]->load() == 0 ? false : true); // lookahead
-
-    tape.processBlock(buffer, midi);
+    processParameters();
+    nel19.processBlock(buffer, midi);
 }
 void Nel19AudioProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) {
-    if (buffersReallocating) return;
     if (buffer.getNumSamples() == 0) return;
-    tape.processBlockBypassed(buffer);
+    juce::ScopedNoDenormals noDenormals;
+    const auto totalNumInputChannels = getTotalNumInputChannels();
+    const auto totalNumOutputChannels = getTotalNumOutputChannels();
+    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
+        buffer.clear(i, 0, buffer.getNumSamples());
+    processParameters();
+    nel19.processBlockBypassed(buffer);
 }
 bool Nel19AudioProcessor::hasEditor() const { return true; }
 juce::AudioProcessorEditor* Nel19AudioProcessor::createEditor() { return new Nel19AudioProcessorEditor (*this); }
@@ -144,5 +142,9 @@ void Nel19AudioProcessor::setStateInformation (const void* data, int sizeInBytes
     if (xmlState.get() != nullptr)
         if (xmlState->hasTagName(apvts.state.getType()))
             apvts.replaceState(juce::ValueTree::fromXml(*xmlState));
+
+    // flush value tree
+    //apvts.state.removeAllChildren(nullptr);
+    //apvts.state.removeAllProperties(nullptr);
 }
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new Nel19AudioProcessor(); }
