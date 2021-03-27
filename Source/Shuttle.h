@@ -3,7 +3,8 @@
 #include <array>
 
 struct Shuttle :
-    public juce::Component
+    public NELComp,
+    public juce::Timer
 {
     // chromatic aberration fx on shuttle visualizes vibrato strength
     enum { R, G, B };
@@ -30,40 +31,25 @@ struct Shuttle :
         std::vector<std::vector<juce::uint8>> colours;
     };
 
-    Shuttle(Nel19AudioProcessor& p) :
-        processor(p),
+    Shuttle(Nel19AudioProcessor& p, NELGUtil& u) :
+        NELComp(p, u, "Lionel's space shuttle vibrates your music! :>"),
         img(nelG::load(BinaryData::shuttle_png, BinaryData::shuttle_pngSize, 2)),
         cVecs(),
         lfoValues(p.nel19.getLFOValues()),
         lastValue(), offset(),
-        depthMax(p.apvts.getParameter(nelDSP::param::getID(nelDSP::param::ID::DepthMax))),
-        depthMaxValues(),
-        heightMax(0)
+        heightMax(0), shuttleYMax(0)
     {
         for (auto& x : lastValue) x = 0;
         for (auto& x : offset) x = 0;
-        depthMaxValues = { 1, 2, 3, 5, 8, 13, 21, 420 };
+
+        startTimerHz(nelG::FPS);
     }
-    
-    void update() {
-        const auto lValue = lfoValues[Left].load();
-        const auto rValue = lfoValues[Right].load();
-        const auto depthMaxValue = depthMaxValues[static_cast<int>(depthMax->convertFrom0to1(depthMax->getValue()))];
-        offset[Left] = static_cast<int>((lValue - lastValue[Left]) * depthMaxValue);
-        offset[Right] = static_cast<int>((rValue - lastValue[Right]) * depthMaxValue);
-        lastValue[Left] = lValue;
-        lastValue[Right] = rValue;
-        repaint();
-    }
-    Nel19AudioProcessor& processor;
     juce::Image img;
     std::array<ColourVec, 3> cVecs;
     const std::array<std::atomic<float>, 2>& lfoValues;
     std::array<float, 2> lastValue;
     std::array<int, 2> offset;
-    juce::RangedAudioParameter* depthMax;
-    std::array<float, 8> depthMaxValues;
-    int heightMax;
+    int heightMax, shuttleYMax;
 private:
     void paint(juce::Graphics& g) override {
         for (auto y = 0; y < img.getHeight(); ++y) {
@@ -87,7 +73,6 @@ private:
         const auto yOffset = (getHeight() - img.getHeight()) / 2;
         for (auto& c : cVecs)
             c.resize(getWidth(), getHeight());
-
         for (auto y = yOffset; y < getHeight(); ++y) {
             const auto n = y - yOffset;
             for (auto x = 0; x < getWidth(); ++x) {
@@ -98,7 +83,18 @@ private:
             }
         }
         heightMax = getHeight() - 1;
+        const auto centreY = getHeight() / 2;
+        shuttleYMax = centreY / 4;
         img = juce::Image(juce::Image::ARGB, img.getWidth(), getHeight(), false);
+    }
+    void timerCallback() override {
+        const auto lValue = lfoValues[Left].load();
+        const auto rValue = lfoValues[Right].load();
+        offset[Left] = static_cast<int>((lValue - lastValue[Left]) * shuttleYMax);
+        offset[Right] = static_cast<int>((rValue - lastValue[Right]) * shuttleYMax);
+        lastValue[Left] = lValue;
+        lastValue[Right] = rValue;
+        repaint();
     }
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Shuttle)
 };

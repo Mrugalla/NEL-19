@@ -2,39 +2,45 @@
 #include <JuceHeader.h>
 
 class QuickAccessWheel :
-    public juce::Component {
+    public NELComp
+{
     enum class State { Def, Drag };
     
     struct Button :
-        public juce::Component {
-        Button(QuickAccessWheel& w, nelDSP::param::ID id) :
+        public NELComp
+    {
+        Button(QuickAccessWheel& w, nelDSP::param::ID id, const juce::String& s) :
+            NELComp(w.processor, w.utils, s),
             wheel(w),
             name(nelDSP::param::getName(id))
-        {}
+        {
+            qaFont = utils.font;
+            qaFont.setHeight(11);
+        }
     private:
         QuickAccessWheel& wheel;
         juce::String name;
+        juce::Font qaFont;
         void paint(juce::Graphics& g) {
-            const auto thicc = 3.f;
-            const auto rounded = 3.f;
-            const auto bounds = getLocalBounds().toFloat().reduced(thicc);
+            const auto bounds = getLocalBounds().toFloat().reduced(nelG::Thicc);
             g.setColour(juce::Colour(nelG::ColBlack));
-            g.fillRoundedRectangle(bounds, rounded);
+            g.fillRoundedRectangle(bounds, nelG::Rounded);
+            g.setFont(qaFont);
             if (wheel.state == State::Def) {
                 g.setColour(juce::Colour(nelG::ColGreen));
-                g.drawRoundedRectangle(bounds, rounded, thicc);
-                g.drawFittedText(name + "\n" + wheel.param->getCurrentValueAsText(), getLocalBounds(), juce::Justification::centred, 1, 1);
+                g.drawRoundedRectangle(bounds, nelG::Rounded, nelG::Thicc);
+                g.drawFittedText(name + "\n" + wheel.param->getCurrentValueAsText(), bounds.toNearestInt(), juce::Justification::centred, 1, 1);
             }
             else {
                 if (wheel.selectedChoice == -1) {
                     g.setColour(juce::Colour(nelG::ColRed));
                     g.drawFittedText("X", getLocalBounds(), juce::Justification::centred, 1, 1);
-                    g.drawRoundedRectangle(bounds, rounded, thicc);
+                    g.drawRoundedRectangle(bounds, nelG::Rounded, nelG::Thicc);
                     return;
                 }
                 g.setColour(juce::Colour(nelG::ColGreen));
-                g.drawRoundedRectangle(bounds, rounded, thicc);
-                g.drawFittedText(name + "\n" + wheel.param->getCurrentValueAsText(), getLocalBounds(), juce::Justification::centred, 1, 1);
+                g.drawRoundedRectangle(bounds, nelG::Rounded, nelG::Thicc);
+                g.drawFittedText(name + "\n" + wheel.param->getCurrentValueAsText(), bounds.toNearestInt(), juce::Justification::centred, 1, 1);
             }
             
         }
@@ -53,13 +59,16 @@ class QuickAccessWheel :
             auto angle = dragLine.getAngle();
             angle -= wheel.startAngle;
             while (angle < 0) angle += nelG::Tau;
-            
             if (angle < wheel.angleRange) {
                 const auto size = static_cast<float>(wheel.choices.size());
                 const auto value = size * angle / wheel.angleRange;
                 const auto rValue = static_cast<int>(value);
-                wheel.selectedChoice = juce::jlimit(0, static_cast<int>(wheel.choices.size()), rValue);
+                wheel.selectedChoice = juce::jlimit(0, static_cast<int>(wheel.choices.size() - 1), rValue);
             }
+            else if (angle < wheel.angleRange + wheel.overshootAngle)
+                wheel.selectedChoice = wheel.choices.size() - 1;
+            else if (angle > nelG::Tau - wheel.overshootAngle)
+                wheel.selectedChoice = 0;
             else
                 wheel.selectedChoice = -1;
             wheel.repaint();
@@ -72,39 +81,46 @@ class QuickAccessWheel :
                 wheel.choices[c].get()->setVisible(false);
             wheel.repaint();
         }
+
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Button)
     };
 
     struct Choice :
-        public juce::Component {
+        public NELComp {
         Choice(QuickAccessWheel& w, const juce::String& vs, int i) :
+            NELComp(w.processor, w.utils),
             wheel(w),
             valueString(vs),
             idx(i)
         {
+            cFont = utils.font;
+            cFont.setHeight(11);
         }
         QuickAccessWheel& wheel;
         juce::String valueString;
+        juce::Font cFont;
         int idx;
     private:
         void paint(juce::Graphics& g) override {
-            const auto thicc = 3.f;
-            const auto rounded = 3.f;
-            const auto bounds = getLocalBounds().toFloat().reduced(thicc);
+            const auto bounds = getLocalBounds().toFloat().reduced(nelG::Thicc);
             const auto curValue = static_cast<int>(wheel.param->convertFrom0to1(wheel.param->getValue()));
             if (idx != curValue) g.setColour(juce::Colour(0x99ffffff));
             else g.setColour(juce::Colour(nelG::ColYellow));
             g.fillRoundedRectangle(bounds, 3.f);
             g.setColour(juce::Colour(nelG::ColBlack));
-            if (idx == wheel.selectedChoice) g.drawRoundedRectangle(bounds, rounded, thicc);
+            if (idx == wheel.selectedChoice) g.drawRoundedRectangle(bounds, nelG::Rounded, nelG::Thicc);
+            g.setFont(cFont);
             g.drawFittedText(valueString, getLocalBounds(), juce::Justification::centred, 1, 0);
         }
+
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Choice)
     };
 public:
-    QuickAccessWheel(Nel19AudioProcessor& p, nelDSP::param::ID id, const NELGUtil& u) :
-        nelGUtil(u),
+    QuickAccessWheel(Nel19AudioProcessor& p, nelDSP::param::ID id, NELGUtil& u, juce::String tooltp = "") :
+        NELComp(p, u),
         param(p.apvts.getParameter(nelDSP::param::getID(id))),
-        attach(*param, [this](float v) { attach.setValueAsCompleteGesture(v); }, nullptr),
-        button(*this, id),
+        attach(*param, [this](float v) { attach.setValueAsCompleteGesture(v); repaint(); }, nullptr),
+        button(*this, id, tooltp),
         choices(),
         startAngle(nelG::Tau * .75f), angleRange(nelG::Tau * .5f),
         state(State::Def),
@@ -120,21 +136,20 @@ public:
         addAndMakeVisible(button);
         button.setMouseCursor(u.cursors[NELGUtil::Cursor::Hover]);
         setInterceptsMouseClicks(false, true);
-        setMouseCursor(nelGUtil.cursors[NELGUtil::Cursor::Norm]);
         attach.sendInitialUpdate();
     }
-    void init(juce::Rectangle<int> buttonBounds, float angleStart = 0.f, float rangeAngle = 3.14f) {
+    void init(juce::Rectangle<int> buttonBounds, float angleStart = 0.f, float rangeAngle = 3.14f, float overshoot = 3.14 / 8.f) {
         startAngle = angleStart;
         angleRange = rangeAngle;
+        overshootAngle = overshoot;
         button.setBounds(buttonBounds);
     }
 private:
-    const NELGUtil& nelGUtil;
     juce::RangedAudioParameter* param;
     juce::ParameterAttachment attach;
     Button button;
     std::vector<std::unique_ptr<Choice>> choices;
-    float startAngle, angleRange;
+    float startAngle, angleRange, overshootAngle;
     State state;
     int selectedChoice;
 
@@ -142,7 +157,7 @@ private:
         const auto bounds = getLocalBounds().toFloat();
         const auto minDimen = std::min(bounds.getWidth(), bounds.getHeight());
         const auto radius = minDimen * .5f;
-        const auto choiceDistance = radius * .75f;
+        const auto choiceDistance = radius * .7f;
         const auto choiceWidth = radius - choiceDistance;
         const auto choiceRadius = choiceWidth * .5f;
 
@@ -169,36 +184,37 @@ private:
         //g.setColour(juce::Colours::red);
         //g.drawRect(getLocalBounds(), 2);
     }
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(QuickAccessWheel)
 };
 
 struct Knob :
-    public juce::Component
+    public NELComp
 {
     struct Dial :
-        public juce::Component
+        public NELComp
     {
-        Dial(Nel19AudioProcessor& p, nelDSP::param::ID id, const NELGUtil& u) :
-            nelGUtil(u),
+        Dial(Nel19AudioProcessor& p, nelDSP::param::ID id, NELGUtil& u, const juce::String& s) :
+            NELComp(p, u, s),
             param(p.apvts.getParameter(nelDSP::param::getID(id))),
             attach(*param, [this](float v) { updateValue(v); }, nullptr),
             lastDistance(0)
         {
-            setMouseCursor(nelGUtil.cursors[NELGUtil::Cursor::Norm]);
+            setMouseCursor(utils.cursors[NELGUtil::Cursor::Hover]);
         }
-        
         void updateValue(float v) {
             attach.setValueAsPartOfGesture(v);
+            repaint();
         }
         juce::RangedAudioParameter* param;
         juce::ParameterAttachment attach;
     private:
-        const NELGUtil& nelGUtil;
         float lastDistance;
         void mouseEnter(const juce::MouseEvent&) override {
-            setMouseCursor(nelGUtil.cursors[NELGUtil::Cursor::Hover]);
+            setMouseCursor(utils.cursors[NELGUtil::Cursor::Hover]);
         }
         void mouseExit(const juce::MouseEvent&) override {
-            setMouseCursor(nelGUtil.cursors[NELGUtil::Cursor::Norm]);
+            setMouseCursor(utils.cursors[NELGUtil::Cursor::Norm]);
         }
         void mouseDown(const juce::MouseEvent&) override {
             attach.beginGesture();
@@ -214,10 +230,10 @@ struct Knob :
             const auto speed = evt.mods.isShiftDown() ? .05f : 1.f;
             const auto newValue = juce::jlimit(0.f, 1.f, param->getValue() + dRate * speed);
             updateValue(param->convertFrom0to1(newValue));
-            repaint();
             lastDistance = dist;
         }
         void mouseWheelMove(const juce::MouseEvent& evt, const juce::MouseWheelDetails& wheel) override {
+            if (evt.mouseWasClicked()) return; // why not drag? idk
             const auto speed = evt.mods.isShiftDown() ? .005f : .05f;
             const auto gestr = wheel.deltaY > 0 ? speed : -speed;
             attach.setValueAsCompleteGesture(
@@ -226,19 +242,19 @@ struct Knob :
             repaint();
         }
         void paint(juce::Graphics& g) override {
-            const auto thicc = 3.f;
-            const auto width = static_cast<float>(getWidth());
-            const auto height = static_cast<float>(getHeight());
+            const auto bounds = getLocalBounds().toFloat().reduced(nelG::Thicc);
+            const auto width = bounds.getWidth();
+            const auto height = bounds.getHeight();
             const auto diameter = std::min(width, height);
             juce::Point<float> centre(width * .5f, height * .5f);
             const auto radius = diameter * .5f;
-            const auto tickLength = radius - thicc * 4.f;
+            const auto tickLength = radius - nelG::Thicc * 2.f;
             juce::Line<float> tick(0, 0, 0, tickLength);
             const auto normalValue = param->getValue();
             const auto translation = juce::AffineTransform::translation(centre);
             const auto startAngle = juce::MathConstants<float>::pi * .25f;
             const auto angleLength = juce::MathConstants<float>::twoPi - startAngle;
-            const auto knobRadius = radius - thicc * 2.f;
+            const auto knobRadius = radius;
             const auto knobX = centre.x - knobRadius;
             const auto knobY = centre.y - knobRadius;
             const auto knobWidth = 2.f * knobRadius;
@@ -246,27 +262,29 @@ struct Knob :
             g.setColour(juce::Colour(nelG::ColBlack));
             g.fillEllipse(knobArea);
             g.setColour(juce::Colour(nelG::ColGreen));
-            g.drawEllipse(knobArea, thicc);
-            for (auto x = 0.f; x <= 1.f; x += 1.f / 16.f) {
+            g.drawEllipse(knobArea, nelG::Thicc);
+            for (auto x = 0.f; x <= 1.f; x += 1.f / 12.f) {
                 auto tickT = tick;
                 const auto angle = startAngle + (x * normalValue) * (angleLength - startAngle);
                 const auto rotation = juce::AffineTransform::rotation(angle);
                 tickT.applyTransform(rotation.followedBy(translation));
-                g.drawLine(tickT, thicc);
+                g.drawLine(tickT, nelG::Thicc);
             }
         }
     };
 
-    Knob(Nel19AudioProcessor& p, nelDSP::param::ID id, const NELGUtil& u) :
-        nelGUtil(u),
+    Knob(Nel19AudioProcessor& p, nelDSP::param::ID id, NELGUtil& u, juce::String tooltp = "") :
+        NELComp(p, u, tooltp),
         param(p.apvts.getParameter(nelDSP::param::getID(id))),
         attach(*param, [this](float v) { updateValue(v); }, nullptr),
-        dial(p, id, u),
+        dial(p, id, u, tooltp),
         name("", nelDSP::param::getName(id)),
         textbox("", "-")
     {
-        name.setMouseCursor(nelGUtil.cursors[NELGUtil::Cursor::Norm]);
-        textbox.setMouseCursor(nelGUtil.cursors[NELGUtil::Cursor::Norm]);
+        name.setMouseCursor(u.cursors[NELGUtil::Cursor::Norm]);
+        textbox.setMouseCursor(u.cursors[NELGUtil::Cursor::Norm]);
+        name.setFont(utils.font);
+        textbox.setFont(utils.font);
         name.setColour(juce::Label::ColourIds::textColourId, juce::Colour(nelG::ColBlack));
         name.setJustificationType(juce::Justification::centredBottom);
         textbox.setColour(juce::Label::ColourIds::textColourId, juce::Colour(nelG::ColBlack));
@@ -282,7 +300,6 @@ struct Knob :
         attach.setValueAsPartOfGesture(v);
     }
 
-    const NELGUtil& nelGUtil;
     juce::RangedAudioParameter* param;
     juce::ParameterAttachment attach;
     Dial dial;
@@ -309,27 +326,26 @@ private:
 };
 
 struct ButtonSwitch :
-    public juce::Component {
+    public NELComp {
 
-    ButtonSwitch(Nel19AudioProcessor& p, nelDSP::param::ID id, const NELGUtil& u) :
+    ButtonSwitch(Nel19AudioProcessor& p, nelDSP::param::ID id, NELGUtil& u, juce::String tooltp = "") :
+        NELComp(p, u, tooltp),
         param(p.apvts.getParameter(nelDSP::param::getID(id))),
-        attach(*param, [this](float v) { attach.setValueAsCompleteGesture(v); })
+        attach(*param, [this](float v) { attach.setValueAsCompleteGesture(v); repaint(); })
     {
         setMouseCursor(u.cursors[NELGUtil::Cursor::Hover]);
     }
-
 private:
     juce::RangedAudioParameter* param;
     juce::ParameterAttachment attach;
 
     void paint(juce::Graphics& g) override {
-        const auto thicc = 3.f;
-        const auto rounded = 3.f;
-        const auto bounds = getLocalBounds().toFloat().reduced(thicc);
+        const auto bounds = getLocalBounds().toFloat().reduced(nelG::Thicc);
         g.setColour(juce::Colour(nelG::ColBlack));
-        g.fillRoundedRectangle(bounds, rounded);
+        g.fillRoundedRectangle(bounds, nelG::Rounded);
         g.setColour(juce::Colour(nelG::ColGreen));
-        g.drawRoundedRectangle(bounds, rounded, thicc);
+        g.drawRoundedRectangle(bounds, nelG::Rounded, nelG::Thicc);
+        g.setFont(utils.font);
         g.drawFittedText(param->getCurrentValueAsText(), getLocalBounds(), juce::Justification::centred, 1);
     }
     void mouseUp(const juce::MouseEvent& evt) override {
@@ -337,23 +353,27 @@ private:
         attach.setValueAsCompleteGesture(1.f - param->getValue());
         repaint();
     }
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ButtonSwitch)
 };
 
 struct ParametersEditor :
-    public juce::Component
+    public NELComp
 {
-    ParametersEditor(Nel19AudioProcessor& p, const NELGUtil& u) :
-        utils(u),
-        processor(p),
-        depthMaxK(p, nelDSP::param::ID::DepthMax, utils),
-        lrmsK(p, nelDSP::param::ID::LRMS, utils),
-        depthK(p, nelDSP::param::ID::Depth, utils),
-        freqK(p, nelDSP::param::ID::Freq, utils),
-        widthK(p, nelDSP::param::ID::Width, utils),
-        mixK(p, nelDSP::param::ID::Mix, utils)
+    ParametersEditor(Nel19AudioProcessor& p, NELGUtil& u) :
+        NELComp(p, u),
+        depthMaxK(p, nelDSP::param::ID::DepthMax, utils, "Higher DepthMax values sacrifice latency for a stronger vibrato."),
+        lrmsK(p, nelDSP::param::ID::LRMS, utils, "L/R for traditional stereo width, M/S for mono compatibility."),
+        depthK(p, nelDSP::param::ID::Depth, utils, "Defines the depth of the vibrato."),
+        freqK(p, nelDSP::param::ID::Freq, utils, "The frequency in which random values are picked for the LFO."),
+        shapeK(p, nelDSP::param::ID::Shape, utils, "Defines the shape of the randomizer."),
+        widthK(p, nelDSP::param::ID::Width, utils, "The offset of each channel's Random LFO."),
+        mixK(p, nelDSP::param::ID::Mix, utils, "Turn Mix down for Chorus/Flanger-Sounds.")
     {
+        setInterceptsMouseClicks(false, true);
         addAndMakeVisible(depthK);
         addAndMakeVisible(freqK);
+        addAndMakeVisible(shapeK);
         addAndMakeVisible(widthK);
         addAndMakeVisible(mixK);
         addAndMakeVisible(depthMaxK);
@@ -370,33 +390,37 @@ struct ParametersEditor :
         const auto height = static_cast<float>(bounds.getHeight());
         auto x = bX;
         const auto y = bY;
-        const auto objWidth = width / 4.f;
+        const auto knobCount = 5.f;
+        const auto objWidth = width / knobCount;
         const auto knobHeight = height * .75f;
         depthK.setBounds(juce::Rectangle<float>(x, y, objWidth, knobHeight).toNearestInt());
         depthMaxK.init(
-            juce::Rectangle<int>(objWidth + depthK.dial.getX(), depthK.getBottom(), depthK.dial.getWidth(), (getHeight() - depthK.getBottom()) * 2 / 3),
+            juce::Rectangle<int>(
+                static_cast<int>(objWidth + depthK.dial.getX()),
+                depthK.getBottom(),
+                depthK.dial.getWidth(),
+                (getHeight() - depthK.getBottom()) * 2 / 3
+                ),
             nelG::Tau * .75f,
-            nelG::Tau * .5f
+            nelG::Tau * .5f,
+            nelG::PiQuart * .25f
         );
         depthMaxK.setBounds(juce::Rectangle<float>(x - objWidth, y, objWidth * 3, height).toNearestInt());
         x += objWidth;
         freqK.setBounds(juce::Rectangle<float>(x, y, objWidth, knobHeight).toNearestInt());
         x += objWidth;
+        shapeK.setBounds(juce::Rectangle<float>(x, y, objWidth, knobHeight).toNearestInt());
+        x += objWidth;
         widthK.setBounds(juce::Rectangle<float>(x, y, objWidth, knobHeight).toNearestInt());
-        lrmsK.setBounds(juce::Rectangle<float>(x + depthK.dial.getX(), knobHeight, depthK.dial.getWidth(), (getHeight() - depthK.getBottom()) * 2 / 3).toNearestInt());
+        lrmsK.setBounds(juce::Rectangle<float>(x + static_cast<float>(depthK.dial.getX()), knobHeight, static_cast<float>(depthK.dial.getWidth()), static_cast<float>(getHeight() - depthK.getBottom()) * 2.f / 3.f).toNearestInt());
         x += objWidth;
         mixK.setBounds(juce::Rectangle<float>(x, y, objWidth, knobHeight).toNearestInt());
     }
 private:
-    const NELGUtil& utils;
-    Nel19AudioProcessor& processor;
     QuickAccessWheel depthMaxK;
     ButtonSwitch lrmsK;
-    Knob depthK, freqK, widthK, mixK;
+    Knob depthK, freqK, shapeK, widthK, mixK;
     juce::Rectangle<int> bounds;
-    void mouseEnter(const juce::MouseEvent&) override {
-        setMouseCursor(utils.cursors[NELGUtil::Cursor::Norm]);
-    }
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ParametersEditor)
 };

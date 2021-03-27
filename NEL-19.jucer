@@ -1,19 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<JUCERPROJECT id="z7Rdwx" name="NEL-19" projectType="audioplug" useAppConfig="0"
+<JUCERPROJECT id="z7Rdwx" name="NEL" projectType="audioplug" useAppConfig="0"
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginFormats="buildStandalone,buildVST3"
-              pluginName="NEL-19" pluginDesc="Random Vibrato For Time Travellers"
+              pluginName="NEL" pluginDesc="Creative Vibrato For Travellers"
               pluginManufacturer="Florian Mrugalla" pluginVST3Category="Modulation"
-              pluginRTASCategory="32" pluginAAXCategory="32" cppLanguageStandard="17"
-              pluginCharacteristicsValue="pluginWantsMidiIn">
-  <MAINGROUP id="V2oOlh" name="NEL-19">
+              pluginRTASCategory="32" pluginAAXCategory="32" pluginCharacteristicsValue="pluginWantsMidiIn"
+              pluginCode="Nel9" pluginManufacturerCode="Mrug" companyName="Mrugalla">
+  <MAINGROUP id="V2oOlh" name="NEL">
     <GROUP id="{EB637F68-8B54-CF39-23F4-99282698FA6E}" name="Img">
+      <FILE id="UlEIyH" name="bluecat.png" compile="0" resource="1" file="Source/Img/bluecat.png"/>
       <FILE id="ok6eqm" name="cursor.png" compile="0" resource="1" file="Source/Img/cursor.png"/>
+      <FILE id="ciQHKW" name="juce.png" compile="0" resource="1" file="Source/Img/juce.png"/>
       <FILE id="Y03fii" name="shuttle.png" compile="0" resource="1" file="Source/Img/shuttle.png"/>
+      <FILE id="xFrvgl" name="tap.png" compile="0" resource="1" file="Source/Img/tap.png"/>
       <FILE id="e3uEiq" name="vst3_logo_small.png" compile="0" resource="1"
             file="Source/Img/vst3_logo_small.png"/>
     </GROUP>
     <GROUP id="{FF8BE835-9B90-31CB-45F4-D4B15FDEFD04}" name="Source">
+      <FILE id="KltU2P" name="nel19.ttf" compile="0" resource="1" file="Source/Font/nel19.ttf"/>
+      <FILE id="kZc4tA" name="TooltipComponent.h" compile="0" resource="0"
+            file="Source/TooltipComponent.h"/>
       <FILE id="LCWf9f" name="Shuttle.h" compile="0" resource="0" file="Source/Shuttle.h"/>
       <FILE id="B2ClOc" name="TitleEditor.h" compile="0" resource="0" file="Source/TitleEditor.h"/>
       <FILE id="vzEU0y" name="SpaceEditor.h" compile="0" resource="0" file="Source/SpaceEditor.h"/>
@@ -39,8 +45,8 @@
   <EXPORTFORMATS>
     <VS2019 targetFolder="Builds/VisualStudio2019">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="NEL-19" enablePluginBinaryCopyStep="1"/>
-        <CONFIGURATION isDebug="0" name="Release" targetName="NEL-19" enablePluginBinaryCopyStep="1"/>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="NEL" enablePluginBinaryCopyStep="1"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="NEL" enablePluginBinaryCopyStep="1"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../../JUCE/modules"/>

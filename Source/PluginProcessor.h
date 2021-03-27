@@ -6,7 +6,6 @@ class Nel19AudioProcessor :
     public juce::AudioProcessor {
 public:
     Nel19AudioProcessor();
-    ~Nel19AudioProcessor() override;
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
    #ifndef JucePlugin_PreferredChannelConfigurations
@@ -28,7 +27,10 @@ public:
     void changeProgramName (int index, const juce::String& newName) override;
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
+    juce::PropertiesFile::Options makeOptions();
     void processParameters();
+
+    juce::ApplicationProperties appProperties;
 
     juce::AudioProcessorValueTreeState apvts;
     std::vector<std::atomic<float>*> params;

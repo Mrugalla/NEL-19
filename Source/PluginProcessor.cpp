@@ -11,20 +11,38 @@ Nel19AudioProcessor::Nel19AudioProcessor()
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
                        ),
+    appProperties(),
     apvts(*this, nullptr, "parameters", nelDSP::param::createParameters()),
     params(),
     nel19(this),
     curDepthMaxIdx(0)
 #endif
 {
+    appProperties.setStorageParameters(makeOptions());
+
     params.push_back(apvts.getRawParameterValue(nelDSP::param::getID(nelDSP::param::ID::DepthMax)));
     params.push_back(apvts.getRawParameterValue(nelDSP::param::getID(nelDSP::param::ID::Depth)));
     params.push_back(apvts.getRawParameterValue(nelDSP::param::getID(nelDSP::param::ID::Freq)));
+    params.push_back(apvts.getRawParameterValue(nelDSP::param::getID(nelDSP::param::ID::Shape)));
     params.push_back(apvts.getRawParameterValue(nelDSP::param::getID(nelDSP::param::ID::LRMS)));
     params.push_back(apvts.getRawParameterValue(nelDSP::param::getID(nelDSP::param::ID::Width)));
     params.push_back(apvts.getRawParameterValue(nelDSP::param::getID(nelDSP::param::ID::Mix)));
 }
-Nel19AudioProcessor::~Nel19AudioProcessor(){}
+
+juce::PropertiesFile::Options Nel19AudioProcessor::makeOptions() {
+    juce::PropertiesFile::Options options;
+    options.applicationName = JucePlugin_Name;
+    options.filenameSuffix = ".settings";
+    options.folderName = "Mrugalla" + juce::File::getSeparatorString() + JucePlugin_Name;
+    options.osxLibrarySubFolder = "Application Support";
+    options.commonToAllUsers = false;
+    options.ignoreCaseOfKeyNames = true;
+    options.doNotSave = false;
+    options.millisecondsBeforeSaving = 0;
+    options.storageFormat = juce::PropertiesFile::storeAsXML;
+    return options;
+}
+
 const juce::String Nel19AudioProcessor::getName() const { return JucePlugin_Name; }
 bool Nel19AudioProcessor::acceptsMidi() const{
    #if JucePlugin_WantsMidiInput
@@ -56,45 +74,19 @@ void Nel19AudioProcessor::changeProgramName (int, const juce::String&){}
 
 void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize) {    
     nel19.prepareToPlay(sampleRate, maxBufferSize, getChannelCountOfBus(true, 0));
-    /*
-    auto state = static_cast<int>(
-        apvts.state.getChildWithName("MIDILearn").getProperty("MIDILearn", 0)
-    );
-    auto& ml = nel19.getMidiLearn();
-    ml.setState(static_cast<nelDSP::MidiLearn::State>(state));
-    auto type = static_cast<int>(
-        apvts.state.getChildWithName("MIDILearn").getProperty("Type", 0)
-    );
-    ml.type = static_cast<nelDSP::MidiLearn::Type>(type);
-    auto cc = static_cast<int>(
-        apvts.state.getChildWithName("MIDILearn").getProperty("CC", 0)
-    );
-    ml.controllerNumber = cc; */
 }
 void Nel19AudioProcessor::releaseResources() {}
-#ifndef JucePlugin_PreferredChannelConfigurations
-bool Nel19AudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
-{
-  #if JucePlugin_IsMidiEffect
-    juce::ignoreUnused (layouts);
-    return true;
-  #else
-    // This is the place where you check if the layout is supported.
-    // In this template code we only support mono or stereo.
-    if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::mono()
-     && layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
-        return false;
 
-    // This checks if the input layout matches the output layout
-   #if ! JucePlugin_IsSynth
-    if (layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet())
-        return false;
-   #endif
+bool Nel19AudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const {
+    return
+        (layouts.getMainInputChannelSet() == juce::AudioChannelSet::disabled()
+        && layouts.getMainOutputChannelSet() == juce::AudioChannelSet::disabled())
 
-    return true;
-  #endif
+        ||
+
+        (layouts.getMainOutputChannelSet() == juce::AudioChannelSet::mono()
+        || layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo());
 }
-#endif
 void Nel19AudioProcessor::processParameters() {
     const auto depthMaxIdx = static_cast<int>(params[static_cast<int>(nelDSP::param::ID::DepthMax)]->load());
     if (depthMaxIdx != curDepthMaxIdx) {
@@ -105,6 +97,7 @@ void Nel19AudioProcessor::processParameters() {
     }
     nel19.setDepth(params[static_cast<int>(nelDSP::param::ID::Depth)]->load());
     nel19.setFreq(params[static_cast<int>(nelDSP::param::ID::Freq)]->load());
+    nel19.setShape(params[static_cast<int>(nelDSP::param::ID::Shape)]->load());
     nel19.setLRMS(params[static_cast<int>(nelDSP::param::ID::LRMS)]->load());
     nel19.setWidth(params[static_cast<int>(nelDSP::param::ID::Width)]->load());
     nel19.setMix(params[static_cast<int>(nelDSP::param::ID::Mix)]->load());

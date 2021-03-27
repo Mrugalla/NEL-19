@@ -12,7 +12,8 @@ namespace nelDSP {
 	static constexpr int InterpolationOrderHalf = MaxInterpolationOrder / 2;
 	// CERTAINTY LFO & SMOOTH CONST
 	static constexpr float DepthDefault = .1f;
-	static constexpr float LFOFreqMin = .5f, LFOFreqMax = 13, LFOFreqDefault = 4.f, LFOFreqInterval = .5f;
+	static constexpr float LFOFreqMin = .01f, LFOFreqMax = 30.f, LFOFreqDefault = 4.f, LFOFreqInterval = .5f;
+	static constexpr float ShapeMax = 24;
 	static constexpr int SmoothOrderDefault = 3;
 	// DELAY CONST
 	static constexpr float DelaySizeInMS = 5.f, DelaySizeInMSMin = 1, DelaySizeInMSMax = 1000;
@@ -134,28 +135,10 @@ namespace nelDSP {
 				swapped = false;
 			} while (true);
 		}
-		static double average(const std::vector<double>& data) {
-			double x = 0;
-			for (const auto& d : data)
-				x += d;
-			return x / data.size();
-		}
-		static void playback(juce::AudioBuffer<float>& buffer, const std::vector<double>& data, const int ch) {
-			auto samples = buffer.getArrayOfWritePointers();
-			for (auto s = 0; s < buffer.getNumSamples(); ++s)
-				samples[ch][s] = (float)data[s];
-		}
 		static void playback(juce::AudioBuffer<float>& buffer, const std::vector<float>& data, const int ch) {
 			auto samples = buffer.getArrayOfWritePointers();
 			for (auto s = 0; s < buffer.getNumSamples(); ++s)
 				samples[ch][s] = data[s];
-		}
-		static void playback(juce::AudioBuffer<float>& buffer, const std::vector<double>& l, const std::vector<double>& r) {
-			auto samples = buffer.getArrayOfWritePointers();
-			for (auto s = 0; s < buffer.getNumSamples(); ++s) {
-				samples[0][s] = (float)l[s];
-				samples[1][s] = (float)r[s];
-			}	
 		}
 		static void playback(juce::AudioBuffer<float>& buffer, const std::vector<float>& l, const std::vector<float>& r) {
 			auto samples = buffer.getArrayOfWritePointers();
@@ -163,12 +146,6 @@ namespace nelDSP {
 				samples[0][s] = l[s];
 				samples[1][s] = r[s];
 			}
-		}
-		static void playback(juce::AudioBuffer<float>& buffer, const std::vector<double>& data) {
-			auto samples = buffer.getArrayOfWritePointers();
-			for (auto ch = 0; ch < buffer.getNumChannels(); ++ch)
-				for (auto s = 0; s < buffer.getNumSamples(); ++s)
-					samples[ch][s] = (float)data[s];
 		}
 		static void playback(juce::AudioBuffer<float>& buffer, const std::vector<float>& data) {
 			auto samples = buffer.getArrayOfWritePointers();
@@ -182,19 +159,6 @@ namespace nelDSP {
 			auto idx = 0;
 			for(auto s = 0; s < data.getNumSamples(); ++s) {
 				header += juce::String(samples[0][s]) + ", ";
-				++idx;
-				if (idx == wordsPerLine) {
-					header += "\n";
-					idx = 0;
-				}
-			}
-			DBG(header += "\n");
-		}
-		static void dbg(const std::vector<double>& data, juce::String header = "", const int wordsPerLine = 17) {
-			if (header.length() != 0) header += ":\n";
-			auto idx = 0;
-			for (const auto& d : data) {
-				header += juce::String(d) + ", ";
 				++idx;
 				if (idx == wordsPerLine) {
 					header += "\n";
@@ -259,8 +223,8 @@ namespace nelDSP {
 		Rand() :
 			gen(std::chrono::high_resolution_clock::now().time_since_epoch().count())
 		{}
-		const float operator()() { return gen.nextFloat(); }
-		const int operator()(const int len) { return gen.nextInt(len); }
+		float operator()() { return gen.nextFloat(); }
+		int operator()(const int len) { return gen.nextInt(len); }
 	private:
 		juce::Random gen;
 	};
@@ -335,13 +299,14 @@ namespace nelDSP {
 	};
 
 	namespace param {
-		enum class ID { DepthMax, Depth, Freq, LRMS, Width, Mix };
+		enum class ID { DepthMax, Depth, Freq, Shape, LRMS, Width, Mix };
 
 		static juce::String getName(ID i) {
 			switch (i) {
 			case ID::DepthMax: return "Depth Max";
 			case ID::Depth: return "Depth";
 			case ID::Freq: return "Freq";
+			case ID::Shape: return "Shape";
 			case ID::LRMS: return "LRMS";
 			case ID::Width: return "Width";
 			case ID::Mix: return "Mix";
@@ -395,14 +360,23 @@ namespace nelDSP {
 			auto lrMsStr = [](float value, int) {
 				return value < .5f ? juce::String("L/R") : juce::String("M/S");
 			};
-			const auto depthMaxChoices = util::makeChoicesArray({ "1","2","3","5","8","13","21","420" });
-			
+			auto sinSqrStr = [](float val, int) {
+				juce::juce_wchar s = 's', i = 'i', n = 'n', q = 'q', r = 'r';
+				const auto l0 = juce::String::charToString(s);
+				const auto l1 = juce::String::charToString(juce::juce_wchar(i + val * (q - i)));
+				const auto l2 = juce::String::charToString(juce::juce_wchar(n + val * (r - n)));
+				return l0 + l1 + l2;
+			};
+			const auto depthMaxChoices = util::makeChoicesArray({ "1","2","3","5","8","13","21","34","55","420" });
+
 			parameters.push_back(createPChoice(ID::DepthMax, depthMaxChoices, 2));
 			parameters.push_back(createParameter(
 				ID::Depth, util::QuadraticBezierRange(0, 1, .51f), DepthDefault, percentStr));
 			parameters.push_back(createParameter(
-				ID::Freq, util::QuadraticBezierRange(LFOFreqMin, LFOFreqMax, .51f), LFOFreqDefault, freqStr));
-			parameters.push_back(createPBool(ID::LRMS, false, lrMsStr));
+				ID::Freq, util::QuadraticBezierRange(LFOFreqMin, LFOFreqMax, .01f), LFOFreqDefault, freqStr));
+			parameters.push_back(createParameter(
+				ID::Shape, util::QuadraticBezierRange(0, 1, .01f), 1, sinSqrStr));
+			parameters.push_back(createPBool(ID::LRMS, true, lrMsStr));
 			parameters.push_back(createParameter(
 				ID::Width, util::QuadraticBezierRange(0, 1, .3f), WowWidthDefault, percentStr));
 			parameters.push_back(createParameter(
@@ -838,14 +812,22 @@ namespace nelDSP {
 				smooth(utils, SmoothOrderDefault),
 				utils(utils),
 				certainty(certainty),
-				curValue(0)
+				freq(1),
+				shape(1),
+				curValue(0),
+				depth(1)
 			{}
 			// PARAM
 			void setFrequencyInHz(float hz) {
-				phase.setFrequencyInHz(hz);
-				smooth.setInertiaInHz(hz * SmoothOrderDefault);
+				freq = hz;
+				phase.setFrequencyInHz(freq);
+				updateLowpassFrequency();
 			}
 			void setDepth(float d) { depth = d; }
+			void setShape(float s) {
+				shape = s;
+				updateLowpassFrequency();
+			}
 			// PROCESS
 			void synthesizeBlock(std::vector<float>& data) { synthesizeRandomValues(data); }
 			void smoothen(std::vector<float>& data) { smooth.processBlock(data); }
@@ -871,13 +853,16 @@ namespace nelDSP {
 			const Utils& utils;
 			certainty::Generator& certainty;
 
-			float curValue, depth;
+			float freq, shape, curValue, depth;
+
+			void updateLowpassFrequency() { smooth.setInertiaInHz(shape * freq * SmoothOrderDefault); }
 
 			/* synthesizes a smooth random curve (-1, 1) */
 			void synthesizeRandomValues(std::vector<float>& data) {
 				for (auto s = 0; s < utils.numSamples; ++s) {
 					if (phase()) {
-						curValue = certainty() * depth;
+						const auto cert = certainty();
+						curValue = cert * depth;
 						if (rand() > .5f)
 							curValue *= -1.f;
 					}
@@ -958,12 +943,13 @@ namespace nelDSP {
 			// PARAM
 			void setDepth(const float d) { seq.setDepth(d); }
 			void setFreq(const float f) { seq.setFrequencyInHz(f); }
+			void setShape(const float s) { seq.setShape(s); }
 			// PROCESS
 			void synthesizeLFO() { seq.synthesizeBlock(data); }
 			void synthesizeLFOBypassed() { seq.synthesizeBlockBypassed(data); }
 			void copyLFO(float* other) { juce::FloatVectorOperations::copy(data.data(), other, utils.numSamples); } // IF WIDTH == 0
 			void saveLFOValue(std::atomic<float>& lfoValue) { lfoValue.store(data[0]); }
-			void mixLFO(float* other, const std::vector<float>& widthData) { // FOR ALL LFOS of channel > 0 && WIDTH != 0 WITH BUFFER
+			void mixLFO(float* other, const std::vector<float>& widthData) { // FOR LFOS of channel == 1 && WIDTH != 0
 				for (auto s = 0; s < utils.numSamples; ++s)
 					data[s] = other[s] + widthData[s] * (data[s] - other[s]);
 			}
@@ -1002,7 +988,7 @@ namespace nelDSP {
 				width(0.f), dest(static_cast<float>(WowWidthDefault))
 			{}
 			// SET
-			void setSampleRate() { smooth.setInertiaInHz(20.f); }
+			void setSampleRate() { smooth.setInertiaInHz(17.f); }
 			// PARAM
 			void setWidth(float w) { dest = w; }
 			// PROCESS
@@ -1038,10 +1024,10 @@ namespace nelDSP {
 				dryBuffer(),
 				utils(u),
 				smoothA(u, 0), smoothB(u, 0),
-				mix(1), mixA(0), mixB(1)
+				mix(1.f), mixA(0), mixB(1)
 			{}
 			// SET
-			void setSampleRate(){ smoothA.setInertiaInHz(7); smoothB.setInertiaInHz(7); }
+			void setSampleRate() { smoothA.setInertiaInHz(7); smoothB.setInertiaInHz(7); }
 			void setNumChannels() {
 				dryBuffer.resize(utils.maxBufferSize);
 				setMaxBufferSize();
@@ -1064,18 +1050,16 @@ namespace nelDSP {
 			}
 			void operator()(juce::AudioBuffer<float>& buffer, std::vector<float>& data) {
 				// MIX
-				if (mix != 1) {
-					auto samples = buffer.getArrayOfWritePointers();
+				auto samples = buffer.getArrayOfWritePointers();
+				for (auto s = 0; s < utils.numSamples; ++s)
+					data[s] = smoothB(mixB);
+				for (auto ch = 0; ch < utils.numChannels; ++ch)
+					juce::FloatVectorOperations::multiply(samples[ch], data.data(), utils.numSamples);
+				for (auto s = 0; s < utils.numSamples; ++s)
+					data[s] = smoothA(mixA);
+				for (auto ch = 0; ch < utils.numChannels; ++ch)
 					for (auto s = 0; s < utils.numSamples; ++s)
-						data[s] = smoothB(mixB);
-					for (auto ch = 0; ch < utils.numChannels; ++ch)
-						juce::FloatVectorOperations::multiply(samples[ch], data.data(), utils.numSamples);
-					for (auto s = 0; s < utils.numSamples; ++s)
-						data[s] = smoothA(mixA);
-					for (auto ch = 0; ch < utils.numChannels; ++ch)
-						for (auto s = 0; s < utils.numSamples; ++s)
-							samples[ch][s] += dryBuffer[ch][s] * data[s];
-				}
+						samples[ch][s] += dryBuffer[ch][s] * data[s];
 			}
 			std::vector<std::vector<float>> dryBuffer;
 			const Utils& utils;
@@ -1095,7 +1079,7 @@ namespace nelDSP {
 				widthProcessor(u),
 				utils(u),
 
-				depth(1.f), freq(static_cast<float>(LFOFreqDefault)), mix(1)
+				depth(1.f), freq(static_cast<float>(LFOFreqDefault)), shape(1), mix(-1.f)
 			{
 			}
 			// SET
@@ -1126,6 +1110,11 @@ namespace nelDSP {
 				freq = f;
 				for (auto& ch : chModules)
 					ch.setFreq(freq);
+			}
+			void setShape(const float s) {
+				shape = std::pow(ShapeMax, s);
+				for (auto& ch : chModules)
+					ch.setShape(shape);
 			}
 			void setWidth(const float w) { widthProcessor.setWidth(w); }
 			void setMix(const float m) {
@@ -1170,7 +1159,7 @@ namespace nelDSP {
 			Utils& utils;
 
 			// PARAM
-			float depth, freq, mix;
+			float depth, freq, shape, mix;
 		};
 	}
 
@@ -1235,6 +1224,7 @@ namespace nelDSP {
 		}
 		void setDepth(const float depth) { vibrato.setDepth(depth); }
 		void setFreq(const float freq) { vibrato.setFreq(freq); }
+		void setShape(const float shape) { vibrato.setShape(shape); }
 		void setLRMS(const float lrms) { stereoMode.setIsMS(lrms > .5f); }
 		void setWidth(const float width) { vibrato.setWidth(width); }
 		void setMix(const float mix) { vibrato.setMix(mix); }
@@ -1265,24 +1255,25 @@ namespace nelDSP {
 /* TO DO
 
 BUGS:
-	FL Randomizer makes plugin freeze
+	FL Parameter Randomizer makes plugin freeze
 		processBlock not called anymore
 		parameters not shown above Randomize
 	STUDIO ONE v5.1 (SB Dvs):
 		jiterry output
-		daw crashes when plugin is removed
+		daw crashes when plugin removed
 	STUDIO ONE
 		no mouseCursor shown
 	REAPER (F Mry):
 		plugin doesn't show up (maybe missing dependencies)
 
 ADD FEATURES / IMPROVE:
-	quickaccesswheel should be below corrspnd knob
-	mid/side
+	cpu verbrauch hoch, interpolation?
+	m/s switch clicks
+	maxdepth auswahl eingeschränkt oben rum
+	mix parameter smoothing
+	mixprocessor only save dry if mix != 1
 	poly vibrato? (unison)
 	new midi learn
-	New Design
-		delay readhead visualizer
 	temposync
 	multiband
 	monoizer for stereowidth-slider to flanger?

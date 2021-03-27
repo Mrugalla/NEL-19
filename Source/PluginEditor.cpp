@@ -4,18 +4,23 @@
 Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     AudioProcessorEditor(&p),
     audioProcessor(p),
-    nelGUtil(),
-    space(),
+    nelGUtil(p),
+    space(p, nelGUtil),
     title(p, nelGUtil),
-    params(p, nelGUtil)
+    params(p, nelGUtil),
+    settings(p, nelGUtil),
+    settingsButton(p, settings, nelGUtil),
+    randomizerButton(p, nelGUtil)
 {
     addAndMakeVisible(space);
     addAndMakeVisible(title);
     addAndMakeVisible(params);
+    addAndMakeVisible(randomizerButton);
+    addAndMakeVisible(settings); settings.setVisible(false);
+    addAndMakeVisible(settingsButton);
 
     space.setMouseCursor(nelGUtil.cursors[NELGUtil::Cursor::Norm]);
 
-    startTimerHz(nelG::FPS);
     setSize(
         static_cast<int>(nelG::Width * nelG::Scale),
         static_cast<int>(nelG::Height * nelG::Scale)
@@ -39,13 +44,25 @@ void Nel19AudioProcessorEditor::resized() {
         getWidth() - shuttleWidth - title.shuttleX,
         space.getHeight()
     });
-}
-void Nel19AudioProcessorEditor::timerCallback() { title.update(); }
 
-/*
-to do:
-vst logo
-settingseditor
-    link discord, github, juce, josh, paypal
-    dank
-*/
+    // left bar of buttons
+    const auto buttonX = 4.f * nelG::Scale;
+    const auto buttonY = buttonX;
+    const auto buttonWidth = 30.f * nelG::Scale;
+    const auto buttonHeight = buttonWidth;
+    settingsButton.setBounds(juce::Rectangle<float>(
+        buttonX, buttonY, buttonWidth, buttonHeight).toNearestInt()
+    );
+
+    juce::Rectangle<float> settingsBounds(0.f, 0.f,
+        width,
+        height * .925f
+    );
+    settings.setBounds(settingsBounds.toNearestInt());
+    juce::Rectangle<float> randButtonBounds(
+        buttonX,
+        static_cast<float>(settingsButton.getBottom()) + buttonY,
+        buttonWidth, buttonHeight
+    );
+    randomizerButton.setBounds(randButtonBounds.toNearestInt());
+}

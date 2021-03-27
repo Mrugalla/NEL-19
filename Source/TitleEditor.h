@@ -1,40 +1,30 @@
 #pragma once
 #include "Shuttle.h"
+#include "SettingsEditor.h"
+#include "TooltipComponent.h"
 #include <JuceHeader.h>
 
 struct TitleEditor :
-    public juce::Component
+    public NELComp
 {
-    TitleEditor(Nel19AudioProcessor& p, const NELGUtil& u) :
-        utils(u),
-        processor(p),
-        shuttle(p),
+    TitleEditor(Nel19AudioProcessor& p, NELGUtil& u) :
+        NELComp(p, u),
+        shuttle(p, u),
+        tooltip(p, u),
         titleArea(),
         paramAreaX(0), paramAreaHeight(0),
         shuttleX(6)
     {
         addAndMakeVisible(shuttle);
-        
-        shuttle.setMouseCursor(u.cursors[NELGUtil::Cursor::Norm]);
+        addAndMakeVisible(tooltip);
     }
-    
-    void drawBuildDate(juce::Graphics& g) {
-        const auto buildDate = juce::String(__DATE__);
-        g.setColour(juce::Colour(0x44ffffff));
-        g.drawFittedText("Build: " + buildDate, getLocalBounds(), juce::Justification::bottomRight, 1, 0);
-    }
-   
     void setArea(float x, float y) {
         paramAreaX = x;
         paramAreaHeight = y;
     }
-    void update() {
-        shuttle.update();
-    }
 
-    const NELGUtil& utils;
-    Nel19AudioProcessor& processor;
     Shuttle shuttle;
+    TooltipComponent tooltip;
     juce::Path titleArea;
     float paramAreaX, paramAreaHeight;
     int shuttleX;
@@ -64,7 +54,14 @@ private:
         titleArea.closeSubPath();
 
         shuttle.setBounds(shuttleX, 0, shuttle.img.getWidth(), getHeight());
+        const auto tooltipHeight = static_cast<int>(destHeight);
+        tooltip.setBounds(0, tooltipHeight, getWidth(), getHeight() - tooltipHeight);
     }
-    
+    void drawBuildDate(juce::Graphics& g) {
+        const auto buildDate = juce::String(__DATE__);
+        g.setColour(juce::Colour(0x44ffffff));
+        g.setFont(utils.font);
+        g.drawFittedText("Build: " + buildDate, getLocalBounds(), juce::Justification::bottomRight, 1, 0);
+    }
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TitleEditor)
 };
