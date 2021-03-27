@@ -1289,6 +1289,7 @@ BUGS:
 		plugin doesn't show up (maybe missing dependencies)
 
 ADD FEATURES / IMPROVE:
+	rewrite so that param smoothing before go to processors
 	cpu verbrauch hoch, interpolation?
 	maxdepth auswahl eingeschränkt oben rum
 	mix parameter smoothing for hard changes
