@@ -608,6 +608,61 @@ namespace nelDSP {
 		};
 	}
 
+	struct ASREnvelope {
+		enum class State { Attack, Sustain, Release };
+		ASREnvelope(const Utils& u) :
+			utils(u),
+			env(0),
+			state(State::Release),
+			attack(.001f),
+			release(.001f)
+		{}
+		// SET
+		void setMaxBufferSize() { data.resize(utils.maxBufferSize, 0); }
+		// PARAM
+		void setAttackInMs(float a) { setAttackInSamples(utils.ms2samples(a)); }
+		void setReleaseInMs(float r) { setReleaseInSamples(utils.ms2samples(r)); }
+		void setAttackInSamples(float a) { attack = 1.f / a; }
+		void setReleaseInSamples(float r) { release = 1.f / r; }
+		// PROCESS
+		void processBlock(bool noteOn) {
+			for (auto s = 0; s < utils.numSamples; ++s) {
+				processSample(noteOn);
+				data[s] = env;
+			}
+		}
+		void processSample(bool noteOn) {
+			switch (state) {
+			case State::Release:
+				if (noteOn) state = State::Attack;
+				else
+					if (env <= 0.f) env = 0.f;
+					else env -= release;
+				return;
+			case State::Attack:
+				if (!noteOn) state = State::Release;
+				else
+					if (env >= 1.f) {
+						env = 1.f;
+						state = State::Sustain;
+					}
+					else env += attack;
+				return;
+			case State::Sustain:
+				if (!noteOn)
+					state = State::Release;
+				return;
+			}
+		}
+		// GET
+		const float operator[](int i) const { return data[i]; }
+		const Utils& utils;
+		std::vector<float> data;
+		State state;
+	private:
+		float env, attack, release;
+	};
+
 	struct Smooth {
 		Smooth(const Utils& utils, float start = 0) :
 			utils(utils),
@@ -658,100 +713,6 @@ namespace nelDSP {
 	private:
 		std::vector<Smooth> smooth;
 		const Utils& utils;
-	};
-
-	struct MidiLearn {
-		enum class State { Off, Learning, Learned };
-		enum class Type { Controller, PitchWheel };
-		MidiLearn(const Utils& u) :
-			buffer(),
-			utils(u),
-			smooth(u, 3),
-			curValue(0),
-			state(State::Off),
-			type(Type::Controller),
-			controllerNumber(0)
-		{}
-		// SET
-		void setState(State s) { state = s; }
-		void setSampleRate() { smooth.setInertiaInHz(17.f); }
-		void setMaxBufferSize() { buffer.resize(utils.maxBufferSize, 0); }
-		// PROCESS
-		void processBlock(const juce::MidiBuffer& midiBuffer) {
-			switch (state) {
-			case State::Off: return;
-			case State::Learned: processBlockLearned(midiBuffer); return;
-			}
-		}
-		// GET
-		State& getState() { return state; }
-		Type& getType() { return type; }
-		int& getControllerNumber() { return controllerNumber; }
-
-		std::vector<float> buffer;
-		const Utils& utils;
-		MultiOrderSmooth smooth;
-		float curValue;
-		State state;
-		Type type;
-		int controllerNumber;
-
-		void processBlockLearning(const juce::MidiBuffer& midiBuffer) {
-			for (const auto& m : midiBuffer)
-				if (processMessageLearning(m.getMessage())) return;
-		}
-		bool processMessageLearning(const juce::MidiMessage& msg) {
-			if (msg.isController()) {
-				type = Type::Controller;
-				controllerNumber = msg.getControllerNumber();
-				state = State::Learned;
-				return true;
-			}
-			else if (msg.isPitchWheel()) {
-				type = Type::PitchWheel;
-				state = State::Learned;
-				return true;
-			}
-			return false;
-		}
-		void processBlockLearned(const juce::MidiBuffer& midiBuffer) {
-			auto sample = 0;
-			switch (type) {
-			case Type::Controller:
-				for (const auto& m : midiBuffer)
-					processController(m.getMessage(), sample);
-				break;
-			case Type::PitchWheel:
-				for (const auto& m : midiBuffer)
-					processPW(m.getMessage(), sample);
-				break;
-			}
-			while (sample < utils.numSamples) {
-				buffer[sample] = curValue;
-				++sample;
-			}
-			smooth.processBlock(buffer);
-		}
-		void processController(const juce::MidiMessage& msg, int& sample) {
-			if (!msg.isController() || msg.getControllerNumber() != controllerNumber) return;
-			auto timeStamp = msg.getTimeStamp();
-			while (sample < timeStamp) {
-				buffer[sample] = curValue;
-				++sample;
-			}
-			curValue = static_cast<float>(msg.getControllerValue()) / 127.f;
-			buffer[sample] = curValue = 2.f * curValue - 1.f;
-		}
-		void processPW(const juce::MidiMessage& msg, int& sample) {
-			if (!msg.isPitchWheel()) return;
-			auto timeStamp = msg.getTimeStamp();
-			while (sample < timeStamp) {
-				buffer[sample] = curValue;
-				++sample;
-			}
-			curValue = static_cast<float>(msg.getPitchWheelValue() - 128.f) * .0000615195324516f;
-			buffer[sample] = curValue = 2.f * curValue - 1.f;
-		}
 	};
 
 	namespace vibrato {
@@ -1027,7 +988,11 @@ namespace nelDSP {
 				mix(1.f), mixA(0), mixB(1)
 			{}
 			// SET
-			void setSampleRate() { smoothA.setInertiaInHz(7); smoothB.setInertiaInHz(7); }
+			void setSampleRate() {
+				const auto time = 1000;
+				smoothA.setInertiaInMs(time);
+				smoothB.setInertiaInMs(time);
+			}
 			void setNumChannels() {
 				dryBuffer.resize(utils.maxBufferSize);
 				setMaxBufferSize();
@@ -1166,34 +1131,89 @@ namespace nelDSP {
 	struct StereoMode {
 		StereoMode(const Utils& u) :
 			utils(u),
+			crossfade(u),
 			isMS(true)
 		{}
+		// SET
+		void setSampleRate() {
+			crossfade.setAttackInMs(20);
+			crossfade.setReleaseInMs(20);
+		}
+		void setMaxBufferSize() { crossfade.setMaxBufferSize(); }
 		// PARAM
 		void setIsMS(bool x) { isMS = x; }
 		// PROCESS
 		bool encode(juce::AudioBuffer<float>& audioBuffer) {
-			if (isMS && utils.numChannels == 2) {
+			if (utils.numChannels != 2) return false;
+			if (isMS) {
 				auto samples = audioBuffer.getArrayOfWritePointers();
-				for (auto s = 0; s < utils.numSamples; ++s) {
-					const auto mid = (samples[0][s] + samples[1][s]) * .5f;
-					const auto side = (samples[0][s] - samples[1][s]) * .5f;
-					samples[0][s] = mid;
-					samples[1][s] = side;
+				if (crossfade[0] != 1.f) {
+					crossfade.processBlock(isMS);
+					for (auto s = 0; s < utils.numSamples; ++s) {
+						const auto mid = (samples[0][s] + samples[1][s]) * .5f;
+						const auto side = (samples[0][s] - samples[1][s]) * .5f;
+						samples[0][s] += crossfade[s] * (mid - samples[0][s]);
+						samples[1][s] += crossfade[s] * (side - samples[1][s]);
+					}
 				}
-				return true;
+				else {
+					for (auto s = 0; s < utils.numSamples; ++s) {
+						const auto mid = (samples[0][s] + samples[1][s]) * .5f;
+						const auto side = (samples[0][s] - samples[1][s]) * .5f;
+						samples[0][s] = mid;
+						samples[1][s] = side;
+					}
+				}
 			}
-			return false;
+			else {
+				if (crossfade[0] != 0.f) {
+					crossfade.processBlock(isMS);
+					auto samples = audioBuffer.getArrayOfWritePointers();
+					for (auto s = 0; s < utils.numSamples; ++s) {
+						const auto mid = (samples[0][s] + samples[1][s]) * .5f;
+						const auto side = (samples[0][s] - samples[1][s]) * .5f;
+						samples[0][s] += crossfade[s] * (mid - samples[0][s]);
+						samples[1][s] += crossfade[s] * (side - samples[1][s]);
+					}
+				}
+			}
+			return true;
 		}
 		void decode(juce::AudioBuffer<float>& audioBuffer) {
-			auto samples = audioBuffer.getArrayOfWritePointers();
-			for (auto s = 0; s < audioBuffer.getNumSamples(); ++s) {
-				const auto left = samples[0][s] + samples[1][s];
-				const auto right = samples[0][s] - samples[1][s];
-				samples[0][s] = left;
-				samples[1][s] = right;
+			if (isMS) {
+				auto samples = audioBuffer.getArrayOfWritePointers();
+				if (crossfade[0] != 1.f) {
+					for (auto s = 0; s < audioBuffer.getNumSamples(); ++s) {
+						const auto left = samples[0][s] + samples[1][s];
+						const auto right = samples[0][s] - samples[1][s];
+						samples[0][s] += crossfade[s] * (left - samples[0][s]);
+						samples[1][s] += crossfade[s] * (right - samples[1][s]);
+					}
+				}
+				else {
+					for (auto s = 0; s < audioBuffer.getNumSamples(); ++s) {
+						const auto left = samples[0][s] + samples[1][s];
+						const auto right = samples[0][s] - samples[1][s];
+						samples[0][s] = left;
+						samples[1][s] = right;
+					}
+				}
+			}
+			else {
+				if (crossfade[0] != 0.f) {
+					auto samples = audioBuffer.getArrayOfWritePointers();
+					for (auto s = 0; s < audioBuffer.getNumSamples(); ++s) {
+						const auto left = samples[0][s] + samples[1][s];
+						const auto right = samples[0][s] - samples[1][s];
+						samples[0][s] += crossfade[s] * (left - samples[0][s]);
+						samples[1][s] += crossfade[s] * (right - samples[1][s]);
+					}
+				}
 			}
 		}
+		
 		const Utils& utils;
+		ASREnvelope crossfade;
 		bool isMS;
 	};
 
@@ -1209,10 +1229,12 @@ namespace nelDSP {
 		void prepareToPlay(const double sampleRate, const int maxBufferSize, const int channelCount, bool forcedUpdate = false) {
 			if (utils.sampleRateChanged(sampleRate, forcedUpdate)) {
 				vibrato.setSampleRate();
+				stereoMode.setSampleRate();
 				utils.setLatency(utils.delayCenter);
 			}
 			if (utils.maxBufferSizeChanged(maxBufferSize, forcedUpdate)) {
 				vibrato.setMaxBufferSize();
+				stereoMode.setMaxBufferSize();
 			}
 			if(utils.numChannelsChanged(channelCount, forcedUpdate))
 				vibrato.setNumChannels();
@@ -1233,10 +1255,10 @@ namespace nelDSP {
 			utils.numSamples = buffer.getNumSamples();
 			if (stereoMode.encode(buffer)) {
 				vibrato.processBlock(buffer);
-				stereoMode.decode(buffer);
+				return stereoMode.decode(buffer);
 			}
-			else
-				vibrato.processBlock(buffer);
+			
+			vibrato.processBlock(buffer);
 		}
 		void processBlockBypassed(juce::AudioBuffer<float>& buffer) {
 			utils.numSamples = buffer.getNumSamples();
@@ -1268,12 +1290,10 @@ BUGS:
 
 ADD FEATURES / IMPROVE:
 	cpu verbrauch hoch, interpolation?
-	m/s switch clicks
 	maxdepth auswahl eingeschränkt oben rum
-	mix parameter smoothing
-	mixprocessor only save dry if mix != 1
+	mix parameter smoothing for hard changes
 	poly vibrato? (unison)
-	new midi learn
+	new midi learn (modulation stuff)
 	temposync
 	multiband
 	monoizer for stereowidth-slider to flanger?

@@ -63,10 +63,10 @@ class QuickAccessWheel :
                 const auto size = static_cast<float>(wheel.choices.size());
                 const auto value = size * angle / wheel.angleRange;
                 const auto rValue = static_cast<int>(value);
-                wheel.selectedChoice = juce::jlimit(0, static_cast<int>(wheel.choices.size() - 1), rValue);
+                wheel.selectedChoice = juce::jlimit(0, static_cast<int>(wheel.choices.size()) - 1, rValue);
             }
             else if (angle < wheel.angleRange + wheel.overshootAngle)
-                wheel.selectedChoice = wheel.choices.size() - 1;
+                wheel.selectedChoice = static_cast<int>(wheel.choices.size()) - 1;
             else if (angle > nelG::Tau - wheel.overshootAngle)
                 wheel.selectedChoice = 0;
             else
