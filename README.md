@@ -1,19 +1,34 @@
-# NEL-19 - VST3 - 64bit - Windows only
-An open-source high-fidelity random vibrato.
+# NEL - VST3 - 64bit - Windows only
+An open-source creative vibrato.
 
 
-NEL-19 requires the latest C++ dependencies. you can dl and install them here until i make a proper installer that takes care of that:
+NEL requires C++14 dependencies. you can download and install them here until i make a proper installer that takes care of that:
 https://aka.ms/vs/16/release/vc_redist.x64.exe
 
-NEL-19 has:
+----------- INTRODUCTION: -----------
 
-- Depth-Parameter. Use it to adjust the depth of the vibrato relative to its current buffer size.
-- Frequency-Parameter. Use it to adjust the frequency of the randomized LFO.
-- Width-Parameter. It mixes in a unique LFO for every other channel.
-- STUDIO-Button. Enables Lookahead.
-- Buffersize-Textfield. Buffersizes between 1-7ms are rather subtle and have low latency. Everything else is for creative use up to 1000ms.
-- MIDI Learn-Button. Use either pitchbend- or midi CC to control the vibrato manually in addition to the randomizer.
-- Vibrato Visualizer. It shows what the internal delay is currently doing.
+NEL is a time-domain vibrato. That means, it essentially uses an internal feed-forward delay to modulate the signal. An LFO is synthesized from weighted pseudo-random values and modulates the distance of that delay. The more its rate changes the stronger the vibrato. Meanwhile the plugin compensates for the length of that delay automatically in order to prevent timing issues automatically. Also I'm using Lanczos Sinc Interpolation on the delay's readhead, which means it sounds clean!
+
+----------- PARAMETERS: -----------
+
+-> Depth.
+Use this to adjust the depth of the vibrato. The higher this value is the further apart the random-values of the LFO can be.
+-> Depth Max.
+You can choose between a bunch of values that set the maximum depth of the vibrato here. This enables you to tweak the behaviour of the depth-parameter. Use low values for a subtle vibrato and high values for strong scratches.
+-> Freq.
+This defines the frequency in which new random values are picked for the LFO.
+-> Shape.
+The more you turn up the shape-parameter, the more it will squarify the output of the LFO.
+-> Width.
+Turn this up to increase the influence of a 2nd LFO to your other channel.
+-> L/R;M/S-Switch.
+Using the plugin in L/R gives the left and right channel individual LFOs, while in M/S mode the mid- and side-channels are altered seperatedly.
+-> Mix.
+100% Wet is a vibrato. But dial down the parameter to any other non-zero value to get chorus- or flanger-effects.
+-> Parameter-Randomizer.
+I didn't implement a preset system yet, but just hitting the parameter randomizer can have a very similiar effect.
+
+----------- EXAMPLES: -----------
 
 Here are a bunch of videos, where you can check out the plugin in action and topics around it:
 https://youtu.be/TVq6FPY_8pU
@@ -21,11 +36,34 @@ https://youtu.be/TVq6FPY_8pU
 Join my plugin's discord to discuss feature requests, bugs and to get informed about updates:
 https://discord.gg/EEnSNuKZCh
 
+----------- TIPPS: -----------
+
+>> USING IT LIVE:
+If you want to use NEL live, in realtime, maybe while playing the guitar, turn up the depth as much as possible and then adjust the depth max-parameter to get the sound you want. The lower the depth max-value is the less latency the plugin produces. Values <= 5 should be unnoticable.
+
+>> LOFI AESTHETICS:
+Turn the frequency to around 4hz, dial in a bit of shape and you get these very occasional fluctuations like in tape wow- and flutter effects.
+
+>> MONO COMPATIBLE DEPTH:
+Use M/S mode, so that you can dial in width without introducing flanging in mono.
+
+>> REVERB SENDS:
+Use L/R mode, so that it sounds really wide and then send it into your reverbs to make a dramatic detune.
+
+>> VERSATILE:
+Turn down the mix a bit and use really low depth max values, so that the effect essentially turns into a flanger/chorus.
+
+>> OTHERWORLDLY:
+Turn down the frequency a lot and select the highest depth max possible, then dial in some width to send your signals into massively different directions.
+
+>> SCRATCH
+Automate the depth on a strong depth max to compose a bunch of broken scratches.
+
 ------------------------FAQ:------------------------
 
 Is there a chance to get a MAC version?
 
-Not soon unfortunately. I neither own a mac nor a license to compile for mac. If you have these you could go ahead and compile my plugin for mac yourself, since it's open-source.
+This is the question I hear the most and I'm in the process of informing myself about mac compatibility, but it's not going to happen tomorrow. Stay tuned I guess.
 
 ---
 
@@ -33,44 +71,26 @@ Why does the plugin not show up in my DAW?
 
 You can try several things
 - Check if your DAW supports VST3 64bit
-- Check if you copied it into the right folder: C:\Program Files\Common Files\VST3
-- Install the latest C++ Dependencies. (sry for this rather geeky solution. this is what an installer would do normally)
-
----
-
-Does this plugin degrade the audio quality?
-
-I like to compare it to tape wow-and-flutter-emulations, since they also randomly vibrate the signal, but unlike them this plugin adds no saturation, filters or other tape degradation stuff. I used cubic spline interpolation on the delay to make sure that everything sounds really clean. Only thing that could make this even better would be oversampling, but that only matters for the more creative vibratos that enter the realms of scratches, so I didn't do that yet.
-
----
-
-Can this plugin be used live?
-
-Turn up the depth parameter to the maximum and then use the buffersize-textfield to adjust the depth of the effect in order to get the lowest possible latency. I made sure that it can be used as good as possible live then. Initially I implemented an alternative algorithm trying to compensate for the latency with some tricks if you disable the Studio-Button, but I personally like the approach with the textfield more.
+- Check if you copied it into the right folder, which is: C:\Program Files\Common Files\VST3
+- Install the latest C++ Dependencies. (sry, for this rather geeky solution. this is what an installer would do normally)
 
 ---
 
 Is this plugin safe to use in a commercial project?
 
-I tested it in Cubase, Reaper, Studio One and FL Studio myself and a friend tested it in Ableton. Also I had a bunch of other testers in various of these DAWs already as well. On top of that I ran it with the official VST3 Validator from Steinberg, which throws ridiculous edge cases at plugins in order to test their stability. So it should really be safe. If it ever causes a crash though just throw it out of your VST-Folder. It will most likely not damage your projects. I use it regularly myself as well. Oh, and also please inform me about crashes! It's the only way for me to grow as a developer. :)
+I tested it in Cubase, Reaper, Studio One and FL Studio myself and a friend tested it in Ableton. Also I had a bunch of other testers in various of these DAWs already as well. On top of that I ran it through the official VST3 Validator from Steinberg, which throws ridiculous edge cases at plugins in order to test their stability and it worked, so it should really be safe. If it ever causes a crash though just throw it out of your VST-Folder. It will not damage your projects. I use it regularly myself as well. Oh, and also please inform me about crashes! It's the only way for me to grow as a developer. :)
 
 ---
 
-How to use this to make a LOFI™ sound?
+What are future plans for this plugin?
 
-Put the frequency to 4-6hz, since that's supposed to be the wow-rate, dial in some depth with a subtle buffersize (2-7ms), then use some other plugin to add saturation and filters.
-
----
-
-How do I use the MIDI Learn feature?
-
-You basically just hit that button, then turn a knob on your master keyboard or use the pitchbend wheel, while having some midi track routed to the plugin and it will notice and remember that until you close the DAW. (I'll implement a feature that remembers that in the future)
+I once had a MIDI Learn-feature in it and I threw it out for now because I want to implement a much more powerful and modular system with different modulators. Also I'd like to add multiband-features, sidechain-features, parallel-processing features and a bunch of other cool stuff. This plugin is getting better and better. One day it will be the best vibrato of the world.
 
 ---
 
 I am a developer and I want to know how to use your dsp code in my own plugins.
 
-Go to Source/Tape.h. It has all the important stuff.
+Go to Source/DSP.h. It has all the important stuff. Also talk to me on discord.
 
 ---
 
@@ -80,15 +100,10 @@ I'd be happy to apply for such jobs in the future, but I'm still spending most o
 
 ---
 
-I think you are really cool and I want to support you by transfering money to your paypal.
+I think you are really cool and I want to support you.
 
-Nice, thxx. https://www.paypal.com/paypalme/alteoma
-
----
-
-I think you are really cool and I want to support you, but I don't want to give you money.
-
-Ok :D Maybe make a cool video about the plugin and share it on tiktok or something.
+Nice. The most straight-forward way to support me is by transfering money to my paypal. https://www.paypal.com/paypalme/alteoma
+But I'd also really appreciate you to give me feedback about the plugin and recommend it to your friends and followers on various social media pages.
 
 ---
 
@@ -96,8 +111,4 @@ I have a cool idea for a feature or for a workflow improvement.
 
 I love that! Come to my discord pls.
 
----
-
-Your plugin sucks because I either can't install it or I used it and don't like it.
-
-Even though I definitely consider this plugin a rather solid release, I do plan to extend its features a lot in the future. So maybe it will stop to suck for you some time.
+-----------------------------------------------
