@@ -395,7 +395,7 @@ namespace nelDSP {
 			SincLUT() :
 				lut()
 			{
-				const auto size = SincResolution + 1;
+				const auto size = SincResolution + 2;
 				lut.reserve(size);
 				max = Alpha * Pi;
 				lut.emplace_back(1.f);
@@ -406,9 +406,14 @@ namespace nelDSP {
 				}
 			}
 			const float operator[](const float idx) const {
-				auto normal = std::abs(idx / max);
-				auto mapped = static_cast<int>(normal * SincResolution);
-				return lut[mapped];
+				const auto normal = std::abs(idx / max);
+				const auto upscaled = normal * SincResolution;
+				const auto mapF = static_cast<int>(upscaled);
+				const auto mapC = mapF + 1;
+				const auto x = upscaled - mapF;
+				const auto s0 = lut[mapF];
+				const auto s1 = lut[mapC];
+				return s0 + x * (s1 - s0);
 			}
 		private:
 			std::vector<float> lut;
@@ -1289,20 +1294,16 @@ BUGS:
 		plugin doesn't show up (maybe missing dependencies)
 
 ADD FEATURES / IMPROVE:
+	mac support
 	rewrite so that param smoothing before go to processors
 	cpu verbrauch hoch, interpolation?
-	maxdepth auswahl eingeschränkt oben rum
 	mix parameter smoothing for hard changes
 	poly vibrato? (unison)
 	new midi learn (modulation stuff)
 	temposync
 	multiband
 	monoizer for stereowidth-slider to flanger?
-	options menue
-		alternative design-parameter based
 	oversampling?
-	Installer
-		because people might not know where vst3 is
 
 TESTED:
 	DAWS
