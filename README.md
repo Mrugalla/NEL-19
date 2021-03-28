@@ -67,6 +67,13 @@ This is the question I hear the most and I'm in the process of informing myself 
 
 ---
 
+What do I need to download from these files?
+
+If you're just a producer / mixing engineer (or whatever user) just download NEL.vst.
+NEL19.vst was an older build that I just left there for nostalgia reasons.
+
+---
+
 Why does the plugin not show up in my DAW?
 
 You can try several things
