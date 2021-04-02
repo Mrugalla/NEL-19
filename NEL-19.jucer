@@ -17,12 +17,14 @@
             file="Source/Img/vst3_logo_small.png"/>
     </GROUP>
     <GROUP id="{FF8BE835-9B90-31CB-45F4-D4B15FDEFD04}" name="Source">
+      <FILE id="UvkqJb" name="RandomizerButton.h" compile="0" resource="0"
+            file="Source/RandomizerButton.h"/>
+      <FILE id="VLWe1x" name="WavetableEditor.h" compile="0" resource="0"
+            file="Source/WavetableEditor.h"/>
       <FILE id="KltU2P" name="nel19.ttf" compile="0" resource="1" file="Source/Font/nel19.ttf"/>
       <FILE id="kZc4tA" name="TooltipComponent.h" compile="0" resource="0"
             file="Source/TooltipComponent.h"/>
       <FILE id="LCWf9f" name="Shuttle.h" compile="0" resource="0" file="Source/Shuttle.h"/>
-      <FILE id="B2ClOc" name="TitleEditor.h" compile="0" resource="0" file="Source/TitleEditor.h"/>
-      <FILE id="vzEU0y" name="SpaceEditor.h" compile="0" resource="0" file="Source/SpaceEditor.h"/>
       <FILE id="jOZ35F" name="ParametersEditor.h" compile="0" resource="0"
             file="Source/ParametersEditor.h"/>
       <FILE id="BV1aaM" name="SettingsEditor.h" compile="0" resource="0"
@@ -45,8 +47,10 @@
   <EXPORTFORMATS>
     <VS2019 targetFolder="Builds/VisualStudio2019">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="NEL" enablePluginBinaryCopyStep="1"/>
-        <CONFIGURATION isDebug="0" name="Release" targetName="NEL" enablePluginBinaryCopyStep="1"/>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="NEL" enablePluginBinaryCopyStep="1"
+                       useRuntimeLibDLL="0"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="NEL" enablePluginBinaryCopyStep="1"
+                       useRuntimeLibDLL="0"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../../JUCE/modules"/>

@@ -9,12 +9,11 @@ namespace nelDSP {
 	// INTERPOLATION CONST
 	static constexpr int MaxInterpolationOrder = 7;
 	static constexpr int SincResolution = 1 << 9;
-	static constexpr int InterpolationOrderHalf = MaxInterpolationOrder / 2;
 	// CERTAINTY LFO & SMOOTH CONST
 	static constexpr float DepthDefault = .1f;
 	static constexpr float LFOFreqMin = .01f, LFOFreqMax = 30.f, LFOFreqDefault = 4.f, LFOFreqInterval = .5f;
 	static constexpr float ShapeMax = 24;
-	static constexpr int SmoothOrderDefault = 3;
+	static constexpr int LowPassOrderDefault = 3;
 	// DELAY CONST
 	static constexpr float DelaySizeInMS = 5.f, DelaySizeInMSMin = 1, DelaySizeInMSMax = 1000;
 	static constexpr float WowWidthDefault = 0.f;
@@ -55,7 +54,7 @@ namespace nelDSP {
 			);
 		}
 		static juce::NormalisableRange<float> QuadraticBezierRange(float min, float max, float shape) {
-			// 0 <= SHAPE < 1 && SHAPE != .5
+			// 0 <= SHAPE < 1 && SHAPE && SHAPE != .5
 			auto rangedShape = shape * (max - min) + min;
 			return juce::NormalisableRange<float>(
 				min, max,
@@ -153,46 +152,6 @@ namespace nelDSP {
 				for (auto s = 0; s < buffer.getNumSamples(); ++s)
 					samples[ch][s] = data[s];
 		}
-		static void dbg(const juce::AudioBuffer<float>& data, const int wordsPerLine = 17) {
-			auto samples = data.getArrayOfReadPointers();
-			juce::String header = "Samples:\n";
-			auto idx = 0;
-			for(auto s = 0; s < data.getNumSamples(); ++s) {
-				header += juce::String(samples[0][s]) + ", ";
-				++idx;
-				if (idx == wordsPerLine) {
-					header += "\n";
-					idx = 0;
-				}
-			}
-			DBG(header += "\n");
-		}
-		static void dbg(const std::vector<float>& data, juce::String header = "", const int wordsPerLine = 17) {
-			if (header.length() != 0) header += ":\n";
-			auto idx = 0;
-			for (const auto& d : data) {
-				header += juce::String(d) + ", ";
-				++idx;
-				if (idx == wordsPerLine) {
-					header += "\n";
-					idx = 0;
-				}
-			}
-			DBG(header += "\n");
-		}
-		static void dbg(const std::vector<int>& data, juce::String header = "", const int wordsPerLine = 17) {
-			if(header.length() != 0) header += ":\n";
-			auto idx = 0;
-			for (const auto& d : data) {
-				header += juce::String(d) + ", ";
-				++idx;
-				if (idx == wordsPerLine) {
-					header += "\n";
-					idx = 0;
-				}
-			}
-			DBG(header += "\n");
-		}
 		static juce::StringArray makeChoicesArray(std::vector<juce::String> str) {
 			juce::StringArray y;
 			for (const auto& i : str)
@@ -233,7 +192,7 @@ namespace nelDSP {
 		Utils(juce::AudioProcessor* p) :
 			processor(p),
 			sampleRate(1),
-			Fs(1), FsInv(1), Nyquist(1),
+			Fs(1), FsInv(1),
 			delaySizeInMs(DelaySizeInMS),
 			numChannels(0), numSamples(0), maxBufferSize(0),
 			delaySize(1), delayMax(1), delayCenter(1)
@@ -249,16 +208,11 @@ namespace nelDSP {
 		bool sampleRateChanged(const double sr, bool forcedUpdate = false) {
 			if (sampleRate != sr || forcedUpdate) {
 				sampleRate = sr;
-
-				numChannels = numSamples = 0;
-
+				//numChannels = numSamples = 0;
 				Fs = static_cast<float>(sampleRate);
 				FsInv = 1.f / Fs;
-				Nyquist = Fs / 2;
-
-				setDelaySize(static_cast<int>(std::rint(ms2samples(delaySizeInMs))));
-
-				maxBufferSize = 0;
+				setDelaySize(static_cast<int>(std::rint(msInsamples(delaySizeInMs))));
+				//maxBufferSize = 0;
 				return true;
 			}
 			return false;
@@ -273,7 +227,7 @@ namespace nelDSP {
 		bool delaySizeChanged(float s) {
 			if (delaySizeInMs != s) {
 				delaySizeInMs = s;
-				setDelaySize(static_cast<int>(std::rint(ms2samples(delaySizeInMs))));
+				setDelaySize(static_cast<int>(std::rint(msInsamples(delaySizeInMs))));
 				return true;
 			}
 			return false;
@@ -282,17 +236,18 @@ namespace nelDSP {
 
 		juce::AudioProcessor* processor;
 		double sampleRate = 0;
-		float Fs, FsInv, Nyquist;
+		float Fs, FsInv;
 		float delaySizeInMs;
 		int numChannels, numSamples, maxBufferSize;
 
-		const float ms2samples(const float ms) const { return ms * Fs * .001f; }
-		const float hz2inc(const float frequency) const { return frequency * FsInv; }
+		const float msInsamples(const float ms) const { return ms * Fs * .001f; }
+		const float hzInRatio(const float frequency) const { return frequency * FsInv; }
 
 		void setDelaySize(const int size) {
-			delaySize = 2 * size;
+			delaySize = size;
 			delayMax = delaySize - 1;
 			delayCenter = size;
+			setLatency(delayCenter);
 		}
 		
 		int delaySize, delayMax, delayCenter;
@@ -400,8 +355,8 @@ namespace nelDSP {
 				max = Alpha * Pi;
 				lut.emplace_back(1.f);
 				for (auto i = 1; i < size; ++i) {
-					auto x = static_cast<float>(i) / SincResolution;
-					auto mapped = x * Alpha * Pi;
+					const auto x = static_cast<float>(i) / SincResolution;
+					const auto mapped = x * Alpha * Pi;
 					lut.emplace_back(sinc(mapped));
 				}
 			}
@@ -506,11 +461,11 @@ namespace nelDSP {
 				rand(),
 				size()
 			{
-				auto rawData = juce::String::createStringFromData(
+				const auto rawData = juce::String::createStringFromData(
 					BinaryData::likelyRawData_txt, BinaryData::likelyRawData_txtSize
 				);
 
-				auto cert = prepareCertainties(rawData);
+				const auto cert = prepareCertainties(rawData);
 				certainties = cert[HighlyUnlikely];
 				if(ShouldSort) sortCertainties();
 				if(ShouldDeleteOutliers) deleteOutliers();
@@ -557,21 +512,19 @@ namespace nelDSP {
 				return cert;
 			}
 			void addWordToCertainties(std::array<std::vector<float>, CertaintiesCount>& cert, juce::String& word, const int row) {
-				auto certaintyInPercent = (float)word.getIntValue();
-				auto certaintyAsDecimal = certaintyInPercent / 100;
+				const auto certaintyInPercent = static_cast<float>(word.getIntValue());
+				const auto certaintyAsDecimal = certaintyInPercent * .01f;
 				cert[row].push_back(certaintyAsDecimal);
 				word.clear();
 			}
 
-			void sortCertainties() {
-				util::shakerSort2(certainties);
-			}
+			void sortCertainties() { util::shakerSort2(certainties); }
 			void deleteOutliers() {
 				float averageInc = 0;
 				for (auto i = 1; i < CertaintiesPerCertainty; ++i)
 					averageInc += certainties[i] - certainties[i - 1];
 				averageInc /= CertaintiesPerCertainty;
-				auto half = CertaintiesPerCertainty / 2;
+				const auto half = CertaintiesPerCertainty / 2;
 				for (auto i = 0; i < half; ++i)
 					if (certainties[i + 1] - certainties[i] > averageInc)
 						certainties[i] = certainties[i + 1];
@@ -596,8 +549,8 @@ namespace nelDSP {
 			}
 			void limitCertainties() {
 				for (auto& i : certainties)
-					if (i < 0) i = 0;
-					else if (i >= 1) i = (float)1 - std::numeric_limits<float>::epsilon();
+					if (i < 0.f) i = 0.f;
+					else if (i >= 1.f) i = 1.f - std::numeric_limits<float>::epsilon();
 			}
 			void normalize() {
 				auto min = 1.f;
@@ -625,8 +578,8 @@ namespace nelDSP {
 		// SET
 		void setMaxBufferSize() { data.resize(utils.maxBufferSize, 0); }
 		// PARAM
-		void setAttackInMs(float a) { setAttackInSamples(utils.ms2samples(a)); }
-		void setReleaseInMs(float r) { setReleaseInSamples(utils.ms2samples(r)); }
+		void setAttackInMs(float a) { setAttackInSamples(utils.msInsamples(a)); }
+		void setReleaseInMs(float r) { setReleaseInSamples(utils.msInsamples(r)); }
 		void setAttackInSamples(float a) { attack = 1.f / a; }
 		void setReleaseInSamples(float r) { release = 1.f / r; }
 		// PROCESS
@@ -668,16 +621,16 @@ namespace nelDSP {
 		float env, attack, release;
 	};
 
-	struct Smooth {
-		Smooth(const Utils& utils, float start = 0) :
+	struct LowPass {
+		LowPass(const Utils& utils, float start = 0) :
 			utils(utils),
 			value(start),
-			inertia(1)
+			inertia(1.f)
 		{}
 		// SET / PARAM
-		void setInertiaInMs(float ms) { inertia = 1.f / utils.ms2samples(ms); }
-		void setInertiaInHz(float hz) { inertia = utils.hz2inc(hz); }
-		void setInertiaInSamples(float smpls) { inertia = 1.f / smpls; }
+		void setInertiaInMs(const float ms) { setInertiaInSamples(utils.msInsamples(ms)); }
+		void setInertiaInHz(const float hz) { inertia = utils.hzInRatio(hz); }
+		void setInertiaInSamples(const float smpls) { inertia = 1.f / smpls; }
 		// PROCESS
 		const float operator()(const float x) {
 			value += inertia * (x - value);
@@ -688,53 +641,108 @@ namespace nelDSP {
 		float value, inertia;
 	};
 
-	struct MultiOrderSmooth {
-		MultiOrderSmooth(const Utils& u, const int order = 1) :
-			smooth(),
+	struct MultiOrderLowPass {
+		MultiOrderLowPass(const Utils& u, const int order = 1) :
+			lowpass(),
 			utils(u)
 		{
 			setOrder(order);
 		}
-		// SET / PARAM
-		void setOrder(int o) { smooth.resize(o, { utils, 0 }); }
+		// PARAM
+		void setOrder(int o) { lowpass.resize(o, { utils, 0 }); }
 		void setInertiaInMs(float ms) {
-			for (auto& s : smooth)
+			for (auto& s : lowpass)
 				s.setInertiaInMs(ms);
 		}
 		void setInertiaInHz(float hz) {
-			for (auto& s : smooth)
+			for (auto& s : lowpass)
 				s.setInertiaInHz(hz);
 		}
 		void setInertiaInSamples(float smpls) {
-			for (auto& s : smooth)
+			for (auto& s : lowpass)
 				s.setInertiaInSamples(smpls);
 		}
 		// PROCESS
 		void processBlock(std::vector<float>& data) {
 			for (auto d = 0; d < utils.numSamples; ++d)
-				for (auto& s : smooth)
+				for (auto& s : lowpass)
 					data[d] = s(data[d]);
 		}
 	private:
-		std::vector<Smooth> smooth;
+		std::vector<LowPass> lowpass;
 		const Utils& utils;
 	};
 
+	namespace wt {
+		struct Wavetable {
+			Wavetable() :
+				points(), tmp(),
+				vt(),
+				id("wavetable"),
+				idPoint("point"),
+				idX("x"),
+				idY("y"),
+				hasChanged(false),
+				stillChanging(false)
+			{}
+			// SET
+			void setState(juce::ValueTree& v) {
+				vt = v.getChildWithName(id);
+				if (vt.isValid()) {
+					points.clear();
+					const auto numChildren = vt.getNumChildren();
+					for (auto i = 0; i < numChildren; ++i) {
+						const auto child = vt.getChild(i);
+						if (child.getType() == idPoint) {
+							const auto x = static_cast<float>(child.getProperty(idX));
+							const auto y = static_cast<float>(child.getProperty(idY));
+							points.push_back({ x, y });
+						}
+					}
+				}
+				else {
+					vt = juce::ValueTree(id);
+					v.appendChild(vt, nullptr);
+				}
+			}
+			void getState() {
+				for (const auto& p : points) {
+					juce::ValueTree child(idPoint);
+					child.setProperty(idX, p.x, nullptr);
+					child.setProperty(idY, p.y, nullptr);
+					vt.appendChild(child, nullptr);
+				}
+			}
+			void sendChange() { hasChanged.store(true); }
+			// PROCESS
+			void processBlock() {
+				if (hasChanged.load()) {
+					points = tmp;
+					hasChanged.store(false);
+				}
+			}
+		private:
+			std::vector<juce::Point<float>> points, tmp;
+			juce::ValueTree vt;
+			juce::Identifier id, idPoint, idX, idY;
+			std::atomic<bool> hasChanged, stillChanging;
+		};
+	}
+
 	namespace vibrato {
 		struct Phase {
-			Phase(const Utils& utils) :
+			Phase(const Utils& u) :
 				phase(1.f),
 				inc(0.f),
-				utils(utils)
+				utils(u)
 			{}
-			void setFrequencyInHz(float hz) { inc = utils.hz2inc(hz); }
+			void setFrequencyInHz(float hz) { inc = utils.hzInRatio(hz); }
 			bool operator()() {
 				phase += inc;
-				if (phase >= 1.f) {
-					--phase;
-					return true;
-				}
-				return false;
+				if (phase < 1.f)
+					return false;
+				--phase;
+				return true;
 			}
 			float phase;
 		private:
@@ -742,46 +750,15 @@ namespace nelDSP {
 			const Utils& utils;
 		};
 
-		struct WIdx {
-			WIdx(const Utils& utils) :
-				data(),
-				utils(utils),
-				idx(0)
-			{}
-			// SET
-			void setMaxBufferSize() {
-				data.clear();
-				data.resize(utils.maxBufferSize, 0);
-				idx = 0;
-			}
-			// PROCESS
-			void processBlock() {
-				for (auto s = 0; s < utils.numSamples; ++s) {
-					data[s] = idx;
-					++idx;
-					if (idx == utils.delaySize)
-						idx = 0;
-				}
-			}
-			// GET
-			const int operator[](const int i) const { return data[i]; }
-			std::vector<int> data;
-		private:
-			const Utils& utils;
-			int idx;
-		};
-
 		struct CertaintySequencer {
-			CertaintySequencer(const Utils& utils, certainty::Generator& certainty) :
-				phase(utils),
+			CertaintySequencer(const Utils& u, certainty::Generator& certainty) :
+				phase(u),
 				rand(),
-				smooth(utils, SmoothOrderDefault),
-				utils(utils),
+				lowpass(u, LowPassOrderDefault),
+				utils(u),
 				certainty(certainty),
-				freq(1),
-				shape(1),
-				curValue(0),
-				depth(1)
+				freq(1.f), shape(1.f),
+				curValue(0.f), depth(1.f)
 			{}
 			// PARAM
 			void setFrequencyInHz(float hz) {
@@ -796,93 +773,111 @@ namespace nelDSP {
 			}
 			// PROCESS
 			void synthesizeBlock(std::vector<float>& data) { synthesizeRandomValues(data); }
-			void smoothen(std::vector<float>& data) { smooth.processBlock(data); }
+			void filter(std::vector<float>& data) { lowpass.processBlock(data); }
 			void scaleForDelay(float* data) {
-				const auto centr = static_cast<float>(utils.delayCenter);
-				juce::FloatVectorOperations::multiply(data, centr, utils.numSamples);
-				juce::FloatVectorOperations::add(data, centr, utils.numSamples);
+				const auto centre = static_cast<float>(utils.delayCenter);
+				juce::FloatVectorOperations::multiply(data, centre * .5f, utils.numSamples);
+				juce::FloatVectorOperations::add(data, centre, utils.numSamples);
 			}
 			void synthesizeBlockBypassed(std::vector<float>& data) {
-				const auto centr = static_cast<float>(utils.delayCenter);
-				for (auto& d : data) d = centr; }
+				auto centre = static_cast<float>(utils.delayCenter);
+				for (auto& d : data) d = centre;
+			}
 			// DBG
 			void playback(juce::AudioBuffer<float>& buffer, const std::vector<float>& data, const int ch) {
+				const auto centre = static_cast<float>(utils.delayCenter);
+				const auto centre2 = centre * 2.f;
 				auto samples = buffer.getArrayOfWritePointers();
-				for (auto s = 0; s < utils.numSamples; ++s) {
-					samples[ch][s] = static_cast<float>((data[s] - utils.delayCenter) / utils.delayCenter);
-				}
+				for (auto s = 0; s < utils.numSamples; ++s)
+					samples[ch][s] = data[s] / centre2 - .5f;
 			}
 		private:
 			Phase phase;
 			Rand rand;
-			MultiOrderSmooth smooth;
+			MultiOrderLowPass lowpass;
 			const Utils& utils;
 			certainty::Generator& certainty;
 
 			float freq, shape, curValue, depth;
 
-			void updateLowpassFrequency() { smooth.setInertiaInHz(shape * freq * SmoothOrderDefault); }
+			void updateLowpassFrequency() { lowpass.setInertiaInHz(shape * freq * LowPassOrderDefault); }
 
 			/* synthesizes a smooth random curve (-1, 1) */
 			void synthesizeRandomValues(std::vector<float>& data) {
 				for (auto s = 0; s < utils.numSamples; ++s) {
 					if (phase()) {
 						const auto cert = certainty();
-						curValue = cert * depth;
-						if (rand() > .5f)
-							curValue *= -1.f;
+						curValue = cert * depth * (rand() > .5f ? 1.f : -1.f);
 					}
 					data[s] = curValue;
 				}
 			}
 		};
 
-		struct RIdx {
-			RIdx(const Utils& utils) :
-				latencySmooth(utils, 2),
-				utils(utils)
+		struct WriteHead {
+			WriteHead(const Utils& utils) :
+				data(),
+				utils(utils),
+				idx(-1)
 			{}
 			// SET
-			void setMaxBufferSize(const int maxBufferSize) {
-				latencySmooth.setInertiaInHz(LFOFreqMax);
-				latencyData.resize(maxBufferSize, 0);
+			void setMaxBufferSize() {
+				data.resize(utils.maxBufferSize, 0);
+				idx = -1;
 			}
 			// PROCESS
-			void processBlock(std::vector<float>& data, const int* wIdx) {
+			void synthesizeBlock() {
 				for (auto s = 0; s < utils.numSamples; ++s) {
-					data[s] = wIdx[s] - data[s];
+					++idx;
+					if (idx == utils.delaySize)
+						idx = 0;
+					data[s] = idx;
+				}
+			}
+			// GET
+			const int operator[](const int i) const { return data[i]; }
+			std::vector<int> data;
+		private:
+			const Utils& utils;
+			int idx;
+		};
+
+		struct ReadHead {
+			ReadHead(const Utils& u) :
+				utils(u)
+			{}
+			// PROCESS
+			void processBlock(std::vector<float>& data, const int* wHead) {
+				for (auto s = 0; s < utils.numSamples; ++s) {
+					data[s] = wHead[s] - data[s];
 					if (data[s] < 0)
 						data[s] += utils.delaySize;
 				}
 			}
 		private:
-			std::vector<float> latencyData;
-			MultiOrderSmooth latencySmooth;
 			const Utils& utils;
 		};
 
 		struct FFDelay {
-			FFDelay(const Utils& utils) :
+			FFDelay(const Utils& u) :
 				buffer(),
-				utils(utils)
-			{
-				setSampleRate();
-			}
+				utils(u)
+			{ setSampleRate(); }
 			// SET
 			void setSampleRate() { buffer.resize(utils.delaySize, 0); }
 			// PROCESS
-			void processBlock(juce::AudioBuffer<float>& b, const int* wIdx, const std::vector<float>& rIdx, const Lanczos& interpolator, const int ch) {
+			void processBlock(juce::AudioBuffer<float>& b, const int* wHead, const std::vector<float>& rHead, const Lanczos& interpolator, const int ch) {
 				auto samples = b.getWritePointer(ch, 0);
 				for (auto s = 0; s < utils.numSamples; ++s) {
-					buffer[wIdx[s]] = samples[s];
-					samples[s] = interpolator(buffer, rIdx[s]);
+					buffer[wHead[s]] = samples[s];
+					samples[s] = interpolator(buffer, rHead[s]);
 				}
 			}
-			void processBlock(juce::AudioBuffer<float>& b, const int* wIdx, const std::vector<float>& rIdx, const int ch) {
+			void processBlock(juce::AudioBuffer<float>& b, const int* wHead, const std::vector<float>& rHead, const int ch) {
 				auto samples = b.getWritePointer(ch, 0);
 				for (auto s = 0; s < utils.numSamples; ++s) {
-					buffer[wIdx[s]] = samples[s];
-					samples[s] = buffer[static_cast<int>(rIdx[s])];
+					buffer[wHead[s]] = samples[s];
+					samples[s] = buffer[static_cast<int>(rHead[s])];
 				}
 			}
 		private:
@@ -891,21 +886,16 @@ namespace nelDSP {
 		};
 		
 		struct MultiChannelModules {
-			MultiChannelModules(Utils& utils, certainty::Generator& certainty) :
+			MultiChannelModules(Utils& u, certainty::Generator& certainty) :
 				data(),
-				seq(utils, certainty),
-				rIdx(utils),
-				delay(utils),
-				utils(utils)
-			{
-				setMaxBufferSize();
-			}
+				seq(u, certainty),
+				rHead(u),
+				delay(u),
+				utils(u)
+			{ setMaxBufferSize(); }
 			// SET
 			void setSampleRate() { delay.setSampleRate(); }
-			void setMaxBufferSize() {
-				data.resize(utils.maxBufferSize, 0);
-				rIdx.setMaxBufferSize(utils.maxBufferSize);
-			}
+			void setMaxBufferSize() { data.resize(utils.maxBufferSize, 0); }
 			// PARAM
 			void setDepth(const float d) { seq.setDepth(d); }
 			void setFreq(const float f) { seq.setFrequencyInHz(f); }
@@ -913,54 +903,52 @@ namespace nelDSP {
 			// PROCESS
 			void synthesizeLFO() { seq.synthesizeBlock(data); }
 			void synthesizeLFOBypassed() { seq.synthesizeBlockBypassed(data); }
-			void copyLFO(float* other) { juce::FloatVectorOperations::copy(data.data(), other, utils.numSamples); } // IF WIDTH == 0
+			void copyLFO(const float* other) { juce::FloatVectorOperations::copy(data.data(), other, utils.numSamples); } // IF WIDTH == 0
 			void saveLFOValue(std::atomic<float>& lfoValue) { lfoValue.store(data[0]); }
-			void mixLFO(float* other, const std::vector<float>& widthData) { // FOR LFOS of channel == 1 && WIDTH != 0
+			void mixLFO(const float* other, const std::vector<float>& widthData) { // FOR LFOS of channel == 1 && WIDTH != 0
 				for (auto s = 0; s < utils.numSamples; ++s)
 					data[s] = other[s] + widthData[s] * (data[s] - other[s]);
 			}
 			void upscaleLFO() { seq.scaleForDelay(data.data()); }
-			void addMidiMessagesToDelay(const std::vector<float>& midiBuffer) {
-				juce::FloatVectorOperations::add(data.data(), midiBuffer.data(), utils.numSamples);
-			}
-			void smoothenDelay() { seq.smoothen(data); }
+			
+			void filterDelay() { seq.filter(data); }
 			void clampDelay() {
 				for (auto s = 0; s < utils.numSamples; ++s)
-					if (data[s] < 0) data[s] = MaxInterpolationOrder;
+					if (data[s] < 0) data[s] = 0;
 					else if (data[s] > utils.delayMax) data[s] = static_cast<float>(utils.delayMax);
 			}
-			void processBlock(juce::AudioBuffer<float>& buffer, const int* wIdx, const Lanczos& interpolator, const int ch) {
+			void processBlock(juce::AudioBuffer<float>& buffer, const int* wHead, const Lanczos& interpolator, const int ch) {
 				//seq.playback(buffer, data, ch);
-				rIdx.processBlock(data, wIdx);
-				delay.processBlock(buffer, wIdx, data, interpolator, ch);
+				rHead.processBlock(data, wHead);
+				delay.processBlock(buffer, wHead, data, interpolator, ch);
 			}
-			void processBlock(juce::AudioBuffer<float>& buffer, const int* wIdx, const int ch) {
-				rIdx.processBlock(data, wIdx);
-				delay.processBlock(buffer, wIdx, data, ch);
+			void processBlock(juce::AudioBuffer<float>& buffer, const int* wHead, const int ch) {
+				rHead.processBlock(data, wHead);
+				delay.processBlock(buffer, wHead, data, ch);
 			}
 			// GET
 			std::vector<float> data;
 		private:
 			CertaintySequencer seq;
-			RIdx rIdx;
+			ReadHead rHead;
 			FFDelay delay;
 			const Utils& utils;
 		};
 
 		struct WidthProcessor {
-			WidthProcessor(const Utils& utils) :
-				utils(utils),
-				smooth(utils, 2),
+			WidthProcessor(const Utils& u) :
+				utils(u),
+				lowpass(utils, 0),
 				width(0.f), dest(static_cast<float>(WowWidthDefault))
 			{}
 			// SET
-			void setSampleRate() { smooth.setInertiaInHz(17.f); }
+			void setSampleRate() { lowpass.setInertiaInHz(17.f); }
 			// PARAM
 			void setWidth(float w) { dest = w; }
 			// PROCESS
 			void operator()(std::vector<float>& data, std::vector<MultiChannelModules>& chModules, std::atomic<float>& lfoValue) {
-				for (auto s = 0; s < utils.numSamples; ++s) data[s] = dest;
-				smooth.processBlock(data); // smoothen width transitions
+				for (auto s = 0; s < utils.numSamples; ++s)
+					data[s] = lowpass(dest); // smoothen width transitions
 
 				if (utils.numChannels == 1)
 					processWidthDisabled(chModules);
@@ -969,14 +957,14 @@ namespace nelDSP {
 			}
 		private:
 			const Utils& utils;
-			MultiOrderSmooth smooth;
+			LowPass lowpass;
 			float width, dest;
 
 			void processWidthDisabled(std::vector<MultiChannelModules>& chModules) { chModules[0].upscaleLFO(); }
 			void processWidthEnabled(std::vector<MultiChannelModules>& chModules, const std::vector<float>& widthData, std::atomic<float>& lfoValue) {
 				for (auto ch = 1; ch < utils.numChannels; ++ch) {
 					chModules[ch].synthesizeLFO();
-					chModules[ch].smoothenDelay();
+					chModules[ch].filterDelay();
 					chModules[ch].mixLFO(chModules[0].data.data(), widthData);
 					chModules[ch].saveLFOValue(lfoValue);
 					chModules[ch].upscaleLFO();
@@ -989,20 +977,20 @@ namespace nelDSP {
 			MixProcessor(const Utils& u) :
 				dryBuffer(),
 				utils(u),
-				smoothA(u, 0), smoothB(u, 0),
+				lowpassA(u, 0), lowpassB(u, 0),
 				mix(1.f), mixA(0), mixB(1)
 			{}
 			// SET
 			void setSampleRate() {
-				const auto time = 1000;
-				smoothA.setInertiaInMs(time);
-				smoothB.setInertiaInMs(time);
+				const auto time = 17.f;
+				lowpassA.setInertiaInMs(time);
+				lowpassB.setInertiaInMs(time);
 			}
 			void setNumChannels() {
-				dryBuffer.resize(utils.maxBufferSize);
+				dryBuffer.resize(utils.numChannels);
 				setMaxBufferSize();
 			}
-			void setMaxBufferSize() { for (auto& d : dryBuffer) d.resize(utils.maxBufferSize); }
+			void setMaxBufferSize() { for (auto& d : dryBuffer) d.resize(utils.maxBufferSize, 0); }
 			// PARAM
 			void setMix(float m) {
 				mix = m;
@@ -1022,18 +1010,19 @@ namespace nelDSP {
 				// MIX
 				auto samples = buffer.getArrayOfWritePointers();
 				for (auto s = 0; s < utils.numSamples; ++s)
-					data[s] = smoothB(mixB);
+					data[s] = lowpassB(mixB);
 				for (auto ch = 0; ch < utils.numChannels; ++ch)
 					juce::FloatVectorOperations::multiply(samples[ch], data.data(), utils.numSamples);
 				for (auto s = 0; s < utils.numSamples; ++s)
-					data[s] = smoothA(mixA);
+					data[s] = lowpassA(mixA);
 				for (auto ch = 0; ch < utils.numChannels; ++ch)
 					for (auto s = 0; s < utils.numSamples; ++s)
 						samples[ch][s] += dryBuffer[ch][s] * data[s];
 			}
+		private:
 			std::vector<std::vector<float>> dryBuffer;
 			const Utils& utils;
-			Smooth smoothA, smoothB;
+			LowPass lowpassA, lowpassB;
 			float mix, mixA, mixB;
 		};
 
@@ -1045,7 +1034,7 @@ namespace nelDSP {
 				mixProcessor(u),
 				chModules(),
 				certainty(),
-				wIdx(u),
+				wHead(u),
 				widthProcessor(u),
 				utils(u),
 
@@ -1054,6 +1043,7 @@ namespace nelDSP {
 			}
 			// SET
 			void setSampleRate() {
+				mixProcessor.setSampleRate();
 				widthProcessor.setSampleRate();
 				for (auto& ch : chModules)
 					ch.setSampleRate();
@@ -1066,7 +1056,7 @@ namespace nelDSP {
 			}
 			void setMaxBufferSize() {
 				data.resize(utils.maxBufferSize, 0);
-				wIdx.setMaxBufferSize();
+				wHead.setMaxBufferSize();
 				for (auto& ch : chModules) ch.setMaxBufferSize();
 				mixProcessor.setMaxBufferSize();
 			}
@@ -1088,32 +1078,30 @@ namespace nelDSP {
 			}
 			void setWidth(const float w) { widthProcessor.setWidth(w); }
 			void setMix(const float m) {
-				if (mix != m) {
-					mix = m;
-					mixProcessor.setMix(mix);
-				}
+				mix = m;
+				mixProcessor.setMix(mix);
 			}
 			// PROCESS
 			void processBlock(juce::AudioBuffer<float>& buffer) {
 				if (mixProcessor.saveDryBuffer(buffer)) return;
-				wIdx.processBlock();
+				wHead.synthesizeBlock();
 				chModules[0].synthesizeLFO();
-				chModules[0].smoothenDelay();
+				chModules[0].filterDelay();
 				chModules[0].saveLFOValue(lfoValues[0]);
 				widthProcessor(data, chModules, lfoValues[1]);
 				for (auto ch = 0; ch < utils.numChannels; ++ch) {
 					chModules[ch].clampDelay();
-					chModules[ch].processBlock(buffer, wIdx.data.data(), interpolator, ch);
+					chModules[ch].processBlock(buffer, wHead.data.data(), interpolator, ch);
 				}
 				mixProcessor(buffer, data);
 			}
 			void processBlockBypassed(juce::AudioBuffer<float>& buffer) {
-				wIdx.processBlock();
+				wHead.synthesizeBlock();
 				chModules[0].synthesizeLFOBypassed();
 				for (auto ch = 1; ch < utils.numChannels; ++ch)
 					chModules[ch].copyLFO(chModules[0].data.data());
 				for (auto ch = 0; ch < utils.numChannels; ++ch)
-					chModules[ch].processBlock(buffer, wIdx.data.data(), ch);
+					chModules[ch].processBlock(buffer, wHead.data.data(), ch);
 			}
 			// GET
 			std::array<std::atomic<float>, 2>& getLFOValues() { return lfoValues; }
@@ -1124,7 +1112,7 @@ namespace nelDSP {
 			MixProcessor mixProcessor;
 			std::vector<MultiChannelModules> chModules;
 			certainty::Generator certainty;
-			WIdx wIdx;
+			WriteHead wHead;
 			WidthProcessor widthProcessor;
 			Utils& utils;
 
@@ -1141,8 +1129,8 @@ namespace nelDSP {
 		{}
 		// SET
 		void setSampleRate() {
-			crossfade.setAttackInMs(20);
-			crossfade.setReleaseInMs(20);
+			crossfade.setAttackInMs(17);
+			crossfade.setReleaseInMs(17);
 		}
 		void setMaxBufferSize() { crossfade.setMaxBufferSize(); }
 		// PARAM
@@ -1256,13 +1244,12 @@ namespace nelDSP {
 		void setWidth(const float width) { vibrato.setWidth(width); }
 		void setMix(const float mix) { vibrato.setMix(mix); }
 		// PROCESS
-		void processBlock(juce::AudioBuffer<float>& buffer, const juce::MidiBuffer&) {
+		void processBlock(juce::AudioBuffer<float>& buffer) {
 			utils.numSamples = buffer.getNumSamples();
 			if (stereoMode.encode(buffer)) {
 				vibrato.processBlock(buffer);
 				return stereoMode.decode(buffer);
 			}
-			
 			vibrato.processBlock(buffer);
 		}
 		void processBlockBypassed(juce::AudioBuffer<float>& buffer) {
@@ -1292,15 +1279,16 @@ BUGS:
 		no mouseCursor shown
 	REAPER (F Mry):
 		plugin doesn't show up (maybe missing dependencies)
+	soupiraille
+		plugin doesn't load with static linking ??
 
 ADD FEATURES / IMPROVE:
 	mac support
 	rewrite so that param smoothing before go to processors
-	cpu verbrauch hoch, interpolation?
-	mix parameter smoothing for hard changes
+	lower cpu consumption, maybe on interpolation?
 	poly vibrato? (unison)
 	new midi learn (modulation stuff)
-	temposync
+	temposync freq
 	multiband
 	monoizer for stereowidth-slider to flanger?
 	oversampling?
@@ -1322,7 +1310,7 @@ D:\Pogramme\Studio One 5\Studio One.exe
 C:\Users\Eine Alte Oma\Documents\CPP\vst3sdk\out\build\x64-Debug (default)\bin\validator.exe
 -e "C:/Program Files/Common Files/VST3/NEL-19.vst3"
 
-DOWNLOAD C++17 AT:
+DOWNLOAD C++14 AT:
 https://support.microsoft.com/en-us/topic/the-latest-supported-visual-c-downloads-2647da03-1eea-4433-9aff-95f26a218cc0
 
 */

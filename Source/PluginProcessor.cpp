@@ -15,7 +15,7 @@ Nel19AudioProcessor::Nel19AudioProcessor()
     apvts(*this, nullptr, "parameters", nelDSP::param::createParameters()),
     params(),
     nel19(this),
-    curDepthMaxIdx(0)
+    curDepthMaxIdx(-1)
 #endif
 {
     appProperties.setStorageParameters(makeOptions());
@@ -71,12 +71,10 @@ int Nel19AudioProcessor::getCurrentProgram() { return 0; }
 void Nel19AudioProcessor::setCurrentProgram (int) {}
 const juce::String Nel19AudioProcessor::getProgramName (int) { return {}; }
 void Nel19AudioProcessor::changeProgramName (int, const juce::String&){}
-
 void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize) {    
-    nel19.prepareToPlay(sampleRate, maxBufferSize, getChannelCountOfBus(true, 0));
+    nel19.prepareToPlay(sampleRate, maxBufferSize, getChannelCountOfBus(false, 0));
 }
 void Nel19AudioProcessor::releaseResources() {}
-
 bool Nel19AudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const {
     return
         (layouts.getMainInputChannelSet() == juce::AudioChannelSet::disabled()
@@ -111,7 +109,7 @@ void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         buffer.clear(i, 0, buffer.getNumSamples());
 
     processParameters();
-    nel19.processBlock(buffer, midi);
+    nel19.processBlock(buffer);
 }
 void Nel19AudioProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) {
     if (buffer.getNumSamples() == 0) return;

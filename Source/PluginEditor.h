@@ -2,6 +2,7 @@
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
 #include <array>
+#define DebugLayout false
 
 namespace nelG {
     static constexpr float Pi = 3.14159265359f;
@@ -10,8 +11,8 @@ namespace nelG {
     static constexpr float PiQuart = Pi * .25f;
     static constexpr float PiInv = 1.f / Pi;
 
-    static constexpr int Width = 512 + 32 * 4;
-    static constexpr int Height = 256 - 8 * 3;
+    static constexpr int Width = 512 + 32 * 2;
+    static constexpr int Height = 512 - 8 * 3;
     static constexpr float Scale = 1;
     static constexpr int FPS = 12;
 
@@ -66,6 +67,69 @@ namespace nelG {
     static int widthRel(float x) { return static_cast<int>(x * Width); }
     static int heightRel(float x) { return static_cast<int>(x * Height); }
     static juce::Rectangle<int> boundsDownscaled() { return { 0, 0 , Width, Height }; }
+
+    struct Ratio {
+        Ratio(const std::vector<float>&& entries, float scaled = 1.f, float xOffset = 0.f) :
+            data(entries), x()
+        {
+            auto max = 0.f;
+            for (const auto& d : data) max += d;
+            max = scaled / max;
+            x.reserve(data.size());
+            float inc = 0.f;
+            for (auto& d : data) {
+                d *= max;
+                x.emplace_back(inc + xOffset);
+                inc += d;
+            }
+        }
+        const size_t size() const { return data.size(); }
+        const float operator[](int i) const { return data[i]; }
+        const float getX(int i) const { return x[i]; }
+    private:
+        std::vector<float> data, x;
+    };
+    struct RatioBounds {
+        RatioBounds(const Ratio& rX, const Ratio& rY) :
+            bounds(),
+            sizeX(rX.size())
+        {
+            const auto sizeY = rY.size();
+            const auto size = sizeX * sizeY;
+            bounds.reserve(size);
+            for (auto i = 0; i < size; ++i) {
+                const auto x = i % sizeX;
+                const auto y = i / sizeX;
+                bounds.emplace_back(juce::Rectangle<float>(rX.getX(x), rY.getX(y), rX[x], rY[y]).toNearestInt());
+            }
+        }
+        const juce::Rectangle<int> operator()(int x, int y) const { return bounds[x + y * sizeX]; }
+        const juce::Rectangle<int> operator()(int x0, int y0, int x1, int y1) const {
+            const auto startBounds = bounds[x0 + y0 * sizeX];
+            const auto endBounds = bounds[x1 + y1 * sizeX];
+            return {
+                startBounds.getX(),
+                startBounds.getY(),
+                endBounds.getRight() - startBounds.getX(),
+                endBounds.getBottom() - startBounds.getY()
+            };
+        }
+    private:
+        std::vector<juce::Rectangle<int>> bounds;
+        size_t sizeX;
+    };
+    struct Image {
+        void paint(juce::Graphics& g) { g.drawImageAt(img, x, y, false); }
+        void setBounds(juce::Rectangle<int>&& b) {
+            x = b.getX();
+            y = b.getY();
+            img = juce::Image(juce::Image::ARGB, b.getWidth(), b.getHeight(), true);
+        }
+        const juce::Rectangle<int> getBounds() const { return img.getBounds(); }
+        void operator()(int x, int y, const juce::Colour& c) { img.setPixelAt(x, y, c); }
+        juce::Image img;
+        int x, y;
+    };
 }
 
 struct NELGUtil {
@@ -129,25 +193,35 @@ struct NELComp :
     void mouseMove(const juce::MouseEvent&) override { utils.tooltip = &tooltip; }
 };
 
-#include "SpaceEditor.h"
-#include "TitleEditor.h"
+#include "Shuttle.h"
+#include "SettingsEditor.h"
+#include "RandomizerButton.h"
+#include "TooltipComponent.h"
 #include "ParametersEditor.h"
+#include "WavetableEditor.h"
 
 struct Nel19AudioProcessorEditor :
     public juce::AudioProcessorEditor
 {
-    Nel19AudioProcessorEditor (Nel19AudioProcessor&);
+    Nel19AudioProcessorEditor(Nel19AudioProcessor&);
 private:
     Nel19AudioProcessor& audioProcessor;
-    NELGUtil nelGUtil;
-    SpaceEditor space;
-    TitleEditor title;
-    ParametersEditor params;
+    NELGUtil utils;
+    Shuttle shuttle;
+
+    QuickAccessWheel depthMaxK;
+    ButtonSwitch lrmsK;
+    Knob depthK, freqK, widthK, mixK;
+    SliderShape shapeK;
+
+    WavetableEditor wavetable;
     Settings settings;
     SettingsButton settingsButton;
     RandomizerButton randomizerButton;
+    TooltipComponent tooltip;
 
     void resized() override;
-    
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Nel19AudioProcessorEditor)
+    void paint(juce::Graphics&) override;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Nel19AudioProcessorEditor)
 };

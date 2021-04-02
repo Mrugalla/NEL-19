@@ -52,6 +52,10 @@ struct Shuttle :
     int heightMax, shuttleYMax;
 private:
     void paint(juce::Graphics& g) override {
+#if DebugLayout
+        g.setColour(juce::Colours::red);
+        g.drawRect(getLocalBounds());
+#endif
         for (auto y = 0; y < img.getHeight(); ++y) {
             const auto yR = juce::jlimit(0, heightMax, y + offset[Left]);
             const auto yG = juce::jlimit(0, heightMax, y - offset[Left]);
