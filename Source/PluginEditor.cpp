@@ -5,39 +5,52 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     AudioProcessorEditor(&p),
     audioProcessor(p),
     utils(p),
+    rb2(
+        { 0, 7, 30, 15, 15, 10, 10, 10 },
+        { 0, 8, 8, 20, 8, 17, 6 }
+    ),
     shuttle(p, utils),
     
-    depthMaxK(p, nelDSP::param::ID::DepthMax, utils, "Higher DepthMax values sacrifice latency for a stronger vibrato."),
-    lrmsK(p, nelDSP::param::ID::LRMS, utils, "L/R for traditional stereo width, M/S for mono compatibility."),
-    depthK(p, nelDSP::param::ID::Depth, utils, "Defines the depth of the vibrato."),
-    freqK(p, nelDSP::param::ID::Freq, utils, "The frequency in which random values are picked for the LFO."),
-    widthK(p, nelDSP::param::ID::Width, utils, "The offset of each channel's Random LFO."),
-    mixK(p, nelDSP::param::ID::Mix, utils, "Turn Mix down for Chorus/Flanger-Sounds."),
-    shapeK(p, nelDSP::param::ID::Shape, utils, "Defines the shape of the randomizer."),
+    depthMaxK(p, param::ID::DepthMax, utils, "Higher values sacrifice latency for a stronger vibrato."),
+    lrmsK(p, param::ID::LRMS, utils, "Seperate rand LFOs for L/R or M/S."),
+    depthK(p, param::ID::Depth, utils, "The depth of the rand LFO."),
+    freqK(p, param::ID::Freq, utils, "The frequency in which random values are picked for the LFO."),
+    widthK(p, param::ID::Width, utils, "The offset of each channel's random LFO."),
+    mixK(p, param::ID::Mix, utils, "Dry/Wet -> Mix."),
+    shapeK(p, param::ID::Smooth, utils, "Higher values for a smoother rand LFO."),
+    //splineMixK(p, param::ID::SplineMix, utils, "Mixes the spline with the rand LFO."),
 
-    wavetable(p, utils),
+    //splineEditor(p, utils),
+    //splinePresetMenu(p, utils, splineEditor),
+    //splinePresetButton(p, utils, "Load or save a spline preset.", splinePresetMenu),
     settings(p, utils),
     settingsButton(p, settings, utils),
     randomizerButton(p, utils),
-    tooltip(p, utils)
+    tooltip(p, utils),
+
+    numChannels(audioProcessor.getChannelCountOfBus(true, 0))
 {
-    setMouseCursor(utils.cursors[NELGUtil::Cursor::Norm]);
+    setOpaque(true);
+    setMouseCursor(utils.cursors[nelG::Utils::Cursor::Norm]);
 
     addAndMakeVisible(shuttle);
-    
     addAndMakeVisible(depthK);
     addAndMakeVisible(freqK);
     addAndMakeVisible(shapeK);
     addAndMakeVisible(widthK);
     addAndMakeVisible(mixK);
     addAndMakeVisible(lrmsK);
-    addAndMakeVisible(depthMaxK);
-
-    addAndMakeVisible(wavetable);
+    //addAndMakeVisible(splineEditor);
+   // addAndMakeVisible(splinePresetButton);
     addAndMakeVisible(randomizerButton);
-    addAndMakeVisible(settings); settings.setVisible(false);
+    addAndMakeVisible(depthMaxK);
+    addChildComponent(settings);
     addAndMakeVisible(settingsButton);
+   // addChildComponent(splinePresetMenu);
     addAndMakeVisible(tooltip);
+
+    const auto numInputChannels = audioProcessor.getChannelCountOfBus(true, 0);
+    updateChannelCount(numInputChannels);
 
     setSize(
         static_cast<int>(nelG::Width * nelG::Scale),
@@ -45,94 +58,61 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     );
 }
 void Nel19AudioProcessorEditor::resized() {
-    const auto bounds = getLocalBounds().toFloat().reduced(nelG::Thicc);
-    const auto width = bounds.getWidth();
-    const auto height = bounds.getHeight();
-    nelG::Ratio ratioX({ 7, 25, 15, 15, 5, 10, 10 }, width, nelG::Thicc);
-    nelG::Ratio ratioY({ 8, 8, 20, 8, 17, 55, 8 }, height, nelG::Thicc);
-    nelG::RatioBounds ratioBounds(ratioX, ratioY);
+    const auto bounds = getLocalBounds().toFloat().reduced(util::Thicc);
+    rb2.setBounds(bounds);
 
-    settings.setBounds(getLocalBounds());
-    settingsButton.setBounds(ratioBounds(0, 0));
-    randomizerButton.setBounds(ratioBounds(0, 1));
-    tooltip.setBounds(ratioBounds(0, 6, 6, 6));
-    shuttle.setBounds(ratioBounds(0, 0, 1, 4));
-
+    settings.setBounds(rb2.exceptBottomBar().toNearestInt());
+    settingsButton.setBounds(rb2(0, 0).toNearestInt());
+    randomizerButton.setBounds(rb2(0, 1).toNearestInt());
+    tooltip.setBounds(rb2.bottomBar().toNearestInt());
+    shuttle.setBounds(rb2(0, 0, 2, 5).toNearestInt());
     depthK.setQBounds(
-        ratioBounds(2, 0),
-        ratioBounds(2, 1, 2, 2),
-        ratioBounds(2, 3)
+        rb2(2, 0).toNearestInt(),
+        rb2(2, 1, 1, 2).toNearestInt(),
+        rb2(2, 3).toNearestInt()
     );
     depthMaxK.init(
-        ratioBounds(2, 4),
-        nelG::Tau * 0,
-        nelG::Tau * 1,
-        nelG::PiQuart * 0.f
+        rb2(2, 4).toNearestInt(),
+        util::Tau * .75f,
+        util::Tau * .5f,
+        util::PiQuart * .5f
     );
     freqK.setQBounds(
-        ratioBounds(3, 0),
-        ratioBounds(3, 1, 3, 2),
-        ratioBounds(3, 3)
+        rb2(3, 0).toNearestInt(),
+        rb2(3, 1, 1, 2).toNearestInt(),
+        rb2(3, 3).toNearestInt()
     );
-    shapeK.setBounds(
-        ratioBounds(4, 1, 4, 3)
+    shapeK.setQBounds(
+        rb2(4, 0).toNearestInt(),
+        rb2(4, 1, 1, 2).toNearestInt(),
+        rb2(4, 3).toNearestInt()
     );
     widthK.setQBounds(
-        ratioBounds(5, 0),
-        ratioBounds(5, 1, 5, 2),
-        ratioBounds(5, 3)
+        rb2(5, 0).toNearestInt(),
+        rb2(5, 1, 1, 2).toNearestInt(),
+        rb2(5, 3).toNearestInt()
     );
-    lrmsK.setBounds(
-        ratioBounds(5, 4)
-    );
+    lrmsK.setBounds(rb2(5, 4).toNearestInt());
     mixK.setQBounds(
-        ratioBounds(6, 0),
-        ratioBounds(6, 1, 6, 2),
-        ratioBounds(6, 3)
+        rb2(6, 0).toNearestInt(),
+        rb2(6, 1, 1, 2).toNearestInt(),
+        rb2(6, 3).toNearestInt()
     );
-
-    /*
-    const auto width = static_cast<float>(getWidth());
-    const auto height = static_cast<float>(getHeight());
-    const auto heightHalf = height * .5f;
-
-    const auto tooltipHeight = utils.font.getHeight();
-    tooltip.setBounds(0, getHeight() - tooltipHeight, getWidth(), tooltipHeight);
-
-    const auto spaceX = width * .15f;
-    const auto spaceY = 0.f;
-    const auto spaceHeight = heightHalf - tooltipHeight;
-    const auto spaceWidth = width - spaceX;
-    shuttle.setBounds(spaceX, 0, shuttle.img.getWidth(), spaceHeight);
-    const auto shuttleWidth = shuttle.getWidth();
-    params.setQBounds({
-        shuttleWidth + shuttle.getX(),
-        0,
-        getWidth() - shuttleWidth - shuttle.getX(),
-        (int)spaceHeight
-    });
-    wavetable.setBounds(juce::Rectangle<float>(0, heightHalf - tooltipHeight, width, heightHalf).toNearestInt());
-
-    // left bar of buttons
-    const auto buttonX = 4.f * nelG::Scale;
-    const auto buttonY = buttonX;
-    const auto buttonWidth = 30.f * nelG::Scale;
-    const auto buttonHeight = buttonWidth;
-    settingsButton.setBounds(juce::Rectangle<float>(
-        buttonX, buttonY, buttonWidth, buttonHeight).toNearestInt()
-    );
-    juce::Rectangle<float> settingsBounds(0.f, 0.f,
-        width,
-        height * .925f
-    );
-    settings.setBounds(settingsBounds.toNearestInt());
-    juce::Rectangle<float> randButtonBounds(
-        buttonX,
-        static_cast<float>(settingsButton.getBottom()) + buttonY,
-        buttonWidth, buttonHeight
-    );
-    randomizerButton.setBounds(randButtonBounds.toNearestInt());
-    */
+    //splineEditor.setBounds(rb2(2,6,4,1).toNearestInt());
+    //splinePresetMenu.setBounds(rb2.exceptBottomBar().toNearestInt());
+    //splinePresetButton.setBounds(rb2(2, 5, 4, 1).toNearestInt());
 }
 
-void Nel19AudioProcessorEditor::paint(juce::Graphics& g) { g.fillAll(juce::Colour(nelG::ColBlack)); }
+
+void Nel19AudioProcessorEditor::paint(juce::Graphics& g) {
+    g.fillAll(juce::Colour(util::ColBlack));
+#if DebugRatioBounds
+    rb2.paintGrid(g);
+#endif
+}
+void Nel19AudioProcessorEditor::mouseEnter(const juce::MouseEvent&) { utils.tooltip = nullptr; }
+void Nel19AudioProcessorEditor::updateChannelCount(int numChannels) {
+    bool enableWidth = numChannels > 1;
+    widthK.setEnabled(enableWidth);
+    lrmsK.setEnabled(enableWidth);
+}

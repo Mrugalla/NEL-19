@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#define RemoveValueTree false
 
 Nel19AudioProcessor::Nel19AudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -12,7 +13,7 @@ Nel19AudioProcessor::Nel19AudioProcessor()
                      #endif
                        ),
     appProperties(),
-    apvts(*this, nullptr, "parameters", nelDSP::param::createParameters()),
+    apvts(*this, nullptr, "parameters", param::createParameters()),
     params(),
     nel19(this),
     curDepthMaxIdx(-1)
@@ -20,13 +21,14 @@ Nel19AudioProcessor::Nel19AudioProcessor()
 {
     appProperties.setStorageParameters(makeOptions());
 
-    params.push_back(apvts.getRawParameterValue(nelDSP::param::getID(nelDSP::param::ID::DepthMax)));
-    params.push_back(apvts.getRawParameterValue(nelDSP::param::getID(nelDSP::param::ID::Depth)));
-    params.push_back(apvts.getRawParameterValue(nelDSP::param::getID(nelDSP::param::ID::Freq)));
-    params.push_back(apvts.getRawParameterValue(nelDSP::param::getID(nelDSP::param::ID::Shape)));
-    params.push_back(apvts.getRawParameterValue(nelDSP::param::getID(nelDSP::param::ID::LRMS)));
-    params.push_back(apvts.getRawParameterValue(nelDSP::param::getID(nelDSP::param::ID::Width)));
-    params.push_back(apvts.getRawParameterValue(nelDSP::param::getID(nelDSP::param::ID::Mix)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::DepthMax)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::Depth)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::Freq)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::Smooth)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::LRMS)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::Width)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::Mix)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::SplineMix)));
 }
 
 juce::PropertiesFile::Options Nel19AudioProcessor::makeOptions() {
@@ -71,7 +73,7 @@ int Nel19AudioProcessor::getCurrentProgram() { return 0; }
 void Nel19AudioProcessor::setCurrentProgram (int) {}
 const juce::String Nel19AudioProcessor::getProgramName (int) { return {}; }
 void Nel19AudioProcessor::changeProgramName (int, const juce::String&){}
-void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize) {    
+void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize) {
     nel19.prepareToPlay(sampleRate, maxBufferSize, getChannelCountOfBus(false, 0));
 }
 void Nel19AudioProcessor::releaseResources() {}
@@ -86,19 +88,20 @@ bool Nel19AudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) co
         || layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo());
 }
 void Nel19AudioProcessor::processParameters() {
-    const auto depthMaxIdx = static_cast<int>(params[static_cast<int>(nelDSP::param::ID::DepthMax)]->load());
+    const auto depthMaxIdx = static_cast<int>(params[static_cast<int>(param::ID::DepthMax)]->load());
     if (depthMaxIdx != curDepthMaxIdx) {
         curDepthMaxIdx = depthMaxIdx;
-        const auto p = apvts.getParameter(nelDSP::param::getID(nelDSP::param::ID::DepthMax));
+        const auto p = apvts.getParameter(param::getID(param::ID::DepthMax));
         const auto depthMaxInMs = p->getCurrentValueAsText().getFloatValue();
         nel19.setDepthMax(depthMaxInMs);
     }
-    nel19.setDepth(params[static_cast<int>(nelDSP::param::ID::Depth)]->load());
-    nel19.setFreq(params[static_cast<int>(nelDSP::param::ID::Freq)]->load());
-    nel19.setShape(params[static_cast<int>(nelDSP::param::ID::Shape)]->load());
-    nel19.setLRMS(params[static_cast<int>(nelDSP::param::ID::LRMS)]->load());
-    nel19.setWidth(params[static_cast<int>(nelDSP::param::ID::Width)]->load());
-    nel19.setMix(params[static_cast<int>(nelDSP::param::ID::Mix)]->load());
+    nel19.setDepth(params[static_cast<int>(param::ID::Depth)]->load());
+    nel19.setFreq(params[static_cast<int>(param::ID::Freq)]->load());
+    nel19.setShape(1.f - params[static_cast<int>(param::ID::Smooth)]->load());
+    nel19.setLRMS(params[static_cast<int>(param::ID::LRMS)]->load());
+    nel19.setWidth(params[static_cast<int>(param::ID::Width)]->load());
+    nel19.setMix(params[static_cast<int>(param::ID::Mix)]->load());
+    nel19.setSplineMix(params[static_cast<int>(param::ID::SplineMix)]->load());
 }
 void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) {
     if (buffer.getNumSamples() == 0) return;
@@ -124,6 +127,12 @@ void Nel19AudioProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer,
 bool Nel19AudioProcessor::hasEditor() const { return true; }
 juce::AudioProcessorEditor* Nel19AudioProcessor::createEditor() { return new Nel19AudioProcessorEditor (*this); }
 void Nel19AudioProcessor::getStateInformation (juce::MemoryBlock& destData) {
+    auto& spline = nel19.getSplineCreator();
+    spline.getState(apvts.state);
+#if RemoveValueTree
+    apvts.state.removeAllChildren(nullptr);
+    apvts.state.removeAllProperties(nullptr);
+#endif
     auto state = apvts.copyState();
     std::unique_ptr<juce::XmlElement> xml(state.createXml());
     copyXmlToBinary(*xml, destData);
@@ -133,9 +142,14 @@ void Nel19AudioProcessor::setStateInformation (const void* data, int sizeInBytes
     if (xmlState.get() != nullptr)
         if (xmlState->hasTagName(apvts.state.getType()))
             apvts.replaceState(juce::ValueTree::fromXml(*xmlState));
-
-    // flush value tree
-    //apvts.state.removeAllChildren(nullptr);
-    //apvts.state.removeAllProperties(nullptr);
+    handleAsyncUpdate();
+#if RemoveValueTree
+    apvts.state.removeAllChildren(nullptr);
+    apvts.state.removeAllProperties(nullptr);
+#endif
+}
+void Nel19AudioProcessor::handleAsyncUpdate() {
+    auto& spline = nel19.getSplineCreator();
+    spline.setState(apvts.state);
 }
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new Nel19AudioProcessor(); }

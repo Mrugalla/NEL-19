@@ -1,192 +1,15 @@
 #pragma once
 #include <array>
 #include <functional>
+#include <chrono>
+#include <thread>
 
 namespace nelDSP {
-	// MATH CONST
-	static constexpr float Tau = 6.28318530718f;
-	static constexpr float Pi = 3.14159265359f;
-	// INTERPOLATION CONST
-	static constexpr int MaxInterpolationOrder = 7;
-	static constexpr int SincResolution = 1 << 9;
 	// CERTAINTY LFO & SMOOTH CONST
-	static constexpr float DepthDefault = .1f;
-	static constexpr float LFOFreqMin = .01f, LFOFreqMax = 30.f, LFOFreqDefault = 4.f, LFOFreqInterval = .5f;
 	static constexpr float ShapeMax = 24;
 	static constexpr int LowPassOrderDefault = 3;
 	// DELAY CONST
 	static constexpr float DelaySizeInMS = 5.f, DelaySizeInMSMin = 1, DelaySizeInMSMax = 1000;
-	static constexpr float WowWidthDefault = 0.f;
-
-	namespace util {
-		static juce::NormalisableRange<float> PowX2Range(float min, float max) {
-			return juce::NormalisableRange<float>(min, max,
-				[](float start, float end, float normalised) {
-					return start + std::pow(normalised, 2.f) * (end - start);
-				},
-				[](float start, float end, float value) {
-					return std::sqrt((value - start) / (end - start));
-					
-				}
-			);
-		}
-		static juce::NormalisableRange<float> LogRange(float min, float max) {
-			return juce::NormalisableRange<float>(min, max,
-				[](float start, float end, float normalised) {
-					return start + (std::pow(2.f, normalised * 10) - 1.f) * (end - start) / 1023.f;
-				},
-				[](float start, float end, float value) {
-					return (std::log(((value - start) * 1023.f / (end - start)) + 1.f) / std::log(2.f)) / 10.f;
-				}
-			);
-		}
-		static juce::NormalisableRange<float> LogRange(float min, float max, float interval) {
-			return juce::NormalisableRange<float>(min, max,
-				[](float start, float end, float normalised) {
-					return start + (std::pow(2.f, normalised * 10) - 1.f) * (end - start) / 1023.f;
-				},
-				[](float start, float end, float value) {
-					return (std::log(((value - start) * 1023.f / (end - start)) + 1.f) / std::log(2.f)) / 10.f;
-				},
-				[interval](float start, float end, float value) {
-					return juce::jlimit(start, end, interval * std::rint(value / interval));
-				}
-			);
-		}
-		static juce::NormalisableRange<float> QuadraticBezierRange(float min, float max, float shape) {
-			// 0 <= SHAPE < 1 && SHAPE && SHAPE != .5
-			auto rangedShape = shape * (max - min) + min;
-			return juce::NormalisableRange<float>(
-				min, max,
-				[rangedShape](float start, float end, float normalized) {
-					auto lin0 = start + normalized * (rangedShape - start);
-					auto lin1 = rangedShape + normalized * (end - rangedShape);
-					auto lin2 = lin0 + normalized * (lin1 - lin0);
-					return lin2;
-				},
-				[rangedShape](float start, float end, float value) {
-					auto start2 = 2 * start;
-					auto shape2 = 2 * rangedShape;
-					auto t0 = start2 - shape2;
-					auto t1 = std::sqrt(std::pow(shape2 - start2, 2.f) - 4.f * (start - value) * (start - shape2 + end));
-					auto t2 = 2.f * (start - shape2 + end);
-					auto y = (t0 + t1) / t2;
-					return juce::jlimit(0.f, 1.f, y);
-				}
-			);
-		}
-		static juce::AudioBuffer<float> load(const char* data, const int size) {
-			auto* stream = new juce::MemoryInputStream(data, size, false);
-			juce::WavAudioFormat format;
-			auto* reader = format.createReaderFor(stream, true);
-			auto lengthInSamples = (int)reader->lengthInSamples;
-			juce::AudioBuffer<float> buffer(1, lengthInSamples);
-			if (reader) reader->read(buffer.getArrayOfWritePointers(), 1, 0, lengthInSamples);
-			delete reader;
-			return buffer;
-		}
-		static void shakerSort(std::vector<double>& data) {
-			auto lenMax = (int)(data.size() - 2);
-			bool swapped;
-			do {
-				swapped = false;
-				for (auto i = 0; i < lenMax; ++i)
-					if (data[i] > data[i + 1]) {
-						std::swap(data[i], data[i + 1]);
-						swapped = true;
-					}
-				if (!swapped) return;
-				swapped = false;
-				for (auto i = lenMax; i > 0; --i)
-					if (data[i] > data[i + 1]) {
-						std::swap(data[i], data[i + 1]);
-						swapped = true;
-					}
-			} while (swapped);
-		}
-		static void shakerSort2(std::vector<float>& data) {
-			auto upperLimit = (int)(data.size() - 2);
-			auto lowerLimit = 0;
-			auto tempLimit = 0;
-			bool swapped = false;
-			do {
-				for (auto i0 = lowerLimit; i0 < upperLimit; ++i0) {
-					auto i1 = i0 + 1;
-					if (data[i0] > data[i1]) {
-						tempLimit = i1;
-						std::swap(data[i0], data[i1]);
-						swapped = true;
-					}
-				}
-				if (!swapped) return;
-				upperLimit = tempLimit;
-				swapped = false;
-				for (auto i0 = upperLimit; i0 > lowerLimit; --i0) {
-					auto i1 = i0 + 1;
-					if (data[i0] > data[i1]) {
-						tempLimit = i0;
-						std::swap(data[i0], data[i1]);
-						swapped = true;
-					}
-				}
-				if (!swapped) return;
-				lowerLimit = tempLimit - 1;
-				swapped = false;
-			} while (true);
-		}
-		static void playback(juce::AudioBuffer<float>& buffer, const std::vector<float>& data, const int ch) {
-			auto samples = buffer.getArrayOfWritePointers();
-			for (auto s = 0; s < buffer.getNumSamples(); ++s)
-				samples[ch][s] = data[s];
-		}
-		static void playback(juce::AudioBuffer<float>& buffer, const std::vector<float>& l, const std::vector<float>& r) {
-			auto samples = buffer.getArrayOfWritePointers();
-			for (auto s = 0; s < buffer.getNumSamples(); ++s) {
-				samples[0][s] = l[s];
-				samples[1][s] = r[s];
-			}
-		}
-		static void playback(juce::AudioBuffer<float>& buffer, const std::vector<float>& data) {
-			auto samples = buffer.getArrayOfWritePointers();
-			for (auto ch = 0; ch < buffer.getNumChannels(); ++ch)
-				for (auto s = 0; s < buffer.getNumSamples(); ++s)
-					samples[ch][s] = data[s];
-		}
-		static juce::StringArray makeChoicesArray(std::vector<juce::String> str) {
-			juce::StringArray y;
-			for (const auto& i : str)
-				y.add(i);
-			return y;
-		}
-	}
-
-	struct Range {
-		Range(const float s = 0, const float e = 1):
-			start(s),
-			end(e),
-			distance(end - start)
-		{}
-		// SET
-		void set(const float s, const float e) {
-			start = s;
-			end = e;
-			distance = e - s;
-		}
-		// GET
-		float start, end, distance;
-		// DBG
-		void dbg() const { DBG(end << " - " << start << " = " << distance); }
-	};
-
-	struct Rand {
-		Rand() :
-			gen(std::chrono::high_resolution_clock::now().time_since_epoch().count())
-		{}
-		float operator()() { return gen.nextFloat(); }
-		int operator()(const int len) { return gen.nextInt(len); }
-	private:
-		juce::Random gen;
-	};
 
 	struct Utils {
 		Utils(juce::AudioProcessor* p) :
@@ -251,156 +74,6 @@ namespace nelDSP {
 		}
 		
 		int delaySize, delayMax, delayCenter;
-	};
-
-	namespace param {
-		enum class ID { DepthMax, Depth, Freq, Shape, LRMS, Width, Mix };
-
-		static juce::String getName(ID i) {
-			switch (i) {
-			case ID::DepthMax: return "Depth Max";
-			case ID::Depth: return "Depth";
-			case ID::Freq: return "Freq";
-			case ID::Shape: return "Shape";
-			case ID::LRMS: return "LRMS";
-			case ID::Width: return "Width";
-			case ID::Mix: return "Mix";
-			default: return "";
-			}
-		}
-		static juce::String getName(int i) { getName(static_cast<ID>(i)); }
-		static juce::String getID(const ID i) { return getName(i).toLowerCase().removeCharacters(" "); }
-		static juce::String getID(const int i) { return getName(i).toLowerCase().removeCharacters(" "); }
-
-		static std::unique_ptr<juce::AudioParameterBool> createPBool(ID i, bool defaultValue, std::function<juce::String(bool value, int maxLen)> func) {
-			return std::make_unique<juce::AudioParameterBool>(
-				getID(i), getName(i), defaultValue, getName(i), func
-				);
-		}
-		static std::unique_ptr<juce::AudioParameterChoice> createPChoice(ID i, const juce::StringArray& choices, int defaultValue) {
-			return std::make_unique<juce::AudioParameterChoice>(
-				getID(i), getName(i), choices, defaultValue, getName(i)
-			);
-		}
-		static std::unique_ptr<juce::AudioParameterFloat> createParameter(ID i, const juce::NormalisableRange<float>& range, float defaultValue,
-			std::function<juce::String(float value, int maxLen)> stringFromValue = nullptr) {
-			return std::make_unique<juce::AudioParameterFloat>(
-				getID(i), getName(i), range, defaultValue, getName(i), juce::AudioProcessorParameter::Category::genericParameter,
-				stringFromValue
-			);
-		}
-
-		static juce::AudioProcessorValueTreeState::ParameterLayout createParameters() {
-			std::vector<std::unique_ptr<juce::RangedAudioParameter>> parameters;
-
-			auto percentStr = [](float value, int) {
-				if (value == 1.f) return juce::String("100 %");
-				value *= 100.f;
-				if(value > 9.f) return static_cast<juce::String>(value).substring(0, 2) + " %";
-				return static_cast<juce::String>(value).substring(0, 1) + " %";
-			};
-			auto freqStr = [](float value, int) {
-				if(value < 10.f)
-					return static_cast<juce::String>(value).substring(0, 3) + " hz";
-				return static_cast<juce::String>(value).substring(0, 2) + " hz";
-			};
-			auto mixStr = [](float value, int) {
-				auto nV = static_cast<int>(std::rint((value + 1.f) * 5.f));
-				switch (nV) {
-				case 0: return juce::String("Dry");
-				case 10: return juce::String("Wet");
-				default: return static_cast<juce::String>(10 - nV) + " : " + static_cast<juce::String>(nV);
-				}
-			};
-			auto lrMsStr = [](float value, int) {
-				return value < .5f ? juce::String("L/R") : juce::String("M/S");
-			};
-			auto sinSqrStr = [](float val, int) {
-				juce::juce_wchar s = 's', i = 'i', n = 'n', q = 'q', r = 'r';
-				const auto l0 = juce::String::charToString(s);
-				const auto l1 = juce::String::charToString(juce::juce_wchar(i + val * (q - i)));
-				const auto l2 = juce::String::charToString(juce::juce_wchar(n + val * (r - n)));
-				return l0 + l1 + l2;
-			};
-			const auto depthMaxChoices = util::makeChoicesArray({ "1","2","3","5","8","13","21","34","55","420" });
-
-			parameters.push_back(createPChoice(ID::DepthMax, depthMaxChoices, 2));
-			parameters.push_back(createParameter(
-				ID::Depth, util::QuadraticBezierRange(0, 1, .51f), DepthDefault, percentStr));
-			parameters.push_back(createParameter(
-				ID::Freq, util::QuadraticBezierRange(LFOFreqMin, LFOFreqMax, .01f), LFOFreqDefault, freqStr));
-			parameters.push_back(createParameter(
-				ID::Shape, util::QuadraticBezierRange(0, 1, .01f), 1, sinSqrStr));
-			parameters.push_back(createPBool(ID::LRMS, true, lrMsStr));
-			parameters.push_back(createParameter(
-				ID::Width, util::QuadraticBezierRange(0, 1, .3f), WowWidthDefault, percentStr));
-			parameters.push_back(createParameter(
-				ID::Mix, juce::NormalisableRange<float>(-1.f, 1.f), 1.f, mixStr));
-
-			return { parameters.begin(), parameters.end() };
-		}
-	};
-
-	struct Lanczos {
-		static constexpr int Alpha = MaxInterpolationOrder;
-		Lanczos() :
-			sinc()
-		{}
-		struct SincLUT {
-			SincLUT() :
-				lut()
-			{
-				const auto size = SincResolution + 2;
-				lut.reserve(size);
-				max = Alpha * Pi;
-				lut.emplace_back(1.f);
-				for (auto i = 1; i < size; ++i) {
-					const auto x = static_cast<float>(i) / SincResolution;
-					const auto mapped = x * Alpha * Pi;
-					lut.emplace_back(sinc(mapped));
-				}
-			}
-			const float operator[](const float idx) const {
-				const auto normal = std::abs(idx / max);
-				const auto upscaled = normal * SincResolution;
-				const auto mapF = static_cast<int>(upscaled);
-				const auto mapC = mapF + 1;
-				const auto x = upscaled - mapF;
-				const auto s0 = lut[mapF];
-				const auto s1 = lut[mapC];
-				return s0 + x * (s1 - s0);
-			}
-		private:
-			std::vector<float> lut;
-			float max;
-
-			float sinc(float xPi) { return std::sin(xPi) / xPi; }
-		};
-		const float operator()(const std::vector<float>& buffer, const float idx) const {
-			const auto iFloor = static_cast<int>(idx);
-			const auto x = idx - iFloor;
-			const auto size = static_cast<int>(buffer.size());
-
-			auto sum = 0.f;
-			for (auto i = -Alpha + 1; i < Alpha; ++i) {
-				auto iLegal = i + iFloor;
-				if (iLegal < 0) iLegal += size;
-				else if (iLegal >= size) iLegal -= size;
-
-				auto xi = x - i;
-				if (xi == 0.f) xi = 1.f;
-				else if (x > -Alpha && x < Alpha) {
-					auto xPi = xi * Pi;
-					xi = sinc[xPi] * sinc[xPi / Alpha];
-				}
-				else xi = 0.f;
-
-				sum += buffer[iLegal] * xi;
-			}
-			return sum;
-		}
-	private:
-		SincLUT sinc;
 	};
 
 	namespace certainty {
@@ -475,7 +148,7 @@ namespace nelDSP {
 			}
 
 			const float operator()() { return certainties[rand(size)]; }
-			const float operator()(const Range& range) {
+			const float operator()(const util::Range& range) {
 				return range.start + certainties[rand(size)] * range.distance;
 			}
 			const float getAverage() const {
@@ -486,7 +159,7 @@ namespace nelDSP {
 			}
 		private:
 			std::vector<float> certainties;
-			Rand rand;
+			util::Rand rand;
 			int size;
 
 			std::array<std::vector<float>, CertaintiesCount> prepareCertainties(const juce::String& rawData) {
@@ -535,7 +208,7 @@ namespace nelDSP {
 			void upscaleCertainties(const int order) {
 				size = order * CertaintiesPerCertainty;
 				if (order != 1) {
-					Lanczos interpolator;
+					interpolation::Lanczos interpolator;
 					std::vector<float> newData;
 					for (auto c = 0; c < CertaintiesCount; ++c) {
 						newData.reserve(size);
@@ -559,7 +232,7 @@ namespace nelDSP {
 					if (s < min) min = s;
 					if (s > max) max = s;
 				}
-				Range r(min, max);
+				util::Range r(min, max);
 				for (auto& s : certainties)
 					s = (s - r.start) / r.distance;
 			}
@@ -673,62 +346,6 @@ namespace nelDSP {
 		const Utils& utils;
 	};
 
-	namespace wt {
-		struct Wavetable {
-			Wavetable() :
-				points(), tmp(),
-				vt(),
-				id("wavetable"),
-				idPoint("point"),
-				idX("x"),
-				idY("y"),
-				hasChanged(false),
-				stillChanging(false)
-			{}
-			// SET
-			void setState(juce::ValueTree& v) {
-				vt = v.getChildWithName(id);
-				if (vt.isValid()) {
-					points.clear();
-					const auto numChildren = vt.getNumChildren();
-					for (auto i = 0; i < numChildren; ++i) {
-						const auto child = vt.getChild(i);
-						if (child.getType() == idPoint) {
-							const auto x = static_cast<float>(child.getProperty(idX));
-							const auto y = static_cast<float>(child.getProperty(idY));
-							points.push_back({ x, y });
-						}
-					}
-				}
-				else {
-					vt = juce::ValueTree(id);
-					v.appendChild(vt, nullptr);
-				}
-			}
-			void getState() {
-				for (const auto& p : points) {
-					juce::ValueTree child(idPoint);
-					child.setProperty(idX, p.x, nullptr);
-					child.setProperty(idY, p.y, nullptr);
-					vt.appendChild(child, nullptr);
-				}
-			}
-			void sendChange() { hasChanged.store(true); }
-			// PROCESS
-			void processBlock() {
-				if (hasChanged.load()) {
-					points = tmp;
-					hasChanged.store(false);
-				}
-			}
-		private:
-			std::vector<juce::Point<float>> points, tmp;
-			juce::ValueTree vt;
-			juce::Identifier id, idPoint, idX, idY;
-			std::atomic<bool> hasChanged, stillChanging;
-		};
-	}
-
 	namespace vibrato {
 		struct Phase {
 			Phase(const Utils& u) :
@@ -748,6 +365,32 @@ namespace nelDSP {
 		private:
 			float inc;
 			const Utils& utils;
+		};
+
+		struct PhaseBuffer {
+			struct Value { float value; bool reset; };
+			PhaseBuffer(const Utils& u) :
+				utils(u),
+				buffer(),
+				phase(u)
+			{}
+			// SET
+			void setMaxBufferSize() { buffer.resize(utils.maxBufferSize, { 0, false }); }
+			// PARAM
+			void setFrequencyInHz(float hz) { phase.setFrequencyInHz(hz); }
+			// PROCESS
+			void synthesizeBlock(int numSamples) {
+				for (auto s = 0; s < numSamples; ++s) {
+					buffer[s].reset = phase();
+					buffer[s].value = phase.phase;
+				}
+			}
+			// GET
+			const Value operator[](int i) const { return buffer[i]; }
+		private:
+			const Utils& utils;
+			std::vector<Value> buffer;
+			Phase phase;
 		};
 
 		struct CertaintySequencer {
@@ -793,7 +436,7 @@ namespace nelDSP {
 			}
 		private:
 			Phase phase;
-			Rand rand;
+			util::Rand rand;
 			MultiOrderLowPass lowpass;
 			const Utils& utils;
 			certainty::Generator& certainty;
@@ -858,6 +501,27 @@ namespace nelDSP {
 			const Utils& utils;
 		};
 
+		struct Wavetable {
+			Wavetable(Utils& u, int sze) :
+				table(),
+				utils(u)
+			{
+				table.resize(sze, 0);
+			}
+			// PROCESS
+			void operator=(const std::vector<float>& other) {
+				const auto sizeInv = 1.f / static_cast<float>(table.size());
+				const auto otherSize = static_cast<float>(other.size());
+				for (auto t = 0; t < table.size(); ++t) {
+					const auto idx = static_cast<float>(t) * otherSize * sizeInv;
+					table[t] = other[static_cast<int>(idx)];
+				}
+			}
+		private:
+			std::vector<float> table;
+			const Utils& utils;
+		};
+
 		struct FFDelay {
 			FFDelay(const Utils& u) :
 				buffer(),
@@ -866,7 +530,7 @@ namespace nelDSP {
 			// SET
 			void setSampleRate() { buffer.resize(utils.delaySize, 0); }
 			// PROCESS
-			void processBlock(juce::AudioBuffer<float>& b, const int* wHead, const std::vector<float>& rHead, const Lanczos& interpolator, const int ch) {
+			void processBlock(juce::AudioBuffer<float>& b, const int* wHead, const std::vector<float>& rHead, const interpolation::Lanczos& interpolator, const int ch) {
 				auto samples = b.getWritePointer(ch, 0);
 				for (auto s = 0; s < utils.numSamples; ++s) {
 					buffer[wHead[s]] = samples[s];
@@ -917,7 +581,7 @@ namespace nelDSP {
 					if (data[s] < 0) data[s] = 0;
 					else if (data[s] > utils.delayMax) data[s] = static_cast<float>(utils.delayMax);
 			}
-			void processBlock(juce::AudioBuffer<float>& buffer, const int* wHead, const Lanczos& interpolator, const int ch) {
+			void processBlock(juce::AudioBuffer<float>& buffer, const int* wHead, const interpolation::Lanczos& interpolator, const int ch) {
 				//seq.playback(buffer, data, ch);
 				rHead.processBlock(data, wHead);
 				delay.processBlock(buffer, wHead, data, interpolator, ch);
@@ -939,7 +603,7 @@ namespace nelDSP {
 			WidthProcessor(const Utils& u) :
 				utils(u),
 				lowpass(utils, 0),
-				width(0.f), dest(static_cast<float>(WowWidthDefault))
+				width(0.f), dest(1.f)
 			{}
 			// SET
 			void setSampleRate() { lowpass.setInertiaInHz(17.f); }
@@ -1036,11 +700,12 @@ namespace nelDSP {
 				certainty(),
 				wHead(u),
 				widthProcessor(u),
+				spline(),
+				table(u, spline.getTable().size()),
 				utils(u),
 
-				depth(1.f), freq(static_cast<float>(LFOFreqDefault)), shape(1), mix(-1.f)
-			{
-			}
+				depth(1.f), freq(1.f), shape(1), mix(-1.f), splineMix(0)
+			{}
 			// SET
 			void setSampleRate() {
 				mixProcessor.setSampleRate();
@@ -1081,6 +746,9 @@ namespace nelDSP {
 				mix = m;
 				mixProcessor.setMix(mix);
 			}
+			void setSplineMix(const float s) {
+				splineMix = s;
+			}
 			// PROCESS
 			void processBlock(juce::AudioBuffer<float>& buffer) {
 				if (mixProcessor.saveDryBuffer(buffer)) return;
@@ -1096,28 +764,35 @@ namespace nelDSP {
 				mixProcessor(buffer, data);
 			}
 			void processBlockBypassed(juce::AudioBuffer<float>& buffer) {
+				setDepth(0.f); setFreq(1.f); setShape(0.f);
+				return processBlock(buffer);
+				/* // these must be a better way to deal with bypass, lol
 				wHead.synthesizeBlock();
 				chModules[0].synthesizeLFOBypassed();
 				for (auto ch = 1; ch < utils.numChannels; ++ch)
 					chModules[ch].copyLFO(chModules[0].data.data());
 				for (auto ch = 0; ch < utils.numChannels; ++ch)
 					chModules[ch].processBlock(buffer, wHead.data.data(), ch);
+				*/
 			}
 			// GET
 			std::array<std::atomic<float>, 2>& getLFOValues() { return lfoValues; }
+			spline::Creator& getSplineCreator() { return spline; }
 			std::vector<float> data;
 		private:
-			Lanczos interpolator;
+			interpolation::Lanczos interpolator;
 			std::array<std::atomic<float>, 2> lfoValues;
 			MixProcessor mixProcessor;
 			std::vector<MultiChannelModules> chModules;
 			certainty::Generator certainty;
 			WriteHead wHead;
 			WidthProcessor widthProcessor;
+			spline::Creator spline;
+			Wavetable table;
 			Utils& utils;
 
 			// PARAM
-			float depth, freq, shape, mix;
+			float depth, freq, shape, mix, splineMix;
 		};
 	}
 
@@ -1243,6 +918,7 @@ namespace nelDSP {
 		void setLRMS(const float lrms) { stereoMode.setIsMS(lrms > .5f); }
 		void setWidth(const float width) { vibrato.setWidth(width); }
 		void setMix(const float mix) { vibrato.setMix(mix); }
+		void setSplineMix(const float sMix) { vibrato.setSplineMix(sMix); }
 		// PROCESS
 		void processBlock(juce::AudioBuffer<float>& buffer) {
 			utils.numSamples = buffer.getNumSamples();
@@ -1258,6 +934,7 @@ namespace nelDSP {
 		}
 		// GET
 		std::array<std::atomic<float>, 2>& getLFOValues() { return vibrato.getLFOValues(); }
+		spline::Creator& getSplineCreator() { return vibrato.getSplineCreator(); }
 	private:
 		std::vector<float> depthMax;
 		Utils utils;

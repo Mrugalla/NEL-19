@@ -9,6 +9,7 @@
   <MAINGROUP id="V2oOlh" name="NEL">
     <GROUP id="{EB637F68-8B54-CF39-23F4-99282698FA6E}" name="Img">
       <FILE id="UlEIyH" name="bluecat.png" compile="0" resource="1" file="Source/Img/bluecat.png"/>
+      <FILE id="qMlrvH" name="cursorCross.png" compile="0" resource="1" file="Source/Img/cursorCross.png"/>
       <FILE id="ok6eqm" name="cursor.png" compile="0" resource="1" file="Source/Img/cursor.png"/>
       <FILE id="ciQHKW" name="juce.png" compile="0" resource="1" file="Source/Img/juce.png"/>
       <FILE id="Y03fii" name="shuttle.png" compile="0" resource="1" file="Source/Img/shuttle.png"/>
@@ -17,10 +18,15 @@
             file="Source/Img/vst3_logo_small.png"/>
     </GROUP>
     <GROUP id="{FF8BE835-9B90-31CB-45F4-D4B15FDEFD04}" name="Source">
+      <FILE id="qgc9VT" name="Interpolation.h" compile="0" resource="0" file="Source/Interpolation.h"/>
+      <FILE id="t6XaOJ" name="Util.h" compile="0" resource="0" file="Source/Util.h"/>
+      <FILE id="OUTZcM" name="Param.h" compile="0" resource="0" file="Source/Param.h"/>
+      <FILE id="KhZFKa" name="NELG.h" compile="0" resource="0" file="Source/NELG.h"/>
       <FILE id="UvkqJb" name="RandomizerButton.h" compile="0" resource="0"
             file="Source/RandomizerButton.h"/>
-      <FILE id="VLWe1x" name="WavetableEditor.h" compile="0" resource="0"
-            file="Source/WavetableEditor.h"/>
+      <FILE id="VLWe1x" name="SplineEditor.h" compile="0" resource="0" file="Source/SplineEditor.h"/>
+      <FILE id="Q5mIYF" name="SplineProcessor.h" compile="0" resource="0"
+            file="Source/SplineProcessor.h"/>
       <FILE id="KltU2P" name="nel19.ttf" compile="0" resource="1" file="Source/Font/nel19.ttf"/>
       <FILE id="kZc4tA" name="TooltipComponent.h" compile="0" resource="0"
             file="Source/TooltipComponent.h"/>

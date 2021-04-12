@@ -3,7 +3,7 @@
 #include <array>
 
 struct Shuttle :
-    public NELComp,
+    public nelG::Comp,
     public juce::Timer
 {
     // chromatic aberration fx on shuttle visualizes vibrato strength
@@ -31,8 +31,8 @@ struct Shuttle :
         std::vector<std::vector<juce::uint8>> colours;
     };
 
-    Shuttle(Nel19AudioProcessor& p, NELGUtil& u) :
-        NELComp(p, u, "Lionel's space shuttle vibrates your music! :>"),
+    Shuttle(Nel19AudioProcessor& p, nelG::Utils& u) :
+        nelG::Comp(p, u, "Lionel's space shuttle vibrates your music! :>"),
         img(nelG::load(BinaryData::shuttle_png, BinaryData::shuttle_pngSize, 2)),
         cVecs(),
         lfoValues(p.nel19.getLFOValues()),
@@ -52,10 +52,6 @@ struct Shuttle :
     int heightMax, shuttleYMax;
 private:
     void paint(juce::Graphics& g) override {
-#if DebugLayout
-        g.setColour(juce::Colours::red);
-        g.drawRect(getLocalBounds());
-#endif
         for (auto y = 0; y < img.getHeight(); ++y) {
             const auto yR = juce::jlimit(0, heightMax, y + offset[Left]);
             const auto yG = juce::jlimit(0, heightMax, y - offset[Left]);

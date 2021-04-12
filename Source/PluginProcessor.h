@@ -1,9 +1,15 @@
 #pragma once
 #include <JuceHeader.h>
+#include "Util.h"
+#include "Param.h"
+#include "Interpolation.h"
+#include "SplineProcessor.h"
 #include "DSP.h"
 
 class Nel19AudioProcessor :
-    public juce::AudioProcessor {
+    public juce::AudioProcessor,
+    public juce::AsyncUpdater
+{
 public:
     Nel19AudioProcessor();
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
@@ -29,6 +35,7 @@ public:
     void setStateInformation (const void* data, int sizeInBytes) override;
     juce::PropertiesFile::Options makeOptions();
     void processParameters();
+    void handleAsyncUpdate() override;
 
     juce::ApplicationProperties appProperties;
 

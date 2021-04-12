@@ -2,19 +2,15 @@
 #include <JuceHeader.h>
 
 struct RandomizerButton :
-    public NELComp
+    public nelG::Comp
 {
-    RandomizerButton(Nel19AudioProcessor& p, NELGUtil& u) :
-        NELComp(p, u, makeTooltip())
+    RandomizerButton(Nel19AudioProcessor& p, nelG::Utils& u) :
+        nelG::Comp(p, u, makeTooltip())
     {
-        setMouseCursor(u.cursors[NELGUtil::Cursor::Hover]);
+        setMouseCursor(u.cursors[nelG::Utils::Cursor::Hover]);
     }
 private:
     void paint(juce::Graphics& g) override {
-#if DebugLayout
-        g.setColour(juce::Colours::red);
-        g.drawRect(getLocalBounds());
-#endif
         const auto width = static_cast<float>(getWidth());
         const auto height = static_cast<float>(getHeight());
         const juce::Point<float> centre(width, height);
@@ -25,11 +21,11 @@ private:
             minDimen,
             minDimen
         );
-        bounds.reduce(nelG::Thicc, nelG::Thicc);
-        g.setColour(juce::Colour(nelG::ColBlack));
-        g.fillRoundedRectangle(bounds, nelG::Rounded);
-        g.setColour(juce::Colour(nelG::ColGreen));
-        g.drawRoundedRectangle(bounds, nelG::Rounded, nelG::Thicc);
+        bounds.reduce(util::Thicc, util::Thicc);
+        g.setColour(juce::Colour(util::ColBlack));
+        g.fillRoundedRectangle(bounds, util::Rounded);
+        g.setColour(juce::Colour(util::ColGreen));
+        g.drawRoundedRectangle(bounds, util::Rounded, util::Thicc);
 
         minDimen = std::min(bounds.getWidth(), bounds.getHeight());
         const auto radius = minDimen * .5f;
@@ -62,10 +58,10 @@ private:
         tooltip = makeTooltip();
         getTopLevelComponent()->repaint();
     }
-    void mouseExit(const juce::MouseEvent& evt) override { tooltip = makeTooltip(); }
+    void mouseExit(const juce::MouseEvent&) override { tooltip = makeTooltip(); }
     juce::String makeTooltip() {
         juce::Random rand;
-        const auto count = 108.f;
+        const auto count = 110.f;
         const auto v = static_cast<int>(std::rint(rand.nextFloat() * count));
         switch (v) {
         case 0: return "Do it!";
@@ -147,7 +143,7 @@ private:
         case 76: return "Once upon a time there was a traveller who clicked this button..";
         case 77: return "10/10 Best Decision!";
         case 78: return "Only really skilled audio professionals use this feature.";
-        case 79: return "What would your melody's name if it was a human being?";
+        case 79: return "What would be your melody's name if it was a human being?";
         case 80: return "What if humanity was just a failed experiment by a higher species?";
         case 81: return "Enter the black hole to stop time!";
         case 82: return "Did you remember to water your plants yet?";
@@ -177,6 +173,8 @@ private:
         case 106: return "The randomizer is better than your presets!";
         case 107: return "Are you a decide-fan, or a random-enjoyer?";
         case 108: return "Let's get it started! :)";
+        case 109: return "Scroll on the spline editor to change its selection!";
+        case 110: return "This is a special strain of random. ;)";
         default: "Are you sure?";
         }
         return "You are not supposed to read this message!";

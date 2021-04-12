@@ -3,19 +3,19 @@
 #include <functional>
 
 struct Settings :
-    public NELComp
+    public nelG::Comp
 {
     struct ButtonImg :
-        public NELComp {
+        public nelG::Comp {
         enum class State { Norm, Hover };
 
-        ButtonImg(const juce::Image& image, Nel19AudioProcessor& p, NELGUtil& u, juce::URL url, juce::String tooltp = "") :
-            NELComp(p, u, tooltp),
+        ButtonImg(const juce::Image& image, Nel19AudioProcessor& p, nelG::Utils& u, juce::URL url, juce::String tooltp = "") :
+            nelG::Comp(p, u, tooltp),
             onClick([url]() { url.launchInDefaultBrowser(); }),
             img(image.createCopy()),
             state(State::Norm)
         {
-            setMouseCursor(u.cursors[NELGUtil::Cursor::Hover]);
+            setMouseCursor(u.cursors[nelG::Utils::Cursor::Hover]);
         }
     private:
         std::function<void()> onClick;
@@ -28,12 +28,12 @@ struct Settings :
             g.drawRect(getLocalBounds());
 #endif
             g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
-            const auto bounds = getLocalBounds().toFloat().reduced(nelG::Thicc);
-            g.setColour(juce::Colour(nelG::ColBlack));
-            g.fillRoundedRectangle(bounds, nelG::Rounded);
+            const auto bounds = getLocalBounds().toFloat().reduced(util::Thicc);
+            g.setColour(juce::Colour(util::ColBlack));
+            g.fillRoundedRectangle(bounds, util::Rounded);
             if (state == State::Hover) {
-                g.setColour(juce::Colour(nelG::ColYellow));
-                g.drawRoundedRectangle(bounds, nelG::Rounded, nelG::Thicc);
+                g.setColour(juce::Colour(util::ColYellow));
+                g.drawRoundedRectangle(bounds, util::Rounded, util::Thicc);
             }
             g.drawImage(img, bounds, juce::RectanglePlacement::Flags::centred, false);
         }
@@ -48,24 +48,24 @@ struct Settings :
     };
 
     struct Button :
-        public NELComp {
+        public nelG::Comp {
         enum class State { Norm, Hover };
 
-        Button(juce::String nme, Nel19AudioProcessor& p, NELGUtil& u, std::function<void()> clck = []() {}, juce::String tooltp = "") :
-            NELComp(p, u, tooltp),
+        Button(juce::String nme, Nel19AudioProcessor& p, nelG::Utils& u, std::function<void()> clck = []() {}, juce::String tooltp = "") :
+            nelG::Comp(p, u, tooltp),
             onClick(clck),
             name(nme),
             state(State::Norm)
         {
-            setMouseCursor(u.cursors[NELGUtil::Cursor::Hover]);
+            setMouseCursor(u.cursors[nelG::Utils::Cursor::Hover]);
         }
-        Button(juce::String nme, Nel19AudioProcessor& p, NELGUtil& u, juce::URL url, juce::String tooltp = "") :
-            NELComp(p, u, tooltp),
+        Button(juce::String nme, Nel19AudioProcessor& p, nelG::Utils& u, juce::URL url, juce::String tooltp = "") :
+            nelG::Comp(p, u, tooltp),
             onClick([url]() { url.launchInDefaultBrowser(); }),
             name(nme),
             state(State::Norm)
         {
-            setMouseCursor(u.cursors[NELGUtil::Cursor::Hover]);
+            setMouseCursor(u.cursors[nelG::Utils::Cursor::Hover]);
         }
         void rename(juce::String nme) {
             name = nme;
@@ -77,14 +77,14 @@ struct Settings :
         State state;
 
         void paint(juce::Graphics& g) override {
-            const auto bounds = getLocalBounds().toFloat().reduced(nelG::Thicc);
-            g.setColour(juce::Colour(nelG::ColBlack));
-            g.fillRoundedRectangle(bounds, nelG::Rounded);
+            const auto bounds = getLocalBounds().toFloat().reduced(util::Thicc);
+            g.setColour(juce::Colour(util::ColBlack));
+            g.fillRoundedRectangle(bounds, util::Rounded);
             if (state == State::Norm)
-                g.setColour(juce::Colour(nelG::ColGreen));
+                g.setColour(juce::Colour(util::ColGreen));
             else
-                g.setColour(juce::Colour(nelG::ColYellow));
-            g.drawRoundedRectangle(bounds, nelG::Rounded, nelG::Thicc);
+                g.setColour(juce::Colour(util::ColYellow));
+            g.drawRoundedRectangle(bounds, util::Rounded, util::Thicc);
             const auto numLines = name.length();
             g.drawFittedText(name, bounds.toNearestInt(), juce::Justification::centred, numLines, 0);
         }
@@ -99,10 +99,10 @@ struct Settings :
     };
 
     struct PageHelp :
-        public NELComp
+        public nelG::Comp
     {
-        PageHelp(Settings& s, Nel19AudioProcessor& p, NELGUtil& u, juce::String tooltp = "") :
-            NELComp(p, u, tooltp),
+        PageHelp(Settings& s, Nel19AudioProcessor& p, nelG::Utils& u, juce::String tooltp = "") :
+            nelG::Comp(p, u, tooltp),
             manualB("Manual", p, u, juce::URL("https://github.com/Mrugalla/NEL-19"), "My Github page also acts as the manual."),
             tutorialsB("Tutorials", p, u, juce::URL("https://www.youtube.com/channel/UCBTAQ7ro8z1f8jufCDGogTw"), "Videos about NEL and my devlog on YouTube."),
             discordB("Bugs- &\nFeature Requests", p, u, juce::URL("https://discord.gg/xpTGJJNAZG"), "Join my Discord to discuss things."),
@@ -117,7 +117,7 @@ struct Settings :
     private:
         Button manualB, tutorialsB, discordB, tooltipsB;
         void resized() override {
-            const auto bounds = getLocalBounds().toFloat().reduced(nelG::Thicc);
+            const auto bounds = getLocalBounds().toFloat().reduced(util::Thicc);
             const auto numTokyoButtons = 4.f;
             auto x = bounds.getX();
             const auto y = bounds.getY();
@@ -145,10 +145,10 @@ struct Settings :
     };
 
     struct PageThanks :
-        public NELComp
+        public nelG::Comp
     {
-        PageThanks(Settings& s, Nel19AudioProcessor& p, NELGUtil& u) :
-            NELComp(p, u),
+        PageThanks(Settings& s, Nel19AudioProcessor& p, nelG::Utils& u) :
+            nelG::Comp(p, u),
             pnsB(nelG::load(BinaryData::bluecat_png, BinaryData::bluecat_pngSize), p, u, juce::URL(""), "My DSP Journey would not have started without Plug'n Script. Thank you!"),
             juceB(nelG::load(BinaryData::juce_png, BinaryData::juce_pngSize), p, u, juce::URL(""), "Thank you for maintaining and improving this awesome framework!"),
             joshB(nelG::load(BinaryData::tap_png, BinaryData::tap_pngSize), p, u, juce::URL(""), "Where would I be now without your community? Thank you!")
@@ -162,12 +162,12 @@ struct Settings :
         juce::Rectangle<float> titleBounds, thanksAllBounds, lionelBounds;
         ButtonImg pnsB, juceB, joshB;
         void paint(juce::Graphics& g) override {
-            g.setColour(juce::Colour(nelG::ColBlack).withAlpha(.5f));
-            g.fillRoundedRectangle(titleBounds, nelG::Rounded);
-            g.fillRoundedRectangle(thanksAllBounds, nelG::Rounded);
-            g.fillRoundedRectangle(lionelBounds, nelG::Rounded);
+            g.setColour(juce::Colour(util::ColBlack).withAlpha(.5f));
+            g.fillRoundedRectangle(titleBounds, util::Rounded);
+            g.fillRoundedRectangle(thanksAllBounds, util::Rounded);
+            g.fillRoundedRectangle(lionelBounds, util::Rounded);
             
-            g.setColour(juce::Colour(nelG::ColGreen));
+            g.setColour(juce::Colour(util::ColGreen));
             g.drawFittedText("Thank You", titleBounds.toNearestInt(), juce::Justification::centred, 1);
             juce::String txt;
             txt += "Special thanks go out to my fiancée, Alina, my cat, Helmi and my son, Lionel.\n";
@@ -181,14 +181,14 @@ struct Settings :
             g.drawFittedText(txt, lionelBounds.toNearestInt(), juce::Justification::left, 420, 0);
         }
         void resized() override {
-            const auto bounds = getLocalBounds().toFloat().reduced(nelG::Thicc);
+            const auto bounds = getLocalBounds().toFloat().reduced(util::Thicc);
             const auto titleHeight = bounds.getHeight() * .2f;
             titleBounds = juce::Rectangle<float>(
                 bounds.getX(),
                 bounds.getY(),
                 bounds.getWidth(),
                 titleHeight
-                ).reduced(nelG::Thicc);
+                ).reduced(util::Thicc);
             const auto thanksAllWidth = bounds.getWidth() * .25f;
             const auto thanksHeight = bounds.getHeight() - titleHeight;
             thanksAllBounds = juce::Rectangle<float>(
@@ -196,13 +196,13 @@ struct Settings :
                 titleBounds.getBottom(),
                 thanksAllWidth,
                 thanksHeight
-            ).reduced(nelG::Thicc);
+            ).reduced(util::Thicc);
             lionelBounds = juce::Rectangle<float>(
                 bounds.getX() + thanksAllWidth,
                 titleBounds.getBottom(),
                 bounds.getWidth() - thanksAllWidth,
                 thanksHeight
-            ).reduced(nelG::Thicc);
+            ).reduced(util::Thicc);
 
             const auto numButtons = 3.f;
             const auto x = thanksAllBounds.getX();
@@ -223,17 +223,17 @@ struct Settings :
     };
 
     struct PageAboutMe :
-        public NELComp
+        public nelG::Comp
     {
-        PageAboutMe(Settings& s, Nel19AudioProcessor& p, NELGUtil& u, juce::String tooltp = "") :
-            NELComp(p, u, tooltp)
+        PageAboutMe(Settings& s, Nel19AudioProcessor& p, nelG::Utils& u, juce::String tooltp = "") :
+            nelG::Comp(p, u, tooltp)
         {}
 
         void paint(juce::Graphics& g) override {
-            const auto bounds = getLocalBounds().toFloat().reduced(nelG::Thicc);
-            g.setColour(juce::Colour(nelG::ColBlack));
-            g.fillRoundedRectangle(bounds, nelG::Rounded);
-            g.setColour(juce::Colour(nelG::ColGreen));
+            const auto bounds = getLocalBounds().toFloat().reduced(util::Thicc);
+            g.setColour(juce::Colour(util::ColBlack));
+            g.fillRoundedRectangle(bounds, util::Rounded);
+            g.setColour(juce::Colour(util::ColGreen));
             juce::String str;
             str += "My name is Florian Mrugalla and I was born '91.\n";
             str += "When I was still in school I constantly made music.\n";
@@ -249,9 +249,9 @@ struct Settings :
     };
 
     struct PageAbout :
-        public NELComp {
-        PageAbout(Settings& s, Nel19AudioProcessor& p, NELGUtil& u) :
-            NELComp(p, u),
+        public nelG::Comp {
+        PageAbout(Settings& s, Nel19AudioProcessor& p, nelG::Utils& u) :
+            nelG::Comp(p, u),
             thanksB("Thank\nYou", p, u, [&]() { s.flipPage(std::make_unique<PageThanks>(s, p, u)); }, "A page dedicated to everyone who has helped me on my journey."),
             paypalB("Donate", p, u, juce::URL("https://paypal.me/AlteOma?locale.x=de_DE"), "I wish I didn't need money, but we all do."),
             meB("About\nMe", p, u, [&]() { s.flipPage(std::make_unique<PageAboutMe>(s, p, u)); }, "Do you want to know more about me? :)")
@@ -264,7 +264,7 @@ struct Settings :
     private:
         Button thanksB, paypalB, meB;
         void resized() override {
-            const auto bounds = getLocalBounds().toFloat().reduced(nelG::Thicc);
+            const auto bounds = getLocalBounds().toFloat().reduced(util::Thicc);
             const auto numTokyoButtons = 3.f;
             auto x = bounds.getX();
             const auto y = bounds.getY();
@@ -284,24 +284,24 @@ struct Settings :
     };
 
     struct PagePerformance :
-        public NELComp
+        public nelG::Comp
     {
-        PagePerformance(Settings& s, Nel19AudioProcessor& p, NELGUtil& u) :
-            NELComp(p, u)
+        PagePerformance(Settings& s, Nel19AudioProcessor& p, nelG::Utils& u) :
+            nelG::Comp(p, u)
         {}
         void paint(juce::Graphics& g) override {
-            const auto bounds = getBounds().toFloat().reduced(nelG::Thicc);
-            g.setColour(juce::Colour(nelG::ColBlack));
-            g.fillRoundedRectangle(bounds, nelG::Rounded);
-            g.setColour(juce::Colour(nelG::ColGreen));
+            const auto bounds = getBounds().toFloat().reduced(util::Thicc);
+            g.setColour(juce::Colour(util::ColBlack));
+            g.fillRoundedRectangle(bounds, util::Rounded);
+            g.setColour(juce::Colour(util::ColGreen));
             g.drawFittedText("There is nothing in here yet,\nbut I keep this page so I remember that I want to add something.", bounds.toNearestInt(), juce::Justification::centred, 1);
         }
     };
 
     struct PageInit :
-        public NELComp {
-        PageInit(Settings& s, Nel19AudioProcessor& p, NELGUtil& u, juce::String tooltp = "") :
-            NELComp(p, u, tooltp),
+        public nelG::Comp {
+        PageInit(Settings& s, Nel19AudioProcessor& p, nelG::Utils& u, juce::String tooltp = "") :
+            nelG::Comp(p, u, tooltp),
             helpB("Help", p, u, [&]() { s.flipPage(std::make_unique<PageHelp>(s, p, u)); }, "Need some help?"),
             aboutB("About\nNEL-19", p, u, [&]() { s.flipPage(std::make_unique<PageAbout>(s, p, u)); }, "Learn more about my plugin and me."),
             performanceB("Performance\nSettings", p, u, [&]() { s.flipPage(std::make_unique<PagePerformance>(s, p, u)); }, "Go here if you need stuff to go brrr more")
@@ -317,7 +317,7 @@ struct Settings :
             
         }
         void resized() override {
-            const auto bounds = getLocalBounds().toFloat().reduced(nelG::Thicc);
+            const auto bounds = getLocalBounds().toFloat().reduced(util::Thicc);
             const auto numTokyoButtons = 3.f;
             auto x = bounds.getX();
             const auto y = bounds.getY();
@@ -336,8 +336,8 @@ struct Settings :
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PageInit)
     };
 
-    Settings(Nel19AudioProcessor& p, NELGUtil& u) :
-        NELComp(p, u),
+    Settings(Nel19AudioProcessor& p, nelG::Utils& u) :
+        nelG::Comp(p, u),
         page()
     {
     }
@@ -360,12 +360,12 @@ struct Settings :
         setVisible(true);
         page = std::move(c);
     }
-    std::unique_ptr<NELComp> page;
+    std::unique_ptr<nelG::Comp> page;
 private:
     void paint(juce::Graphics& g) override {
-        const auto bounds = getLocalBounds().toFloat().reduced(nelG::Thicc);
+        const auto bounds = getLocalBounds().toFloat().reduced(util::Thicc);
         g.setColour(juce::Colour(0xbb000000));
-        g.fillRoundedRectangle(bounds, nelG::Rounded);
+        g.fillRoundedRectangle(bounds, util::Rounded);
         const auto& vstLogo = nelG::load(BinaryData::vst3_logo_small_png, BinaryData::vst3_logo_small_pngSize, 1);
         const auto vstLogoX = static_cast<int>(bounds.getWidth() - vstLogo.getWidth());
         const auto vstLogoY = static_cast<int>(bounds.getHeight() - vstLogo.getHeight());
@@ -377,46 +377,42 @@ private:
 };
 
 struct SettingsButton :
-    public NELComp
+    public nelG::Comp
 {
-    SettingsButton(Nel19AudioProcessor& p, Settings& s, NELGUtil& u) :
-        NELComp(p, u, "All the extra stuff. Do you feel extra?"),
+    SettingsButton(Nel19AudioProcessor& p, Settings& s, nelG::Utils& u) :
+        nelG::Comp(p, u, "All the extra stuff. Do you feel extra?"),
         settings(s)
     {
-        setMouseCursor(u.cursors[NELGUtil::Cursor::Hover]);
+        setMouseCursor(u.cursors[nelG::Utils::Cursor::Hover]);
     }
 private:
     Settings& settings;
     
     void paint(juce::Graphics& g) override {
-#if DebugLayout
-        g.setColour(juce::Colours::red);
-        g.drawRect(getLocalBounds());
-#endif
         const auto width = static_cast<float>(getWidth());
         const auto height = static_cast<float>(getHeight());
         const juce::Point<float> centre(width, height);
-        const auto minDimen = std::min(width, height);
+        auto minDimen = std::min(width, height);
         juce::Rectangle<float> bounds(
             (width - minDimen) * .5f,
             (height - minDimen) * .5f,
             minDimen,
             minDimen
         );
-        bounds.reduce(nelG::Thicc, nelG::Thicc);
-        g.setColour(juce::Colour(nelG::ColBlack));
-        g.fillRoundedRectangle(bounds, nelG::Rounded);
+        bounds.reduce(util::Thicc, util::Thicc);
+        g.setColour(juce::Colour(util::ColBlack));
+        g.fillRoundedRectangle(bounds, util::Rounded);
         if (settings.isVisible()) {
-            g.setColour(juce::Colour(nelG::ColRed));
-            g.drawRoundedRectangle(bounds, nelG::Rounded, nelG::Thicc);
+            g.setColour(juce::Colour(util::ColRed));
+            g.drawRoundedRectangle(bounds, util::Rounded, util::Thicc);
             g.drawFittedText("X", getLocalBounds(), juce::Justification::centred, 1, 0);
         }
         else {
-            g.setColour(juce::Colour(nelG::ColGreen));
-            g.drawRoundedRectangle(bounds, nelG::Rounded, nelG::Thicc);
+            g.setColour(juce::Colour(util::ColGreen));
+            g.drawRoundedRectangle(bounds, util::Rounded, util::Thicc);
             const auto boundsHalf = bounds.reduced(std::min(bounds.getWidth(), bounds.getHeight()) * .25f);
-            g.drawEllipse(boundsHalf.reduced(nelG::Thicc * .5f), nelG::Thicc);
-            const auto minDimen = std::min(boundsHalf.getWidth(), boundsHalf.getHeight());
+            g.drawEllipse(boundsHalf.reduced(util::Thicc * .5f), util::Thicc);
+            minDimen = std::min(boundsHalf.getWidth(), boundsHalf.getHeight());
             const auto radius = minDimen * .5f;
             auto bumpSize = radius * .4f;
             juce::Line<float> bump(0, radius, 0, radius + bumpSize);
@@ -424,18 +420,18 @@ private:
             for (auto i = 0; i < 4; ++i) {
                 const auto x = static_cast<float>(i) / 4.f;
                 auto rotatedBump = bump;
-                const auto rotation = juce::AffineTransform::rotation(x * nelG::Tau);
+                const auto rotation = juce::AffineTransform::rotation(x * util::Tau);
                 rotatedBump.applyTransform(rotation.followedBy(translation));
-                g.drawLine(rotatedBump, nelG::Thicc);
+                g.drawLine(rotatedBump, util::Thicc);
             }
             bumpSize *= .6f;
             bump.setStart(0, radius); bump.setEnd(0, radius + bumpSize);
             for (auto i = 0; i < 4; ++i) {
                 const auto x = static_cast<float>(i) / 4.f;
                 auto rotatedBump = bump;
-                const auto rotation = juce::AffineTransform::rotation(nelG::PiQuart + x * nelG::Tau);
+                const auto rotation = juce::AffineTransform::rotation(util::PiQuart + x * util::Tau);
                 rotatedBump.applyTransform(rotation.followedBy(translation));
-                g.drawLine(rotatedBump, nelG::Thicc);
+                g.drawLine(rotatedBump, util::Thicc);
             }
         }   
     }
@@ -447,19 +443,40 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SettingsButton)
 };
 
+struct ExitButton :
+    public nelG::Comp
+{
+    ExitButton(Nel19AudioProcessor& p, nelG::Utils& u, juce::Component& component) :
+        nelG::Comp(p, u, "Click to exit!"),
+        comp(component)
+    { setMouseCursor(u.cursors[nelG::Utils::Cursor::Hover]); }
+private:
+    juce::Component& comp;
+
+    void paint(juce::Graphics& g) override {
+        const auto width = static_cast<float>(getWidth());
+        const auto height = static_cast<float>(getHeight());
+        const auto minDimen = std::min(width, height) - util::Thicc;
+        const auto x = (width - minDimen) * .5f;
+        const auto y = (height - minDimen) * .5f;
+        juce::Rectangle<float> bounds(x, y, minDimen, minDimen);
+        g.setColour(juce::Colour(util::ColRed));
+        g.drawRoundedRectangle(bounds, util::Rounded, util::Thicc);
+        g.drawFittedText("X", bounds.toNearestInt(), juce::Justification::centred, 1, 0);
+    }
+    void mouseUp(const juce::MouseEvent& evt) override {
+        if (evt.mouseWasDraggedSinceMouseDown()) return;
+        comp.setVisible(false);
+    }
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ExitButton)
+};
+
 /*
 * lucas feedback:
-ich frage mich wie es wäre, wenn man die knobs genau entgegengesetzt macht. 0%
-ist dieser stern und 100% der perfekte kreis. weil je mehr solcher zacken hinzukommen,
-desto voller ist ja eig der kreis. das wäre gui wise interessant zu testen.
-
-und ich hätte gerne:
 click mix knob for bypass.
 dann kriegt der ne pinke umrandung wenn es bypass ist.
 und wenn einem das feature aufn sack geht, kann man es dort diablen wo auch
 tooltips disabled werden können
-
-kannst du noch einen mode reinmachen, der nicht random sondern nur ne pure sine ist?
 
 kannst du noch nen Plattenspieler-Stop machen. also einfach nur der pitch down effekt?
 das wäre so geil

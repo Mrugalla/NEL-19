@@ -2,11 +2,11 @@
 #include <JuceHeader.h>
 
 struct TooltipComponent :
-    public NELComp,
+    public nelG::Comp,
     public juce::Timer
 {
-    TooltipComponent(Nel19AudioProcessor& p, NELGUtil& u) :
-        NELComp(p, u, "Lmao, I'm the tooltip bar.")
+    TooltipComponent(Nel19AudioProcessor& p, nelG::Utils& u) :
+        nelG::Comp(p, u, "Lmao, I'm the tooltip bar.")
     {
         startTimerHz(nelG::FPS);
         ttFont = utils.font;
@@ -15,14 +15,10 @@ struct TooltipComponent :
 private:
     juce::Font ttFont;
     void paint(juce::Graphics& g) override {
-#if DebugLayout
-        g.setColour(juce::Colours::red);
-        g.drawRect(getLocalBounds());
-#endif
         drawBuildDate(g);
         if (!utils.tooltipEnabled || utils.tooltip == nullptr) return;
-        const auto bounds = getLocalBounds().toFloat().reduced(nelG::Thicc);
-        g.setColour(juce::Colour(nelG::ColBeige));
+        const auto bounds = getLocalBounds().toFloat().reduced(util::Thicc);
+        g.setColour(juce::Colour(util::ColBeige));
         g.setFont(ttFont);
         g.drawFittedText(*utils.tooltip, bounds.toNearestInt(), juce::Justification::left, 1);
     }
