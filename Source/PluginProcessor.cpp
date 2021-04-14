@@ -127,8 +127,8 @@ void Nel19AudioProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer,
 bool Nel19AudioProcessor::hasEditor() const { return true; }
 juce::AudioProcessorEditor* Nel19AudioProcessor::createEditor() { return new Nel19AudioProcessorEditor (*this); }
 void Nel19AudioProcessor::getStateInformation (juce::MemoryBlock& destData) {
-    auto& spline = nel19.getSplineCreator();
-    spline.getState(apvts.state);
+    //auto& spline = nel19.getSplineCreator();
+    //spline.getState(apvts.state);
 #if RemoveValueTree
     apvts.state.removeAllChildren(nullptr);
     apvts.state.removeAllProperties(nullptr);
@@ -149,7 +149,7 @@ void Nel19AudioProcessor::setStateInformation (const void* data, int sizeInBytes
 #endif
 }
 void Nel19AudioProcessor::handleAsyncUpdate() {
-    auto& spline = nel19.getSplineCreator();
-    spline.setState(apvts.state);
+    //auto& spline = nel19.getSplineCreator();
+    //spline.setState(apvts.state);
 }
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new Nel19AudioProcessor(); }

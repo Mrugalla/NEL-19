@@ -69,7 +69,7 @@ namespace nelDSP {
 		void setDelaySize(const int size) {
 			delaySize = size;
 			delayMax = delaySize - 1;
-			delayCenter = size;
+			delayCenter = size / 2;
 			setLatency(delayCenter);
 		}
 		
@@ -367,32 +367,6 @@ namespace nelDSP {
 			const Utils& utils;
 		};
 
-		struct PhaseBuffer {
-			struct Value { float value; bool reset; };
-			PhaseBuffer(const Utils& u) :
-				utils(u),
-				buffer(),
-				phase(u)
-			{}
-			// SET
-			void setMaxBufferSize() { buffer.resize(utils.maxBufferSize, { 0, false }); }
-			// PARAM
-			void setFrequencyInHz(float hz) { phase.setFrequencyInHz(hz); }
-			// PROCESS
-			void synthesizeBlock(int numSamples) {
-				for (auto s = 0; s < numSamples; ++s) {
-					buffer[s].reset = phase();
-					buffer[s].value = phase.phase;
-				}
-			}
-			// GET
-			const Value operator[](int i) const { return buffer[i]; }
-		private:
-			const Utils& utils;
-			std::vector<Value> buffer;
-			Phase phase;
-		};
-
 		struct CertaintySequencer {
 			CertaintySequencer(const Utils& u, certainty::Generator& certainty) :
 				phase(u),
@@ -418,9 +392,10 @@ namespace nelDSP {
 			void synthesizeBlock(std::vector<float>& data) { synthesizeRandomValues(data); }
 			void filter(std::vector<float>& data) { lowpass.processBlock(data); }
 			void scaleForDelay(float* data) {
-				const auto centre = static_cast<float>(utils.delayCenter);
-				juce::FloatVectorOperations::multiply(data, centre * .5f, utils.numSamples);
-				juce::FloatVectorOperations::add(data, centre, utils.numSamples);
+				const auto dSize = static_cast<float>(utils.delaySize);
+				juce::FloatVectorOperations::multiply(data, .5f, utils.numSamples);
+				juce::FloatVectorOperations::add(data, .5f, utils.numSamples);
+				juce::FloatVectorOperations::multiply(data, dSize, utils.numSamples);
 			}
 			void synthesizeBlockBypassed(std::vector<float>& data) {
 				auto centre = static_cast<float>(utils.delayCenter);
@@ -428,11 +403,9 @@ namespace nelDSP {
 			}
 			// DBG
 			void playback(juce::AudioBuffer<float>& buffer, const std::vector<float>& data, const int ch) {
-				const auto centre = static_cast<float>(utils.delayCenter);
-				const auto centre2 = centre * 2.f;
 				auto samples = buffer.getArrayOfWritePointers();
 				for (auto s = 0; s < utils.numSamples; ++s)
-					samples[ch][s] = data[s] / centre2 - .5f;
+					samples[ch][s] = 2.f * data[s] / utils.delaySize - 1.f;
 			}
 		private:
 			Phase phase;
@@ -472,7 +445,7 @@ namespace nelDSP {
 			void synthesizeBlock() {
 				for (auto s = 0; s < utils.numSamples; ++s) {
 					++idx;
-					if (idx == utils.delaySize)
+					if (idx >= utils.delaySize)
 						idx = 0;
 					data[s] = idx;
 				}
@@ -493,32 +466,11 @@ namespace nelDSP {
 			void processBlock(std::vector<float>& data, const int* wHead) {
 				for (auto s = 0; s < utils.numSamples; ++s) {
 					data[s] = wHead[s] - data[s];
-					if (data[s] < 0)
+					if (data[s] < 0.f)
 						data[s] += utils.delaySize;
 				}
 			}
 		private:
-			const Utils& utils;
-		};
-
-		struct Wavetable {
-			Wavetable(Utils& u, int sze) :
-				table(),
-				utils(u)
-			{
-				table.resize(sze, 0);
-			}
-			// PROCESS
-			void operator=(const std::vector<float>& other) {
-				const auto sizeInv = 1.f / static_cast<float>(table.size());
-				const auto otherSize = static_cast<float>(other.size());
-				for (auto t = 0; t < table.size(); ++t) {
-					const auto idx = static_cast<float>(t) * otherSize * sizeInv;
-					table[t] = other[static_cast<int>(idx)];
-				}
-			}
-		private:
-			std::vector<float> table;
 			const Utils& utils;
 		};
 
@@ -577,9 +529,10 @@ namespace nelDSP {
 			
 			void filterDelay() { seq.filter(data); }
 			void clampDelay() {
+				const auto delaySize = static_cast<float>(utils.delaySize);
 				for (auto s = 0; s < utils.numSamples; ++s)
-					if (data[s] < 0) data[s] = 0;
-					else if (data[s] > utils.delayMax) data[s] = static_cast<float>(utils.delayMax);
+					if (data[s] < 0.f) data[s] = 0.f;
+					else if (data[s] >= delaySize) data[s] = delaySize - std::numeric_limits<float>::min();
 			}
 			void processBlock(juce::AudioBuffer<float>& buffer, const int* wHead, const interpolation::Lanczos& interpolator, const int ch) {
 				//seq.playback(buffer, data, ch);
@@ -700,8 +653,6 @@ namespace nelDSP {
 				certainty(),
 				wHead(u),
 				widthProcessor(u),
-				spline(),
-				table(u, spline.getTable().size()),
 				utils(u),
 
 				depth(1.f), freq(1.f), shape(1), mix(-1.f), splineMix(0)
@@ -777,7 +728,6 @@ namespace nelDSP {
 			}
 			// GET
 			std::array<std::atomic<float>, 2>& getLFOValues() { return lfoValues; }
-			spline::Creator& getSplineCreator() { return spline; }
 			std::vector<float> data;
 		private:
 			interpolation::Lanczos interpolator;
@@ -787,8 +737,6 @@ namespace nelDSP {
 			certainty::Generator certainty;
 			WriteHead wHead;
 			WidthProcessor widthProcessor;
-			spline::Creator spline;
-			Wavetable table;
 			Utils& utils;
 
 			// PARAM
@@ -909,6 +857,7 @@ namespace nelDSP {
 		}
 		// PARAM
 		void setDepthMax(const float dm) {
+			DBG(dm);
 			if (utils.delaySizeChanged(dm))
 				prepareToPlay(utils.sampleRate, utils.maxBufferSize, utils.numChannels, true);
 		}
@@ -934,7 +883,6 @@ namespace nelDSP {
 		}
 		// GET
 		std::array<std::atomic<float>, 2>& getLFOValues() { return vibrato.getLFOValues(); }
-		spline::Creator& getSplineCreator() { return vibrato.getSplineCreator(); }
 	private:
 		std::vector<float> depthMax;
 		Utils utils;

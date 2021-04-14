@@ -1,6 +1,8 @@
 #pragma once
 #include <JuceHeader.h>
 
+/*
+
 namespace spline {
 	struct Editor :
 		public nelG::Comp,
@@ -180,14 +182,6 @@ namespace spline {
 	};
 
 	static constexpr float PresetHeightRelative = .3f;
-	/*
-	PresetMenu
-		EnterNameTextField
-		Browser
-			Preset (n)
-			ScrollBar
-
-	*/
 
 	class PresetMenu :
 		public nelG::Comp {
@@ -601,23 +595,6 @@ namespace spline {
 			addAndMakeVisible(exitButton);
 			addChildComponent(enterNameTextField);
 			addAndMakeVisible(browser);
-			/*
-			auto user = p.appProperties.getUserSettings();
-			if (user->isValidFile()) {
-				auto& props = user->getAllProperties();
-				auto& keys = props.getAllKeys();
-				for (auto k = 0; k < keys.size(); ++k) {
-					if (keys[k] == presetID.toString()) {
-						auto pName = "";
-						Points pPoints;
-						juce::Image pThumbNail;
-						presets.push_back({pName, pPoints, pThumbNail});
-					}	
-				}
-				//tooltipEnabled = !user->getBoolValue(tooltipID, tooltipEnabled);
-				//user->setValue(tooltipID, tooltipEnabled);
-			}
-			*/
 		}
 		void setVisible(bool e) override {
 			juce::Component::setVisible(e);
@@ -703,8 +680,17 @@ namespace spline {
 	};
 }
 
+*/
+
 /*
 to do:
+
+	PresetMenu
+		EnterNameTextField
+		Browser
+			Preset (n)
+			ScrollBar
+
 
 PRESET BROWSER
 	repaint bugs (preset hover, textfield)
@@ -725,3 +711,21 @@ VALUE TREE WRITE TO STREAM: https://docs.juce.com/master/classValueTree.html#a63
 OUTPUT STREAM: https://docs.juce.com/master/classMemoryOutputStream.html
 
 */
+
+/*
+			auto user = p.appProperties.getUserSettings();
+			if (user->isValidFile()) {
+				auto& props = user->getAllProperties();
+				auto& keys = props.getAllKeys();
+				for (auto k = 0; k < keys.size(); ++k) {
+					if (keys[k] == presetID.toString()) {
+						auto pName = "";
+						Points pPoints;
+						juce::Image pThumbNail;
+						presets.push_back({pName, pPoints, pThumbNail});
+					}
+				}
+				//tooltipEnabled = !user->getBoolValue(tooltipID, tooltipEnabled);
+				//user->setValue(tooltipID, tooltipEnabled);
+			}
+			*/
