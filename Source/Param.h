@@ -15,7 +15,7 @@ namespace param {
 		RandSync1, RandRate1, RandBias1, RandWidth1, RandSmooth1,
 		PerlinSync1, PerlinRate1, PerlinOctaves1, PerlinWidth1,
 
-		Depth, Mix // non modulator params (channel config lr/ms?, order of delays? crossfb?)
+		Depth, ModulatorsMix, DryWetMix, Voices // non modulator params (channel config lr/ms? crossfb?)
 	};
 
 	static juce::String getName(ID i) {
@@ -64,7 +64,9 @@ namespace param {
 		case ID::PerlinWidth1: return "PerlinWidth 1";
 
 		case ID::Depth: return "Depth"; // put depth max somewhere else because buffer realloc
-		case ID::Mix: return "Mix";
+		case ID::ModulatorsMix: return "Mix Mods";
+		case ID::DryWetMix: return "Mix DryWet";
+		case ID::Voices: return "Voices";
 
 		default: return "";
 		}
@@ -281,6 +283,9 @@ namespace param {
 		const auto octStr = [](float value, int) {
 			return juce::String(static_cast<int>(value)) + " oct";
 		};
+		const auto voicesStr = [](float value, int) {
+			return juce::String(static_cast<int>(value)) + " voices";
+		};
 
 		const auto maxSyncTime = 6; // 64th
 		const auto tsValues = getTempoSyncValues(maxSyncTime);
@@ -354,7 +359,9 @@ namespace param {
 
 		// non modulators' parameters:
 		parameters.push_back(createParameter(ID::Depth, 1.f, percentStr));
-		parameters.push_back(createParameter(ID::Mix, 1.f, percentStr));
+		parameters.push_back(createParameter(ID::ModulatorsMix, 0.f, normBiasStr));
+		parameters.push_back(createParameter(ID::DryWetMix, 1.f, percentStr));
+		parameters.push_back(createParameter(ID::Voices, 1.f, voicesStr, 1.f, 8.f, 1.f));
 
 		return { parameters.begin(), parameters.end() };
 	}

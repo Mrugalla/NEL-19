@@ -12,7 +12,7 @@ struct Nel19AudioProcessorEditor :
 private:
     Nel19AudioProcessor& audioProcessor;
     Utils utils;
-    nelG::Layout layout, layoutMacros;
+    nelG::Layout layout, layoutMacros, layoutDepthMix, layoutBottomBar, layoutParams;
 
     void resized() override;
     void paint(juce::Graphics&) override;

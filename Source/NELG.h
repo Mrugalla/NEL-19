@@ -3,8 +3,8 @@
 #include <JuceHeader.h>
 
 namespace nelG {
-    static constexpr int Width = 512 + 128;
-    static constexpr int Height = 256 + 64 + 16;
+    static constexpr int Width = 512 + 256;
+    static constexpr int Height = 256 + 128 + 16;
 
     static constexpr unsigned int ColBlack = 0xff171623;
     static constexpr unsigned int ColDarkGrey = 0xff595652;
@@ -24,18 +24,19 @@ namespace nelG {
 
     class Layout {
         struct NamedLocation {
-            NamedLocation(juce::String&& n, int xx, int yy, int widthh, int heightt, bool quad, bool ellip) :
+            NamedLocation(juce::String&& n, int xx, int yy, int widthh, int heightt, bool quad, bool ellip, bool visible) :
                 name(n),
                 x(xx),
                 y(yy),
                 width(widthh),
                 height(heightt),
                 isQuad(quad),
-                isElliptic(ellip)
+                isElliptic(ellip),
+                isVisible(visible)
             {}
             juce::String name;
             int x, y, width, height;
-            bool isQuad, isElliptic;
+            bool isQuad, isElliptic, isVisible;
         };
     public:
         Layout(const std::vector<float> xxx, const std::vector<float> yyy) :
@@ -107,17 +108,20 @@ namespace nelG {
         }
         void paintGrid(juce::Graphics& g) {
 #if DebugLayout
-            dbgConsole(g);
-            g.setColour(juce::Colours::white);
+            const auto shownAThing = paintNamedLocs(g);
+            if(shownAThing)
+                g.setColour(juce::Colour(0x77ffffff));
+            else
+                g.setColour(juce::Colour(0x22ffffff));
             for (auto x = 0; x < rX.size(); ++x)
-                g.drawLine(rX[x], 0, rX[x], rY[rY.size() - 1]);
+                g.drawLine(rX[x], rY[0], rX[x], rY[rY.size() - 1]);
             for (auto y = 0; y < rY.size(); ++y)
-                g.drawLine(0, rY[y], rX[rX.size() - 1], rY[y]);
+                g.drawLine(rX[0], rY[y], rX[rX.size() - 1], rY[y]);
 #endif
         }
-        void addNamedLocation(juce::String&& name, int x, int y, int width, int height, bool isQuad = false, bool isElliptic = false) {
+        void addNamedLocation(juce::String&& name, int x, int y, int width, int height, bool isQuad = false, bool isElliptic = false, bool isVisible = true) {
 #if DebugLayout
-            namedLocs.push_back({std::move(name), x, y, width, height, isQuad, isElliptic});
+            namedLocs.push_back({std::move(name), x, y, width, height, isQuad, isElliptic, isVisible});
 #endif
         }
         void mouseMove(juce::Point<float> p) {
@@ -131,32 +135,36 @@ namespace nelG {
         std::vector<NamedLocation> namedLocs;
         juce::Point<float> pos;
 
-        void dbgConsole(juce::Graphics& g) {
+        bool paintNamedLocs(juce::Graphics& g) {
+            bool shownAThing = false;
             juce::String str;
             juce::Colour col(0x77ff00dd);
             g.setColour(col);
             for (const auto& nl : namedLocs) {
-                const auto area = this->operator()(nl.x, nl.y, nl.width, nl.height);
-                if (area.contains(pos.x, pos.y)) {
-                    if (str.isNotEmpty()) {
-                        col = col.withRotatedHue(.2f);
-                        g.setColour(col);
-                        str.clear();
-                    }
-                        
-                    str += nl.name + juce::String(": ") +
-                        juce::String(nl.x) + ", " + juce::String(nl.y) + ", " +
-                        juce::String(nl.width) + ", " + juce::String(nl.height);
-                    if(!nl.isQuad) g.fillRect(area);
-                    else
-                        if (!nl.isElliptic)
-                            g.fillRect(maxQuadIn(area));
+                if (nl.isVisible) {
+                    const auto area = this->operator()(nl.x, nl.y, nl.width, nl.height);
+                    if (area.contains(pos.x, pos.y)) {
+                        shownAThing = true;
+                        if (str.isNotEmpty()) {
+                            col = col.withRotatedHue(.2f);
+                            g.setColour(col);
+                            str.clear();
+                        }
+                        str += nl.name + juce::String(": ") +
+                            juce::String(nl.x) + ", " + juce::String(nl.y) + ", " +
+                            juce::String(nl.width) + ", " + juce::String(nl.height);
+                        if (!nl.isQuad) g.fillRect(area);
                         else
-                            g.fillEllipse(maxQuadIn(area));
-                    g.setColour(juce::Colours::white);
-                    g.drawFittedText(str, area.toNearestInt(), juce::Justification::centredTop, 2);
+                            if (!nl.isElliptic)
+                                g.fillRect(maxQuadIn(area));
+                            else
+                                g.fillEllipse(maxQuadIn(area));
+                        g.setColour(juce::Colours::white);
+                        g.drawFittedText(str, area.toNearestInt(), juce::Justification::centredTop, 2);
+                    }
                 }
             }
+            return shownAThing;
         }
 #endif
     };

@@ -64,7 +64,9 @@ Nel19AudioProcessor::Nel19AudioProcessor()
     params.push_back(apvts.getRawParameterValue(param::getID(param::ID::PerlinWidth1)));
 
     params.push_back(apvts.getRawParameterValue(param::getID(param::ID::Depth)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::Mix)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::ModulatorsMix)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::DryWetMix)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::Voices)));
 }
 
 juce::PropertiesFile::Options Nel19AudioProcessor::makeOptions() {
