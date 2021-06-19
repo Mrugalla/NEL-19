@@ -1,10 +1,6 @@
 #pragma once
-#include <JuceHeader.h>
-#include "Util.h"
 #include "Param.h"
-#include "Interpolation.h"
-#include "SplineProcessor.h"
-#include "DSP.h"
+#include <JuceHeader.h>
 
 class Nel19AudioProcessor :
     public juce::AudioProcessor,
@@ -39,11 +35,9 @@ public:
 
     juce::ApplicationProperties appProperties;
 
+    param::MultiRange modRateRanges;
     juce::AudioProcessorValueTreeState apvts;
     std::vector<std::atomic<float>*> params;
-    nelDSP::Nel19 nel19;
-
-    int curDepthMaxIdx;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Nel19AudioProcessor)
 };

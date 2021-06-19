@@ -2,18 +2,70 @@
 #include <JuceHeader.h>
 
 namespace param {
-	enum class ID { DepthMax, Depth, Freq, Smooth, LRMS, Width, Mix, SplineMix };
+	enum class ID {
+		Macro0, Macro1, Macro2, Macro3, // general modulator params
+
+		EnvFolGain0, EnvFolAtk0, EnvFolRls0, EnvFolBias0, EnvFolWidth0, // modulator 0 params
+		LFOSync0, LFORate0, LFOWidth0, LFOWaveTable0,
+		RandSync0, RandRate0, RandBias0, RandWidth0, RandSmooth0,
+		PerlinSync0, PerlinRate0, PerlinOctaves0, PerlinWidth0,
+
+		EnvFolGain1, EnvFolAtk1, EnvFolRls1, EnvFolBias1, EnvFolWidth1, // modulator 1 params
+		LFOSync1, LFORate1, LFOWidth1, LFOWaveTable1,
+		RandSync1, RandRate1, RandBias1, RandWidth1, RandSmooth1,
+		PerlinSync1, PerlinRate1, PerlinOctaves1, PerlinWidth1,
+
+		Depth, Mix // non modulator params (channel config lr/ms?, order of delays? crossfb?)
+	};
 
 	static juce::String getName(ID i) {
 		switch (i) {
-		case ID::DepthMax: return "Depth Max";
-		case ID::Depth: return "Depth";
-		case ID::Freq: return "Freq";
-		case ID::Smooth: return "Smooth";
-		case ID::LRMS: return "LRMS";
-		case ID::Width: return "Width";
+		case ID::Macro0: return "Macro 0";
+		case ID::Macro1: return "Macro 1";
+		case ID::Macro2: return "Macro 2";
+		case ID::Macro3: return "Macro 3";
+		
+		case ID::EnvFolGain0: return "EnvFolGain 0";
+		case ID::EnvFolAtk0: return "EnvFolAtk 0";
+		case ID::EnvFolRls0: return "EnvFolRls 0";
+		case ID::EnvFolBias0: return "EnvFolBias 0";
+		case ID::EnvFolWidth0: return "EnvFolWidth 0";
+		case ID::LFOSync0: return "LFOSync 0";
+		case ID::LFORate0: return "LFORate 0";
+		case ID::LFOWidth0: return "LFOWidth 0";
+		case ID::LFOWaveTable0: return "LFOWaveTable 0";
+		case ID::RandSync0: return "RandSync 0";
+		case ID::RandRate0: return "RandRate 0";
+		case ID::RandBias0: return "RandBias 0";
+		case ID::RandWidth0: return "RandWidth 0";
+		case ID::RandSmooth0: return "RandSmooth 0";
+		case ID::PerlinSync0: return "PerlinSync 0";
+		case ID::PerlinRate0: return "PerlinRate 0";
+		case ID::PerlinOctaves0: return "PerlinOctaves 0";
+		case ID::PerlinWidth0: return "PerlinWidth 0";
+
+		case ID::EnvFolGain1: return "EnvFolGain 1";
+		case ID::EnvFolAtk1: return "EnvFolAtk 1";
+		case ID::EnvFolRls1: return "EnvFolRls 1";
+		case ID::EnvFolBias1: return "EnvFolBias 1";
+		case ID::EnvFolWidth1: return "EnvFolWidth 1";
+		case ID::LFOSync1: return "LFOSync 1";
+		case ID::LFORate1: return "LFORate 1";
+		case ID::LFOWidth1: return "LFOWidth 1";
+		case ID::LFOWaveTable1: return "LFOWaveTable 1";
+		case ID::RandSync1: return "RandSync 1";
+		case ID::RandRate1: return "RandRate 1";
+		case ID::RandBias1: return "RandBias 1";
+		case ID::RandWidth1: return "RandWidth 1";
+		case ID::RandSmooth1: return "RandSmooth 1";
+		case ID::PerlinSync1: return "PerlinSync 1";
+		case ID::PerlinRate1: return "PerlinRate 1";
+		case ID::PerlinOctaves1: return "PerlinOctaves 1";
+		case ID::PerlinWidth1: return "PerlinWidth 1";
+
+		case ID::Depth: return "Depth"; // put depth max somewhere else because buffer realloc
 		case ID::Mix: return "Mix";
-		case ID::SplineMix: return "Spline Mix";
+
 		default: return "";
 		}
 	}
@@ -31,29 +83,175 @@ namespace param {
 			getID(i), getName(i), choices, defaultValue, getName(i)
 			);
 	}
-	static std::unique_ptr<juce::AudioParameterFloat> createParameter(ID i, const juce::NormalisableRange<float>& range, float defaultValue,
-		std::function<juce::String(float value, int maxLen)> stringFromValue = nullptr) {
+	static std::unique_ptr<juce::AudioParameterFloat> createParameter(ID i, float defaultValue,
+		std::function<juce::String(float value, int maxLen)> stringFromValue,
+		const juce::NormalisableRange<float>& range) {
 		return std::make_unique<juce::AudioParameterFloat>(
 			getID(i), getName(i), range, defaultValue, getName(i), juce::AudioProcessorParameter::Category::genericParameter,
 			stringFromValue
 			);
 	}
+	static std::unique_ptr<juce::AudioParameterFloat> createParameter(ID i, float defaultValue = 1.f,
+		std::function<juce::String(float value, int maxLen)> stringFromValue = nullptr,
+		const float min = 0.1, const float max = 1.f, const float interval = -1.f) {
+		if(interval != -1.f)
+			return createParameter(i, defaultValue, stringFromValue, juce::NormalisableRange<float>(min, max, interval));
+		else
+			return createParameter(i, defaultValue, stringFromValue, juce::NormalisableRange<float>(min, max));
+	}
 
-	static juce::AudioProcessorValueTreeState::ParameterLayout createParameters() {
+	struct MultiRange {
+		struct Range
+		{
+			Range(const juce::String& rID, const juce::NormalisableRange<float>& r) :
+				id(rID),
+				range(r)
+			{}
+			bool operator==(const juce::Identifier& rID) const { return id == rID; }
+			const juce::NormalisableRange<float>& operator()() const { return range; }
+			const juce::Identifier& getID() const { return id; }
+		protected:
+			const juce::Identifier id;
+			const juce::NormalisableRange<float> range;
+		};
+		MultiRange() :
+			ranges()
+		{}
+		void add(const juce::String& rID, const juce::NormalisableRange<float>&& r) { ranges.push_back({ rID, r }); }
+		const juce::NormalisableRange<float>& operator()(const juce::Identifier& rID) const {
+			for (const auto& r : ranges)
+				if (r == rID)
+					return r();
+			return ranges[0]();
+		}
+		const juce::Identifier& getID(const juce::String&& idStr) const {
+			for (const auto& r : ranges)
+				if (r.getID().toString() == idStr)
+					return r.getID();
+			return ranges[0].getID();
+		}
+	private:
+		std::vector<Range> ranges;
+	};
+
+	static std::vector<float> getTempoSyncValues(int range) {
+		/*
+		* range = 6 => 2^6=64 => [1, 64] =>
+		* 1, 1., 1t, 1/2, 1/2., 1/2t, 1/4, 1/4., 1/4t, ..., 1/64
+		*/
+		const auto numRates = range * 3 + 1;
+		std::vector<float> rates;
+		rates.reserve(numRates);
+		for (auto i = 0; i < range; ++i) {
+			const auto denominator = 1 << i;
+			const auto beat = 1.f / static_cast<float>(denominator);
+			const auto euclid = beat * 3.f / 4.f;
+			const auto triplet = beat * 2.f / 3.f;
+			rates.emplace_back(beat);
+			rates.emplace_back(euclid);
+			rates.emplace_back(triplet);
+		}
+		const auto denominator = 1 << range;
+		const auto beat = 1.f / static_cast<float>(denominator);
+		rates.emplace_back(beat);
+		return rates;
+	}
+	static std::vector<juce::String> getTempoSyncStrings(int range) {
+		/*
+		* range = 6 => 2^6=64 => [1, 64] =>
+		* 1, 1., 1t, 1/2, 1/2., 1/2t, 1/4, 1/4., 1/4t, ..., 1/64
+		*/
+		const auto numRates = range * 3 + 1;
+		std::vector<juce::String> rates;
+		rates.reserve(numRates);
+		for (auto i = 0; i < range; ++i) {
+			const auto denominator = 1 << i;
+			juce::String beat("1/" + juce::String(denominator));
+			rates.emplace_back(beat);
+			rates.emplace_back(beat + ".");
+			rates.emplace_back(beat + "t");
+		}
+		const auto denominator = 1 << range;
+		juce::String beat("1/" + juce::String(denominator));
+		rates.emplace_back(beat);
+		return rates;
+	}
+	static juce::NormalisableRange<float> getTempoSyncRange(const std::vector<float>& rates) {
+		return juce::NormalisableRange<float>(
+			0.f, static_cast<float>(rates.size()),
+			[rates](float, float end, float normalized) {
+				const auto idx = static_cast<int>(normalized * end);
+				if (idx >= end) return rates[idx - 1];
+				return rates[idx];
+			},
+			[rates](float, float end, float mapped) {
+				for (auto r = 0; r < end; ++r)
+					if (rates[r] == mapped)
+						return static_cast<float>(r) / end;
+				return 0.f;
+			}
+			);
+	}
+	static std::function<juce::String(float, int)> getRateStr(
+		const juce::AudioProcessorValueTreeState& apvts,
+		const ID syncID,
+		const juce::NormalisableRange<float>& freeRange,
+		const std::vector<juce::String>& syncStrings)
+	{
+		return [&apvts, syncID, freeRange, syncStrings](float value, int) {
+			const auto syncP = apvts.getRawParameterValue(getID(syncID));
+			const auto sync = syncP->load();
+			if (sync < .5f) {
+				value = freeRange.convertFrom0to1(value);
+				return static_cast<juce::String>(std::rint(value)).substring(0, 4);
+			}
+			else {
+				const auto idx = static_cast<int>(value * syncStrings.size());
+				return value < 1.f ? syncStrings[idx] : syncStrings[idx - 1];
+			}
+		};
+	}
+
+
+	static juce::AudioProcessorValueTreeState::ParameterLayout createParameters(const juce::AudioProcessorValueTreeState& apvts, MultiRange& modRateRanges) {
 		std::vector<std::unique_ptr<juce::RangedAudioParameter>> parameters;
 
+		// string lambdas
+		// [0, 1]:
 		auto percentStr = [](float value, int) {
 			if (value == 1.f) return juce::String("100 %");
 			value *= 100.f;
 			if (value > 9.f) return static_cast<juce::String>(value).substring(0, 2) + " %";
 			return static_cast<juce::String>(value).substring(0, 1) + " %";
 		};
-		auto freqStr = [](float value, int) {
+		// [-1, 1]:
+		const auto percentStrM1 = [](float value, int) {
+			if (value == 1.f) return juce::String("100 %");
+			value = (value + 1.f) * 50.f;
+			if (value > 9.f) return static_cast<juce::String>(value).substring(0, 2) + " %";
+			return static_cast<juce::String>(value).substring(0, 1) + " %";
+		};
+		// [0, 1]:
+		const auto normBiasStr = [](float value, int) {
+			value = value * 200.f - 100.f;
+			if (value >= 0.f) {
+				if (value > 9.f)
+					return juce::String(value).substring(0, 2) + " %";
+				return juce::String(value).substring(0, 1) + " %";
+			}
+			else {
+				if (value < -9.f)
+					return "-" + juce::String(value).substring(0, 2) + " %";
+				return "-" + juce::String(value).substring(0, 1) + " %";
+			}
+		};
+		const auto freqStr = [](float value, int) {
 			if (value < 10.f)
 				return static_cast<juce::String>(value).substring(0, 3) + " hz";
 			return static_cast<juce::String>(value).substring(0, 2) + " hz";
 		};
-		auto mixStr = [](float value, int) {
+		// [-1, 1]:
+		const auto mixStr = [](float value, int) {
 			auto nV = static_cast<int>(std::rint((value + 1.f) * 5.f));
 			switch (nV) {
 			case 0: return juce::String("Dry");
@@ -61,36 +259,102 @@ namespace param {
 			default: return static_cast<juce::String>(10 - nV) + " : " + static_cast<juce::String>(nV);
 			}
 		};
-		auto lrMsStr = [](float value, int) {
+		const auto lrMsStr = [](float value, int) {
 			return value < .5f ? juce::String("L/R") : juce::String("M/S");
 		};
-		auto sinSqrStr = [](float val, int) {
-			juce::juce_wchar s = 's', i = 'i', n = 'n', q = 'q', r = 'r';
-			const auto l0 = juce::String::charToString(s);
-			const auto l1 = juce::String::charToString(juce::juce_wchar(i + val * (q - i)));
-			const auto l2 = juce::String::charToString(juce::juce_wchar(n + val * (r - n)));
-			return l0 + l1 + l2;
+		const auto dbStr = [](float value, int) {
+			return static_cast<juce::String>(std::rint(value)).substring(0, 5) + " db";
 		};
-		const auto depthMaxChoices = util::makeChoicesArray({ "1","2","3","5","8","13","21","34","55","420" });
+		const auto msStr = [](float value, int) {
+			return static_cast<juce::String>(std::rint(value)).substring(0, 5) + " ms";
+		};
+		const auto syncStr = [](bool value, int) {
+			return value > .5f ? static_cast<juce::String>("Sync") : static_cast<juce::String>("Free");
+		};
+		const auto wtStr = [](float value, int) {
+			return value < 1 ?
+				juce::String("SIN") : value < 2 ?
+				juce::String("TRI") : value < 3 ?
+				juce::String("SQR") :
+				juce::String("SAW");
+		};
+		const auto octStr = [](float value, int) {
+			return juce::String(static_cast<int>(value)) + " oct";
+		};
 
-		const float DepthDefault = .1f;
-		const float LFOFreqMin = .01f, LFOFreqMax = 30.f, LFOFreqDefault = 4.f;
-		const float WowWidthDefault = 0.f;
+		const auto maxSyncTime = 6; // 64th
+		const auto tsValues = getTempoSyncValues(maxSyncTime);
+		modRateRanges.add("free", { .1f, 20.f, .5f });
+		modRateRanges.add("sync", getTempoSyncRange(tsValues));
+		const auto tsStrings = getTempoSyncStrings(maxSyncTime);
+		auto rateStr = getRateStr(apvts, ID::LFOSync0, modRateRanges("free"), tsStrings);
 
-		parameters.push_back(createPChoice(ID::DepthMax, depthMaxChoices, 2));
-		parameters.push_back(createParameter(
-			ID::Depth, util::QuadraticBezierRange(0, 1, .51f), DepthDefault, percentStr));
-		parameters.push_back(createParameter(
-			ID::Freq, util::QuadraticBezierRange(LFOFreqMin, LFOFreqMax, .01f), LFOFreqDefault, freqStr));
-		parameters.push_back(createParameter(
-			ID::Smooth, util::QuadraticBezierRange(0, 1, .99f), 1, percentStr));
-		parameters.push_back(createPBool(ID::LRMS, true, lrMsStr));
-		parameters.push_back(createParameter(
-			ID::Width, util::QuadraticBezierRange(0, 1, .3f), WowWidthDefault, percentStr));
-		parameters.push_back(createParameter(
-			ID::Mix, juce::NormalisableRange<float>(-1.f, 1.f), 1.f, mixStr));
-		parameters.push_back(createParameter(
-			ID::SplineMix, util::QuadraticBezierRange(0, 1, .51f), .5f, percentStr));
+		parameters.push_back(createParameter(ID::Macro0, 0.f, percentStr));
+		parameters.push_back(createParameter(ID::Macro1, 0.f, percentStr));
+		parameters.push_back(createParameter(ID::Macro2, 0.f, percentStr));
+		parameters.push_back(createParameter(ID::Macro3, 0.f, percentStr));
+
+		// mod's parameters 0:
+
+		parameters.push_back(createParameter(ID::EnvFolGain0, 0.f, dbStr, 0.f, 24.f));
+		parameters.push_back(createParameter(ID::EnvFolAtk0, 1.f, msStr, 1.f, 24.f));
+		parameters.push_back(createParameter(ID::EnvFolRls0, 1.f, msStr, 1.f, 24.f));
+		parameters.push_back(createParameter(ID::EnvFolBias0, .5f, normBiasStr));
+		parameters.push_back(createParameter(ID::EnvFolWidth0, 0.f, percentStr));
+
+		parameters.push_back(createPBool(ID::LFOSync0, false, syncStr));
+		parameters.push_back(createParameter(ID::LFORate0, .1f, rateStr));
+		parameters.push_back(createParameter(ID::LFOWidth0, 0.f, percentStrM1));
+		parameters.push_back(createParameter(ID::LFOWaveTable0, 0.f, wtStr, 0.f, 3.f));
+
+		rateStr = getRateStr(apvts, ID::RandSync0, modRateRanges("free"), tsStrings);
+
+		parameters.push_back(createPBool(ID::RandSync0, false, syncStr));
+		parameters.push_back(createParameter(ID::RandRate0, .5f, rateStr));
+		parameters.push_back(createParameter(ID::RandBias0, .5f, normBiasStr));
+		parameters.push_back(createParameter(ID::RandWidth0, 0.f, percentStr));
+		parameters.push_back(createParameter(ID::RandSmooth0, 1.f, percentStr));
+
+		rateStr = getRateStr(apvts, ID::PerlinSync0, modRateRanges("free"), tsStrings);
+
+		parameters.push_back(createPBool(ID::PerlinSync0, false, syncStr));
+		parameters.push_back(createParameter(ID::PerlinRate0, .5f, rateStr));
+		parameters.push_back(createParameter(ID::PerlinOctaves0, 1.f, octStr, 1.f, 8.f, 1.f));
+		parameters.push_back(createParameter(ID::PerlinWidth0, 0.f, percentStr));
+
+		// mod's parameters 1:
+
+		parameters.push_back(createParameter(ID::EnvFolGain1, 0.f, dbStr, 0.f, 24.f));
+		parameters.push_back(createParameter(ID::EnvFolAtk1, 1.f, msStr, 1.f, 24.f));
+		parameters.push_back(createParameter(ID::EnvFolRls1, 1.f, msStr, 1.f, 24.f));
+		parameters.push_back(createParameter(ID::EnvFolBias1, .5f, normBiasStr));
+		parameters.push_back(createParameter(ID::EnvFolWidth1, 0.f, percentStr));
+
+		rateStr = getRateStr(apvts, ID::LFOSync1, modRateRanges("free"), tsStrings);
+
+		parameters.push_back(createPBool(ID::LFOSync1, false, syncStr));
+		parameters.push_back(createParameter(ID::LFORate1, .1f, rateStr));
+		parameters.push_back(createParameter(ID::LFOWidth1, 0.f, percentStrM1));
+		parameters.push_back(createParameter(ID::LFOWaveTable1, 0.f, wtStr, 0.f, 3.f));
+
+		rateStr = getRateStr(apvts, ID::RandSync1, modRateRanges("free"), tsStrings);
+
+		parameters.push_back(createPBool(ID::RandSync1, false, syncStr));
+		parameters.push_back(createParameter(ID::RandRate1, .5f, rateStr));
+		parameters.push_back(createParameter(ID::RandBias1, .5f, normBiasStr));
+		parameters.push_back(createParameter(ID::RandWidth1, 0.f, percentStr));
+		parameters.push_back(createParameter(ID::RandSmooth1, 1.f, percentStr));
+
+		rateStr = getRateStr(apvts, ID::PerlinSync1, modRateRanges("free"), tsStrings);
+
+		parameters.push_back(createPBool(ID::PerlinSync1, false, syncStr));
+		parameters.push_back(createParameter(ID::PerlinRate1, .5f, rateStr));
+		parameters.push_back(createParameter(ID::PerlinOctaves1, 1.f, octStr, 1.f, 8.f, 1.f));
+		parameters.push_back(createParameter(ID::PerlinWidth1, 0.f, percentStr));
+
+		// non modulators' parameters:
+		parameters.push_back(createParameter(ID::Depth, 1.f, percentStr));
+		parameters.push_back(createParameter(ID::Mix, 1.f, percentStr));
 
 		return { parameters.begin(), parameters.end() };
 	}

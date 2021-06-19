@@ -1,16 +1,9 @@
 #pragma once
+#include "NELG.h"
+#include "Component.h"
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
 #include <array>
-#define DebugRatioBounds false
-
-#include "NELG.h"
-#include "Shuttle.h"
-#include "SettingsEditor.h"
-#include "RandomizerButton.h"
-#include "TooltipComponent.h"
-#include "ParametersEditor.h"
-#include "SplineEditor.h"
 
 struct Nel19AudioProcessorEditor :
     public juce::AudioProcessorEditor
@@ -18,27 +11,13 @@ struct Nel19AudioProcessorEditor :
     Nel19AudioProcessorEditor(Nel19AudioProcessor&);
 private:
     Nel19AudioProcessor& audioProcessor;
-    nelG::Utils utils;
-    nelG::RatioBounds2 rb2;
-    Shuttle shuttle;
-
-    QuickAccessWheel depthMaxK;
-    ButtonSwitch lrmsK;
-    Knob depthK, freqK, widthK, mixK, shapeK;
-
-    //spline::Editor splineEditor;
-    //spline::PresetMenu splinePresetMenu;
-    //spline::PresetButton splinePresetButton;
-    Settings settings;
-    SettingsButton settingsButton;
-    RandomizerButton randomizerButton;
-    TooltipComponent tooltip;
-    int numChannels;
+    Utils utils;
+    nelG::Layout layout, layoutMacros;
 
     void resized() override;
     void paint(juce::Graphics&) override;
     void mouseEnter(const juce::MouseEvent& evt) override;
-    void updateChannelCount(int ch);
+    void mouseMove(const juce::MouseEvent& evt) override;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Nel19AudioProcessorEditor)
 };

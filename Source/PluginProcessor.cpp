@@ -13,22 +13,58 @@ Nel19AudioProcessor::Nel19AudioProcessor()
                      #endif
                        ),
     appProperties(),
-    apvts(*this, nullptr, "parameters", param::createParameters()),
-    params(),
-    nel19(this),
-    curDepthMaxIdx(-1)
+    modRateRanges(),
+    apvts(*this, nullptr, "parameters", param::createParameters(apvts, modRateRanges)),
+    params()
 #endif
 {
     appProperties.setStorageParameters(makeOptions());
 
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::DepthMax)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::Macro0)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::Macro1)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::Macro2)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::Macro3)));
+
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::EnvFolGain0)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::EnvFolAtk0)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::EnvFolRls0)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::EnvFolBias0)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::EnvFolWidth0)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::LFOSync0)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::LFORate0)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::LFOWidth0)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::LFOWaveTable0)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::RandSync0)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::RandRate0)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::RandBias0)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::RandWidth0)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::RandSmooth0)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::PerlinSync0)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::PerlinRate0)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::PerlinOctaves0)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::PerlinWidth0)));
+
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::EnvFolGain1)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::EnvFolAtk1)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::EnvFolRls1)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::EnvFolBias1)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::EnvFolWidth1)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::LFOSync1)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::LFORate1)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::LFOWidth1)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::LFOWaveTable1)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::RandSync1)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::RandRate1)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::RandBias1)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::RandWidth1)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::RandSmooth1)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::PerlinSync1)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::PerlinRate1)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::PerlinOctaves1)));
+    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::PerlinWidth1)));
+
     params.push_back(apvts.getRawParameterValue(param::getID(param::ID::Depth)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::Freq)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::Smooth)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::LRMS)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::Width)));
     params.push_back(apvts.getRawParameterValue(param::getID(param::ID::Mix)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::SplineMix)));
 }
 
 juce::PropertiesFile::Options Nel19AudioProcessor::makeOptions() {
@@ -74,7 +110,7 @@ void Nel19AudioProcessor::setCurrentProgram (int) {}
 const juce::String Nel19AudioProcessor::getProgramName (int) { return {}; }
 void Nel19AudioProcessor::changeProgramName (int, const juce::String&){}
 void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize) {
-    nel19.prepareToPlay(sampleRate, maxBufferSize, getChannelCountOfBus(false, 0));
+    
 }
 void Nel19AudioProcessor::releaseResources() {}
 bool Nel19AudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const {
@@ -88,20 +124,7 @@ bool Nel19AudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) co
         || layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo());
 }
 void Nel19AudioProcessor::processParameters() {
-    const auto depthMaxIdx = static_cast<int>(params[static_cast<int>(param::ID::DepthMax)]->load());
-    if (depthMaxIdx != curDepthMaxIdx) {
-        curDepthMaxIdx = depthMaxIdx;
-        const auto p = apvts.getParameter(param::getID(param::ID::DepthMax));
-        const auto depthMaxInMs = p->getCurrentValueAsText().getFloatValue();
-        nel19.setDepthMax(depthMaxInMs);
-    }
-    nel19.setDepth(params[static_cast<int>(param::ID::Depth)]->load());
-    nel19.setFreq(params[static_cast<int>(param::ID::Freq)]->load());
-    nel19.setShape(1.f - params[static_cast<int>(param::ID::Smooth)]->load());
-    nel19.setLRMS(params[static_cast<int>(param::ID::LRMS)]->load());
-    nel19.setWidth(params[static_cast<int>(param::ID::Width)]->load());
-    nel19.setMix(params[static_cast<int>(param::ID::Mix)]->load());
-    nel19.setSplineMix(params[static_cast<int>(param::ID::SplineMix)]->load());
+    
 }
 void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) {
     if (buffer.getNumSamples() == 0) return;
@@ -112,7 +135,7 @@ void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         buffer.clear(i, 0, buffer.getNumSamples());
 
     processParameters();
-    nel19.processBlock(buffer);
+    ////
 }
 void Nel19AudioProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) {
     if (buffer.getNumSamples() == 0) return;
@@ -122,7 +145,7 @@ void Nel19AudioProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer,
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear(i, 0, buffer.getNumSamples());
     processParameters();
-    nel19.processBlockBypassed(buffer);
+    ////
 }
 bool Nel19AudioProcessor::hasEditor() const { return true; }
 juce::AudioProcessorEditor* Nel19AudioProcessor::createEditor() { return new Nel19AudioProcessorEditor (*this); }
