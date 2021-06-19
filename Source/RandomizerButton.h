@@ -50,9 +50,16 @@ private:
             if (child.hasType("PARAM")) {
                 const auto pID = child.getProperty("id").toString();
                 auto param = processor.apvts.getParameter(pID);
-                const auto value = param->convertFrom0to1(rand.nextFloat());
-                juce::ParameterAttachment attach(*param, [this](float) {}, nullptr);
-                attach.setValueAsCompleteGesture(value);
+                if (pID != param::getID(param::ID::DepthMax)) {
+                    const auto value = param->convertFrom0to1(rand.nextFloat());
+                    param->setValue(value);
+                }
+                else {
+                    const auto& vStrings = param->getAllValueStrings();
+                    const auto vsSize = static_cast<float>(vStrings.size());
+                    const auto value = vsSize * rand.nextFloat();
+                    param->setValue(value);
+                }
             }
         }
         tooltip = makeTooltip();
@@ -61,7 +68,7 @@ private:
     void mouseExit(const juce::MouseEvent&) override { tooltip = makeTooltip(); }
     juce::String makeTooltip() {
         juce::Random rand;
-        const auto count = 110.f;
+        const auto count = 117.f;
         const auto v = static_cast<int>(std::rint(rand.nextFloat() * count));
         switch (v) {
         case 0: return "Do it!";
@@ -175,6 +182,13 @@ private:
         case 108: return "Let's get it started! :)";
         case 109: return "Scroll on the spline editor to change its selection!";
         case 110: return "This is a special strain of random. ;)";
+        case 111: return "Return to the battlefield or get killed.";
+        case 112: return "~<* Easy Peazy Lemon Squeezy *>~";
+        case 113: return "Why does it sound like dubstep?";
+        case 114: return "Excuse me.. Have you seen my sanity?";
+        case 115: return "In case of an emergency, push the button!";
+        case 116: return "Based.";
+        case 117: return "Life is a series of random collisions.";
         default: "Are you sure?";
         }
         return "You are not supposed to read this message!";
