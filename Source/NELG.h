@@ -1,8 +1,14 @@
 #pragma once
-#define DebugLayout true
 #include <JuceHeader.h>
+#define DebugLayout true && JUCE_DEBUG
 
 namespace nelG {
+    static constexpr float Pi = 3.14159265359f;
+    static constexpr float Tau = 6.28318530718f;
+    static constexpr float PiHalf = Pi * .5f;
+    static constexpr float PiQuart = Pi * .25f;
+
+    static constexpr float Thicc = 2.5f, Thicc2 = Thicc * 2.f;
     static constexpr int Width = 512 + 256;
     static constexpr int Height = 256 + 128 + 16;
 
@@ -81,6 +87,17 @@ namespace nelG {
             for (auto& y : rY) y += bounds.getY();
         }
         // PROCESS
+        void place(juce::Component& comp, int x, int y, int width = 1, int height = 1, bool isQuad = false) {
+            const auto cBounds = this->operator()(x, y, width, height);
+            if(!isQuad) comp.setBounds(cBounds.toNearestInt());
+            else comp.setBounds(maxQuadIn(cBounds).toNearestInt());
+        }
+        void place(juce::Component* comp, int x, int y, int width = 1, int height = 1, bool isQuad = false) {
+            if (comp == nullptr) return;
+            const auto cBounds = this->operator()(x, y, width, height);
+            if (!isQuad) comp->setBounds(cBounds.toNearestInt());
+            else comp->setBounds(maxQuadIn(cBounds).toNearestInt());
+        }
         juce::Rectangle<float> operator()() {
             return {
                 rX[0],
@@ -98,6 +115,13 @@ namespace nelG {
                 rY[rY.size() - 2],
                 rX[rX.size() - 1] - rX[0],
                 rY[rY.size() - 1] - rY[rY.size() - 2] };
+        }
+        juce::Rectangle<float> topBar() const {
+            return {
+                rX[0],
+                rY[0],
+                rX[rX.size() - 1] - rX[0],
+                rY[1] - rY[0] };
         }
         juce::Rectangle<float> exceptBottomBar() const {
             return {
@@ -206,3 +230,14 @@ namespace nelG {
         return img.rescaled(img.getWidth() * scale, img.getHeight() * scale, juce::Graphics::lowResamplingQuality).createCopy();
     }
 }
+
+/*
+
+remake colour sheme stuff so that customizable
+    SOLUTION 1:
+        nelG holds values to default colours for certain functions
+        certain functions: normal, interactable, modulation, inactive, background
+        all custom components refer to abstract function colours now
+        abstract function colours' colours can be changed in settings menu
+        changes are applied to all instances of the plugin simultanously
+*/

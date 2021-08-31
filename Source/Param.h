@@ -2,22 +2,26 @@
 #include <JuceHeader.h>
 
 namespace param {
+	static constexpr int PerlinMaxOctaves = 8;
+
 	enum class ID {
 		Macro0, Macro1, Macro2, Macro3, // general modulator params
 
 		EnvFolGain0, EnvFolAtk0, EnvFolRls0, EnvFolBias0, EnvFolWidth0, // modulator 0 params
-		LFOSync0, LFORate0, LFOWidth0, LFOWaveTable0,
+		LFOSync0, LFORate0, LFOWidth0, LFOWaveTable0, LFOPolarity0, LFOPhase0,
 		RandSync0, RandRate0, RandBias0, RandWidth0, RandSmooth0,
 		PerlinSync0, PerlinRate0, PerlinOctaves0, PerlinWidth0,
 
 		EnvFolGain1, EnvFolAtk1, EnvFolRls1, EnvFolBias1, EnvFolWidth1, // modulator 1 params
-		LFOSync1, LFORate1, LFOWidth1, LFOWaveTable1,
+		LFOSync1, LFORate1, LFOWidth1, LFOWaveTable1, LFOPolarity1, LFOPhase1,
 		RandSync1, RandRate1, RandBias1, RandWidth1, RandSmooth1,
 		PerlinSync1, PerlinRate1, PerlinOctaves1, PerlinWidth1,
 
-		Depth, ModulatorsMix, DryWetMix, Voices // non modulator params (channel config lr/ms? crossfb?)
+		Depth, ModulatorsMix, DryWetMix, Voices, StereoConfig, // non modulator params (crossfb?)
+		EnumSize
 	};
 
+	// PARAMETER ID STUFF
 	static juce::String getName(ID i) {
 		switch (i) {
 		case ID::Macro0: return "Macro 0";
@@ -34,6 +38,8 @@ namespace param {
 		case ID::LFORate0: return "LFORate 0";
 		case ID::LFOWidth0: return "LFOWidth 0";
 		case ID::LFOWaveTable0: return "LFOWaveTable 0";
+		case ID::LFOPolarity0: return "LFOPolarity 0";
+		case ID::LFOPhase0: return "LFOPhase 0";
 		case ID::RandSync0: return "RandSync 0";
 		case ID::RandRate0: return "RandRate 0";
 		case ID::RandBias0: return "RandBias 0";
@@ -53,6 +59,8 @@ namespace param {
 		case ID::LFORate1: return "LFORate 1";
 		case ID::LFOWidth1: return "LFOWidth 1";
 		case ID::LFOWaveTable1: return "LFOWaveTable 1";
+		case ID::LFOPolarity1: return "LFOPolarity 1";
+		case ID::LFOPhase1: return "LFOPhase 1";
 		case ID::RandSync1: return "RandSync 1";
 		case ID::RandRate1: return "RandRate 1";
 		case ID::RandBias1: return "RandBias 1";
@@ -67,6 +75,7 @@ namespace param {
 		case ID::ModulatorsMix: return "Mix Mods";
 		case ID::DryWetMix: return "Mix DryWet";
 		case ID::Voices: return "Voices";
+		case ID::StereoConfig: return "StereoConfig";
 
 		default: return "";
 		}
@@ -75,6 +84,23 @@ namespace param {
 	static juce::String getID(const ID i) { return getName(i).toLowerCase().removeCharacters(" "); }
 	static juce::String getID(const int i) { return getName(i).toLowerCase().removeCharacters(" "); }
 
+	// NORMALISABLE RANGE STUFF
+	static juce::NormalisableRange<float> getBiasedRange(float min, float max, float bias) noexcept {
+		bias = 1.f - bias;
+		const auto biasInv = 1.f / bias;
+		const auto range = max - min;
+		const auto rangeInv = 1.f / range;
+		return juce::NormalisableRange<float>(min, max,
+			[b = bias, bInv = biasInv, r = range](float start, float end, float normalised) {
+				return start + r * std::pow(normalised, bInv);
+			},
+			[b = bias, rInv = rangeInv](float start, float end, float denormalized) {
+				return std::pow((denormalized - start) * rInv, b);
+			}
+			);
+	}
+
+	// PARAMETER CREATION STUFF
 	static std::unique_ptr<juce::AudioParameterBool> createPBool(ID i, bool defaultValue, std::function<juce::String(bool value, int maxLen)> func) {
 		return std::make_unique<juce::AudioParameterBool>(
 			getID(i), getName(i), defaultValue, getName(i), func
@@ -95,13 +121,14 @@ namespace param {
 	}
 	static std::unique_ptr<juce::AudioParameterFloat> createParameter(ID i, float defaultValue = 1.f,
 		std::function<juce::String(float value, int maxLen)> stringFromValue = nullptr,
-		const float min = 0.1, const float max = 1.f, const float interval = -1.f) {
+		const float min = 0.f, const float max = 1.f, const float interval = -1.f) {
 		if(interval != -1.f)
 			return createParameter(i, defaultValue, stringFromValue, juce::NormalisableRange<float>(min, max, interval));
 		else
 			return createParameter(i, defaultValue, stringFromValue, juce::NormalisableRange<float>(min, max));
 	}
 
+	// TEMPOSYNC VS FREE STUFF
 	struct MultiRange {
 		struct Range
 		{
@@ -120,6 +147,7 @@ namespace param {
 			ranges()
 		{}
 		void add(const juce::String& rID, const juce::NormalisableRange<float>&& r) { ranges.push_back({ rID, r }); }
+		void add(const juce::String& rID, const juce::NormalisableRange<float>& r) { ranges.push_back({ rID, r }); }
 		const juce::NormalisableRange<float>& operator()(const juce::Identifier& rID) const {
 			for (const auto& r : ranges)
 				if (r == rID)
@@ -205,7 +233,18 @@ namespace param {
 			const auto sync = syncP->load();
 			if (sync < .5f) {
 				value = freeRange.convertFrom0to1(value);
-				return static_cast<juce::String>(std::rint(value)).substring(0, 4);
+				if (value < 10) {
+					value = std::rint(value * 100.f) * .01f;
+					const juce::String valueStr(value);
+					if(valueStr.length() < 3)
+						return valueStr + ".00 hz";
+					else if(valueStr.length() < 4)
+						return valueStr + "0 hz";
+					else
+						return valueStr + " hz";
+				}
+				else
+					return static_cast<juce::String>(std::rint(value)) + " hz";
 			}
 			else {
 				const auto idx = static_cast<int>(value * syncStrings.size());
@@ -235,17 +274,9 @@ namespace param {
 		};
 		// [0, 1]:
 		const auto normBiasStr = [](float value, int) {
-			value = value * 200.f - 100.f;
-			if (value >= 0.f) {
-				if (value > 9.f)
-					return juce::String(value).substring(0, 2) + " %";
-				return juce::String(value).substring(0, 1) + " %";
-			}
-			else {
-				if (value < -9.f)
-					return "-" + juce::String(value).substring(0, 2) + " %";
-				return "-" + juce::String(value).substring(0, 1) + " %";
-			}
+			value = std::floor(value * 100.f);
+			return juce::String(value) + " %";
+
 		};
 		const auto freqStr = [](float value, int) {
 			if (value < 10.f)
@@ -260,6 +291,13 @@ namespace param {
 			case 10: return juce::String("Wet");
 			default: return static_cast<juce::String>(10 - nV) + " : " + static_cast<juce::String>(nV);
 			}
+		};
+		// [0, 1]
+		const auto modsMixStr = [](float value, int) {
+			// [0,1] >> [25:75] etc
+			const auto mapped = value * 100.f;
+			const auto beautified = std::floor(mapped);
+			return static_cast<juce::String>(100.f - beautified) + " : " + static_cast<juce::String>(beautified);
 		};
 		const auto lrMsStr = [](float value, int) {
 			return value < .5f ? juce::String("L/R") : juce::String("M/S");
@@ -286,24 +324,44 @@ namespace param {
 		const auto voicesStr = [](float value, int) {
 			return juce::String(static_cast<int>(value)) + " voices";
 		};
-
-		const auto maxSyncTime = 6; // 64th
-		const auto tsValues = getTempoSyncValues(maxSyncTime);
-		modRateRanges.add("free", { .1f, 20.f, .5f });
-		modRateRanges.add("sync", getTempoSyncRange(tsValues));
-		const auto tsStrings = getTempoSyncStrings(maxSyncTime);
-		auto rateStr = getRateStr(apvts, ID::LFOSync0, modRateRanges("free"), tsStrings);
+		const auto polarityStr = [](float value, int) {
+			return value < .5f ?
+				juce::String("Polarity Off") :
+				juce::String("Polarity On");
+		};
+		// [0, 1]
+		const auto phaseStr = [](float value, int) {
+			return juce::String(std::floor(value * 360.f)) + " °";
+		};
 
 		parameters.push_back(createParameter(ID::Macro0, 0.f, percentStr));
 		parameters.push_back(createParameter(ID::Macro1, 0.f, percentStr));
 		parameters.push_back(createParameter(ID::Macro2, 0.f, percentStr));
 		parameters.push_back(createParameter(ID::Macro3, 0.f, percentStr));
 
+		// general constants of the env fol parameter creation
+		static constexpr float maxEnvFolAtk = 10000.f;
+		static constexpr float maxEnvFolRls = 10000.f;
+		static constexpr float EnvFolAtkRlsBias = .75f;
+		const auto envFolAtkRlsRange = getBiasedRange(1.f, maxEnvFolAtk, EnvFolAtkRlsBias);
+
+		// general constants of the lfo rand perlin's freq parameter creation
+		static constexpr float lfoRandPerlinMinFreq = .1f;
+		static constexpr float lfoRandPerlinMaxFreq = 24.f;
+		static constexpr float lfoRandPerlinFreqBias = .5f;
+		const auto lfoRandPerlinFreqRange = getBiasedRange(lfoRandPerlinMinFreq, lfoRandPerlinMaxFreq, lfoRandPerlinFreqBias);
+		static constexpr int maxSyncTime = 6; // 64th notes
+		const auto tsValues = getTempoSyncValues(maxSyncTime);
+		modRateRanges.add("free", lfoRandPerlinFreqRange);
+		modRateRanges.add("sync", getTempoSyncRange(tsValues));
+		const auto tsStrings = getTempoSyncStrings(maxSyncTime);
+		auto rateStr = getRateStr(apvts, ID::LFOSync0, modRateRanges("free"), tsStrings);
+
 		// mod's parameters 0:
 
 		parameters.push_back(createParameter(ID::EnvFolGain0, 0.f, dbStr, 0.f, 24.f));
-		parameters.push_back(createParameter(ID::EnvFolAtk0, 1.f, msStr, 1.f, 24.f));
-		parameters.push_back(createParameter(ID::EnvFolRls0, 1.f, msStr, 1.f, 24.f));
+		parameters.push_back(createParameter(ID::EnvFolAtk0, 1.f, msStr, envFolAtkRlsRange));
+		parameters.push_back(createParameter(ID::EnvFolRls0, 1.f, msStr, envFolAtkRlsRange));
 		parameters.push_back(createParameter(ID::EnvFolBias0, .5f, normBiasStr));
 		parameters.push_back(createParameter(ID::EnvFolWidth0, 0.f, percentStr));
 
@@ -311,6 +369,8 @@ namespace param {
 		parameters.push_back(createParameter(ID::LFORate0, .1f, rateStr));
 		parameters.push_back(createParameter(ID::LFOWidth0, 0.f, percentStrM1));
 		parameters.push_back(createParameter(ID::LFOWaveTable0, 0.f, wtStr, 0.f, 3.f));
+		parameters.push_back(createPBool(ID::LFOPolarity0, false, polarityStr));
+		parameters.push_back(createParameter(ID::LFOPhase0, 0.f, phaseStr));
 
 		rateStr = getRateStr(apvts, ID::RandSync0, modRateRanges("free"), tsStrings);
 
@@ -324,14 +384,14 @@ namespace param {
 
 		parameters.push_back(createPBool(ID::PerlinSync0, false, syncStr));
 		parameters.push_back(createParameter(ID::PerlinRate0, .5f, rateStr));
-		parameters.push_back(createParameter(ID::PerlinOctaves0, 1.f, octStr, 1.f, 8.f, 1.f));
+		parameters.push_back(createParameter(ID::PerlinOctaves0, 1.f, octStr, 1.f, PerlinMaxOctaves, 1.f));
 		parameters.push_back(createParameter(ID::PerlinWidth0, 0.f, percentStr));
 
 		// mod's parameters 1:
 
 		parameters.push_back(createParameter(ID::EnvFolGain1, 0.f, dbStr, 0.f, 24.f));
-		parameters.push_back(createParameter(ID::EnvFolAtk1, 1.f, msStr, 1.f, 24.f));
-		parameters.push_back(createParameter(ID::EnvFolRls1, 1.f, msStr, 1.f, 24.f));
+		parameters.push_back(createParameter(ID::EnvFolAtk1, 1.f, msStr, envFolAtkRlsRange));
+		parameters.push_back(createParameter(ID::EnvFolRls1, 1.f, msStr, envFolAtkRlsRange));
 		parameters.push_back(createParameter(ID::EnvFolBias1, .5f, normBiasStr));
 		parameters.push_back(createParameter(ID::EnvFolWidth1, 0.f, percentStr));
 
@@ -341,6 +401,8 @@ namespace param {
 		parameters.push_back(createParameter(ID::LFORate1, .1f, rateStr));
 		parameters.push_back(createParameter(ID::LFOWidth1, 0.f, percentStrM1));
 		parameters.push_back(createParameter(ID::LFOWaveTable1, 0.f, wtStr, 0.f, 3.f));
+		parameters.push_back(createPBool(ID::LFOPolarity1, false, polarityStr));
+		parameters.push_back(createParameter(ID::LFOPhase1, 0.f, phaseStr));
 
 		rateStr = getRateStr(apvts, ID::RandSync1, modRateRanges("free"), tsStrings);
 
@@ -354,12 +416,12 @@ namespace param {
 
 		parameters.push_back(createPBool(ID::PerlinSync1, false, syncStr));
 		parameters.push_back(createParameter(ID::PerlinRate1, .5f, rateStr));
-		parameters.push_back(createParameter(ID::PerlinOctaves1, 1.f, octStr, 1.f, 8.f, 1.f));
+		parameters.push_back(createParameter(ID::PerlinOctaves1, 1.f, octStr, 1.f, PerlinMaxOctaves, 1.f));
 		parameters.push_back(createParameter(ID::PerlinWidth1, 0.f, percentStr));
 
 		// non modulators' parameters:
 		parameters.push_back(createParameter(ID::Depth, 1.f, percentStr));
-		parameters.push_back(createParameter(ID::ModulatorsMix, 0.f, normBiasStr));
+		parameters.push_back(createParameter(ID::ModulatorsMix, .5f, modsMixStr));
 		parameters.push_back(createParameter(ID::DryWetMix, 1.f, percentStr));
 		parameters.push_back(createParameter(ID::Voices, 1.f, voicesStr, 1.f, 8.f, 1.f));
 

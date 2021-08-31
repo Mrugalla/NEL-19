@@ -2,34 +2,6 @@
 #include <JuceHeader.h>
 
 /*
-* pointers to arbitrary underlying objects
-*/
-struct VectorAnything {
-    VectorAnything() :
-        data()
-    {}
-    template<typename T>
-    void add(const T&& args) { data.push_back(std::make_shared<T>(args)); }
-    template<typename T>
-    T* get(const int idx) const noexcept {
-        auto newShredPtr = data[idx];
-        return static_cast<T*>(newShredPtr.get());
-    }
-    const size_t size() const noexcept { return data.size(); }
-    void dbgRefCount() const noexcept {
-        juce::String str;
-        for (const auto& d : data) str += juce::String(d.use_count()) + ", ";
-        DBG(str);
-    }
-protected:
-    std::vector<std::shared_ptr<void>> data;
-    /*
-    * try to rewrite this with different smart pointers and/or std::any some time
-    * or with juce::Var?
-    */
-};
-
-/*
 * releasePool for any object
 */
 struct ReleasePool :

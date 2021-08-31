@@ -1,12 +1,21 @@
 #pragma once
+#include "Approx.h"
+#include "Outtakes.h"
 #include "Param.h"
+#include "Interpolation.h"
+#include "Vibrato.h"
 #include <JuceHeader.h>
+#include "ReleasePool.h"
+#include "ModSystem.h"
 
-class Nel19AudioProcessor :
-    public juce::AudioProcessor,
-    public juce::AsyncUpdater
+#include <limits>
+
+struct Nel19AudioProcessor :
+    public juce::AudioProcessor
 {
-public:
+    enum Mods { EnvFol, LFO, Rand, Perlin };
+    enum PID { Depth, ModsMix, EnumSize };
+
     Nel19AudioProcessor();
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
@@ -30,14 +39,41 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
     juce::PropertiesFile::Options makeOptions();
-    void processParameters();
-    void handleAsyncUpdate() override;
 
     juce::ApplicationProperties appProperties;
-
     param::MultiRange modRateRanges;
     juce::AudioProcessorValueTreeState apvts;
     std::vector<std::atomic<float>*> params;
+    ThreadSafePtr<modSys2::Matrix> matrix;
+    std::vector<int> mtrxParams;
+
+    std::array<std::vector<juce::Identifier>, 2> modsIDs;
+    juce::Identifier modulatorsID;
+
+    std::array<juce::AudioBuffer<float>, 2> vibDelay;
+    vibrato::Processor vibrato;
+    std::atomic<float> vibDelayVisualizerValue;
+
+private:
+    const juce::CriticalSection mutex;
+
+    bool processBlockReady(juce::AudioBuffer<float>&) noexcept;
+    const std::shared_ptr<modSys2::Matrix> processBlockModSys(juce::AudioBuffer<float>&);
+    void processBlockVibDelay(juce::AudioBuffer<float>&, const std::shared_ptr<modSys2::Matrix>&) noexcept;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Nel19AudioProcessor)
 };
+
+/*
+debugger:
+
+steinberg validator
+C:\Users\Eine Alte Oma\Documents\CPP\vst3sdk\out\build\x64-Debug (default)\bin\validator.exe
+-e "C:/Program Files/Common Files/VST3/NEL-19.vst3"
+
+DAWS Debug:
+D:\Pogramme\Cubase 9.5\Cubase9.5.exe
+D:\Pogramme\FL Studio 20\FL64.exe
+D:\Pogramme\Studio One 5\Studio One.exe
+
+*/

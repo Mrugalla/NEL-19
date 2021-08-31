@@ -18,6 +18,15 @@
             file="Source/Img/vst3_logo_small.png"/>
     </GROUP>
     <GROUP id="{FF8BE835-9B90-31CB-45F4-D4B15FDEFD04}" name="Source">
+      <FILE id="jJ2XEr" name="Approx.h" compile="0" resource="0" file="Source/Approx.h"/>
+      <FILE id="McjeaG" name="ParameterRandomizer.h" compile="0" resource="0"
+            file="Source/ParameterRandomizer.h"/>
+      <FILE id="xZdKBx" name="Outtakes.h" compile="0" resource="0" file="Source/Outtakes.h"/>
+      <FILE id="Mf0SnE" name="ModsComps.h" compile="0" resource="0" file="Source/ModsComps.h"/>
+      <FILE id="B5d2nX" name="Parameter.h" compile="0" resource="0" file="Source/Parameter.h"/>
+      <FILE id="RWsf1L" name="Interpolation.h" compile="0" resource="0" file="Source/Interpolation.h"/>
+      <FILE id="ko9msz" name="Visualizer.h" compile="0" resource="0" file="Source/Visualizer.h"/>
+      <FILE id="L1EjYW" name="Vibrato.h" compile="0" resource="0" file="Source/Vibrato.h"/>
       <FILE id="xxe5Fr" name="NELG.h" compile="0" resource="0" file="Source/NELG.h"/>
       <FILE id="PdaT6g" name="Param.h" compile="0" resource="0" file="Source/Param.h"/>
       <FILE id="DNwWaN" name="Component.h" compile="0" resource="0" file="Source/Component.h"/>
