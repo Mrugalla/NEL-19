@@ -3,10 +3,11 @@
 #include "Outtakes.h"
 #include "Param.h"
 #include "Interpolation.h"
-#include "Vibrato.h"
+#include "dsp/MidSideEncoder.h"
+#include "dsp/Vibrato.h"
 #include <JuceHeader.h>
 #include "ReleasePool.h"
-#include "ModSystem.h"
+#include "modsys/ModSystem.h"
 
 #include <limits>
 
@@ -14,7 +15,7 @@ struct Nel19AudioProcessor :
     public juce::AudioProcessor
 {
     enum Mods { EnvFol, LFO, Rand, Perlin };
-    enum PID { Depth, ModsMix, EnumSize };
+    enum PID { Depth, ModsMix, StereoConfig, EnumSize };
 
     Nel19AudioProcessor();
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
@@ -43,12 +44,13 @@ struct Nel19AudioProcessor :
     juce::ApplicationProperties appProperties;
     param::MultiRange modRateRanges;
     juce::AudioProcessorValueTreeState apvts;
-    std::vector<std::atomic<float>*> params;
     ThreadSafePtr<modSys2::Matrix> matrix;
     std::vector<int> mtrxParams;
 
     std::array<std::vector<juce::Identifier>, 2> modsIDs;
     juce::Identifier modulatorsID;
+
+    midSide::Processor midSideProcessor;
 
     std::array<juce::AudioBuffer<float>, 2> vibDelay;
     vibrato::Processor vibrato;
@@ -57,14 +59,18 @@ struct Nel19AudioProcessor :
 private:
     const juce::CriticalSection mutex;
 
-    bool processBlockReady(juce::AudioBuffer<float>&) noexcept;
+    bool processBlockReady(juce::AudioBuffer<float>&);
     const std::shared_ptr<modSys2::Matrix> processBlockModSys(juce::AudioBuffer<float>&);
-    void processBlockVibDelay(juce::AudioBuffer<float>&, const std::shared_ptr<modSys2::Matrix>&) noexcept;
+    void processBlockVibDelay(juce::AudioBuffer<float>&, const std::shared_ptr<modSys2::Matrix>&);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Nel19AudioProcessor)
 };
 
 /*
+
+find out why sometimes crashes daw on init (probably some noexcept thing)
+
+
 debugger:
 
 steinberg validator

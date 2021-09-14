@@ -9,7 +9,7 @@ namespace approx {
     * ranges:
     * x [-pi, pi]; y [-1, 1]
     */
-    static inline float taylor_sin(const float x) {
+    static inline float taylor_sin(const float x) noexcept {
         // https://www.wolframalpha.com/input/?i=sin%28x%29%2C+%28x+-+x%5E3%2F6+%2B+x%5E5%2F120+-+x%5E7%2F5040%29
         const auto x3 = x * x * x;
         const auto x5 = x3 * x * x;

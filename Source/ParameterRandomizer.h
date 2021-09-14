@@ -29,9 +29,9 @@ protected:
             minDimen
         );
         bounds.reduce(nelG::Thicc, nelG::Thicc);
-        g.setColour(juce::Colour(nelG::ColBlack));
+        g.setColour(utils.colours[Utils::Background]);
         g.fillRoundedRectangle(bounds, nelG::Thicc);
-        g.setColour(juce::Colour(nelG::ColGreen));
+        g.setColour(utils.colours[Utils::Normal]);
         g.drawRoundedRectangle(bounds, nelG::Thicc, nelG::Thicc);
 
         minDimen = std::min(bounds.getWidth(), bounds.getHeight());
@@ -58,7 +58,7 @@ protected:
     void mouseExit(const juce::MouseEvent&) override { tooltip = makeTooltip(); }
     juce::String makeTooltip() {
         juce::Random rand;
-        static constexpr float count = 128.f;
+        static constexpr float count = 134.f;
         const auto v = static_cast<int>(std::rint(rand.nextFloat() * count));
         switch (v) {
         case 0: return "Do it!";
@@ -190,6 +190,12 @@ protected:
         case 126: return "Me? Well...";
         case 127: return "What happens if I press this?";
         case 128: return "Artificial Intelligence! Not used here, but it sounds cool.";
+        case 129: return "My internet just broke so why not just write another msg in here, right?";
+        case 130: return "Mood.";
+        case 131: return "I'm only a randomizer, after all...";
+        case 132: return "There is a strong correlation between you and awesomeness.";
+        case 133: return "Yes! Yes! Yes!";
+        case 134: return "Up for a surprise?";
         default: "Are you sure?";
         }
         return "You are not supposed to read this message!";

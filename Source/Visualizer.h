@@ -5,7 +5,8 @@ class VisualizerComp :
     public juce::Timer
 {
     struct SideScroller {
-        SideScroller() :
+        SideScroller(const Utils& u) :
+            utils(u),
             img(),
             midY(0),
             idx(0)
@@ -20,15 +21,15 @@ class VisualizerComp :
             const auto yEnd = static_cast<int>(height - (value * .5f + .5f) * height);
             img.multiplyAllAlphas(.999f);
             auto y = midY;
-            img.setPixelAt(idx, y, juce::Colour(nelG::ColGreen));
+            img.setPixelAt(idx, y, utils.colours[Utils::Normal]);
             if(y < yEnd)
                 while (y < yEnd) {
-                    img.setPixelAt(idx, y, juce::Colour(nelG::ColGreen));
+                    img.setPixelAt(idx, y, utils.colours[Utils::Normal]);
                     ++y;
                 }
             else if(y > yEnd)
                 while (y > yEnd) {
-                    img.setPixelAt(idx, y, juce::Colour(nelG::ColGreen));
+                    img.setPixelAt(idx, y, utils.colours[Utils::Normal]);
                     --y;
                 }
         }
@@ -50,6 +51,7 @@ class VisualizerComp :
             );
         }
     protected:
+        const Utils& utils;
         juce::Image img;
         int midY, idx;
     private:
@@ -62,7 +64,7 @@ class VisualizerComp :
 public:
     VisualizerComp(Nel19AudioProcessor& p, Utils& u) :
         Component(p, u, "The Vibrato is visualized here."),
-        sideScroller()
+        sideScroller(u)
     {
         startTimerHz(24);
     }

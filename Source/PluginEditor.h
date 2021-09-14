@@ -19,12 +19,15 @@ private:
     TooltipComponent tooltips;
     Knob macro0, macro1, macro2, macro3;
     ModulatableKnob modulatorsMix, depth, dryWetMix;
+    Switch midSideSwitch;
     std::vector<Modulatable*> modulatables;
     ModDragger macroDragger0, macroDragger1, macroDragger2, macroDragger3;
     std::vector<std::unique_ptr<DropDownMenu>> modSelector;
     PopUpComponent popUp;
     std::array<std::array<std::unique_ptr<ModulatorComp>, 4>, 2> modulatorComps;
     VisualizerComp visualizer;
+
+    menu2::Button optionsButton;
     
     void resized() override;
     void paint(juce::Graphics&) override;
@@ -38,5 +41,7 @@ private:
 };
 
 /*
-mouseMove repaints whole window instead of selected part
+
+
+
 */

@@ -3,12 +3,74 @@
 #include <functional>
 
 struct Utils {
+    enum { Background, Normal, Interactable, Modulation, Inactive, Abort, SideNote, EnumSize }; // colours
+    struct ColourSheme {
+        ColourSheme(Nel19AudioProcessor& p) :
+            colour(),
+            coloursID("colours")
+        {
+            auto state = p.apvts.state;
+            auto coloursState = state.getChildWithName(coloursID);
+            if (!coloursState.isValid()) {
+                colour[Background] = juce::Colour(nelG::ColBlack);
+                colour[Normal] = juce::Colour(nelG::ColGreen);
+                colour[Interactable] = juce::Colour(nelG::ColYellow);
+                colour[Modulation] = juce::Colour(nelG::ColGreenNeon);
+                colour[Inactive] = juce::Colour(nelG::ColGrey);
+                colour[Abort] = juce::Colour(nelG::ColRed);
+                colour[SideNote] = juce::Colour(0x55ffffff);
+
+                coloursState = juce::ValueTree(coloursID);
+                for (auto i = 0; i < EnumSize; ++i)
+                    coloursState.setProperty(identify(i), static_cast<juce::int64>(colour[i].getARGB()), nullptr);
+            }
+            else {
+                for (auto i = 0; i < EnumSize; ++i) {
+                    auto prop = coloursState.getProperty(identify(i), 0).isInt64();
+                    auto var = static_cast<juce::uint32>(prop);
+                    colour[i] = juce::Colour(var);
+                }
+            }
+        }
+        juce::String identify(int i) const {
+            switch (i) {
+            case Background: return "Background";
+            case Normal: return "Normal";
+            case Interactable: return "Interactable";
+            case Modulation: return "Modulation";
+            case Inactive: return "Inactive";
+            case Abort: return "Abort";
+            case SideNote: return "SideNote";
+            default: return "";
+            }
+        }
+        const juce::Colour operator[](const int i) const noexcept { return colour[i]; }
+        juce::Colour& operator[](const int i) noexcept { return colour[i]; }
+        void setColour(const juce::String& colourName, juce::Colour col) {
+            for (auto c = 0; c < EnumSize; ++c)
+                if (colourName == identify(c)) {
+                    colour[c] = col;
+                    return;
+                }
+        }
+        std::array<juce::Colour, EnumSize> colour;
+        juce::Identifier coloursID;
+        /*
+        implement options menu
+        implement sub-menu for look and feel
+        implement sub-menu for colours
+        every colour has https://docs.juce.com/develop/classColourSelector.html
+        if a colour has changed: repaint all components
+        */
+    };
+
     enum Cursor { Norm, Hover, Cross };
     Utils(Nel19AudioProcessor& p) :
         cursors(),
         tooltipID("tooltip"), popUpID("popUp"),
         tooltip(nullptr), popUp(""),
         font(getCustomFont()),
+        colours(p),
         tooltipEnabled(true), popUpEnabled(true), popUpUpdated(false)
     {
         // CURSOR
@@ -17,8 +79,8 @@ struct Utils {
         auto cursorHoverImage = cursorImage.createCopy();
         for (auto x = 0; x < cursorImage.getWidth(); ++x)
             for (auto y = 0; y < cursorImage.getHeight(); ++y)
-                if (cursorImage.getPixelAt(x, y) == juce::Colour(nelG::ColGreen))
-                    cursorHoverImage.setPixelAt(x, y, juce::Colour(nelG::ColYellow));
+                if (cursorImage.getPixelAt(x, y) == colours[Normal])
+                    cursorHoverImage.setPixelAt(x, y, colours[Interactable]);
         const juce::MouseCursor cursor(cursorImage, 0, 0);
         juce::MouseCursor cursorHover(cursorHoverImage, 0, 0);
         cursors.push_back(cursor);
@@ -28,7 +90,6 @@ struct Utils {
         const juce::MouseCursor cursorCross(cursorCrossImage, midPoint, midPoint);
         cursors.push_back(cursorCross);
 
-        
         auto user = p.appProperties.getUserSettings();
         if (user->isValidFile()) {
             // TOOL TIPS
@@ -65,6 +126,7 @@ struct Utils {
     juce::String* tooltip;
     juce::String popUp;
     juce::Font font;
+    ColourSheme colours;
     bool tooltipEnabled, popUpEnabled, popUpUpdated;
 private:
     juce::Font getCustomFont() {
@@ -103,27 +165,39 @@ struct TooltipComponent :
 {
     TooltipComponent(Nel19AudioProcessor& p, Utils& u) :
         Component(p, u, "Tooltips are shown here."),
-        tooltip(nullptr)
+        tooltip(nullptr),
+        enabled(true)
     { startTimerHz(24); }
 protected:
     juce::String* tooltip;
+    bool enabled;
+
     void timerCallback() override {
-        if (!utils.tooltipEnabled || tooltip == utils.tooltip) return;
+        if (!utils.tooltipEnabled) {
+            if (enabled) {
+                startTimerHz(1);
+                enabled = false;
+            }
+            return;
+        }
+        if (!enabled) {
+            startTimerHz(24);
+            enabled = true;
+            tooltip = utils.tooltip;
+            repaint();
+            return;
+        }
+        else if (tooltip == utils.tooltip) return;
         tooltip = utils.tooltip;
         repaint();
     }
     void paint(juce::Graphics& g) override {
         if (tooltip == nullptr) return;
-        //g.setFont(utils.font);
-        g.setColour(juce::Colour(0x55ffffff));
+        g.setColour(utils.colours[Utils::SideNote]);
         g.drawFittedText(*tooltip, getLocalBounds(), juce::Justification::centredLeft, 1);
     }
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TooltipComponent)
-
-    /*
-    * crash: tooltip can become nullptr after if(tooltip == nullptr) in paint
-    */
 };
 
 struct BuildDateComponent :
@@ -136,7 +210,7 @@ protected:
     juce::String buildDate;
     void paint(juce::Graphics& g) override {
         g.setFont(utils.font);
-        g.setColour(juce::Colour(0x55ffffff));
+        g.setColour(utils.colours[Utils::SideNote]);
         g.drawFittedText(buildDate, getLocalBounds(), juce::Justification::centredRight, 1);
     }
 
@@ -151,7 +225,7 @@ struct PopUpComponent :
         Component(p, u),
         idx(0), duration(0)
     {
-        const auto fps = 24;
+        const auto fps = 24.f;
         duration = static_cast<int>(durationInMs * fps / 1000.f);
         setInterceptsMouseClicks(false, false);
         startTimerHz(fps);
@@ -232,6 +306,7 @@ struct DropDownMenu :
         }
     protected:
         void paint(juce::Graphics& g) override {
+            g.fillAll(juce::Colour(nelG::ColBlack));
             g.setColour(juce::Colour(nelG::ColGreen));
             g.drawRect(getLocalBounds().toFloat());
             for (auto& entry: entries)
@@ -279,9 +354,9 @@ protected:
             g.fillRect(getLocalBounds().toFloat());
         }
         if (hovering)
-            g.setColour(juce::Colour(nelG::ColYellow));
+            g.setColour(utils.colours[Utils::Interactable]);
         else
-            g.setColour(juce::Colour(nelG::ColGreen));
+            g.setColour(utils.colours[Utils::Normal]);
         g.drawRect(getLocalBounds().toFloat());
         g.drawFittedText("<< select", getLocalBounds(), juce::Justification::centred, 1);
     }
@@ -344,3 +419,22 @@ protected:
 #include "ModsComps.h"
 
 #include "Visualizer.h"
+
+#include "Menu.h"
+
+/*
+
+make seperate headers for each thing
+
+utils:
+    - more sophisticated fonts handling system for when i'll have more fonts
+
+poup component
+    stays at currently touched mod (because that's where the eyes look at)
+
+dropdownmenu
+    looks really bad atm, fix :>
+
+
+
+*/

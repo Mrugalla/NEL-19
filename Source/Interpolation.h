@@ -3,52 +3,34 @@
 namespace interpolation {
 	static constexpr float Pi = 3.14159265359f;
 	
-	static inline float sinc(const float xPi) noexcept { return std::sin(xPi) / xPi; }
+	static float sinc(const float xPi) noexcept { return std::sin(xPi) / xPi; }
 
-	/*
-	* I0 => 0th-order modified bessel function
-	* L => window duration
-	* a > 0 => determines shape of window (trade-off between main lobe and side lobe)
-	*/
-	static float kaiser(float x, float I0, float a, float L) {
-		const auto LHalf = L * .5f;
-		if (std::abs(x) <= LHalf) {
-			const auto x2InvL = 2.f * x / L;
-			const auto beta = a * Pi;
-			return I0 * (beta * std::sqrt(1.f - x2InvL * x2InvL)) / (I0 * beta);
+	namespace window {
+		static float lanczos(const float xPi, const float alphaInv) noexcept { return sinc(xPi * alphaInv); }
+		static float circular(const float x, const float alphaInv) noexcept {
+			const auto a = x * alphaInv;
+			return std::sqrt(1.f - a * a);
 		}
-		else
-			return 0.f;
-	}
-	/*
-	* 0 <= n <= N
-	* n => ???
-	* N + 1 => window length (can be even or odd)
-	* L => ???
-	* w0 => ???
-	*/
-	static float kaiser2(float n, float N, float w0, float L) {
-		return w0 * (L / N * (n - N * .5f));
 	}
 
-	static inline float lanczosSinc(const float* buffer, const float readHead, const int size, const int alpha = 7) noexcept {
-		const auto iFloor = std::floor(readHead);		// N [0, size)
-		const auto iFloorInt = static_cast<int>(iFloor);// N [0, size)
-		const auto x = readHead - iFloor;				// R [0, 1)
+	static float lanczosSinc(const float* buffer, const float readHead, const int size, const int alpha) noexcept {
+		const auto iFloor = std::floor(readHead);
+		const auto iFloorInt = static_cast<int>(iFloor);
+		const auto x = readHead - iFloor;
 		const auto alphaInv = 1.f / static_cast<float>(alpha);
 		
 		auto sum = 0.f;
-		for (auto i = -alpha; i < alpha; ++i) { // N [-alpha, alpha)
-			const auto lx = x - i;				// R [-alpha, alpha)
-			float ly;							// R [0, 1]
+		for (auto i = -alpha; i <= alpha; ++i) {
+			const auto lx = x - static_cast<float>(i);
+			float ly;
 			if (lx == 0.f) ly = 1.f;
-			else if (lx != 0.f && -alpha <= lx && lx < alpha) {
+			else if (-alpha < lx && lx <= alpha) {
 				const auto lxPi = lx * Pi;
 				ly = sinc(lxPi) * sinc(lxPi * alphaInv);
 			}
 			else ly = 0.f;
 
-			auto idx = iFloorInt + i; // N [iFloor - alpha, iFloor + alpha]
+			auto idx = iFloorInt + i;
 			if (idx < 0) idx += size;
 			else if (idx >= size) idx -= size;
 			sum += ly * buffer[idx];
@@ -56,17 +38,29 @@ namespace interpolation {
 		return sum;
 	}
 
+	static float lerp(float a, float b, float x) noexcept { return a + x * (b - a); }
 
-	static inline float cubicHermitSpline(const float* buffer, const float readHead, const int size) {
-		auto i1 = static_cast<int>(readHead);
+	static float lerp(const float* buffer, const float readHead, const int size) {
+		const auto iFloor = std::floor(readHead);
+		const auto i0 = static_cast<int>(iFloor);
+		auto i1 = i0 + 1;
+		if (i1 >= size)
+			i1 -= size;
+		const auto x = readHead - iFloor;
+		return lerp(buffer[i0], buffer[i1], x);
+	}
+
+	static float cubicHermiteSpline(const float* buffer, const float readHead, const int size) {
+		const auto iFloor = std::floor(readHead);
+		auto i1 = static_cast<int>(iFloor);
 		auto i0 = i1 - 1;
 		auto i2 = i1 + 1;
 		auto i3 = i1 + 2;
-		while (i3 >= size) i3 -= size;
-		while (i2 >= size) i2 -= size;
-		while (i0 < 0) i0 += size;
+		if (i3 >= size) i3 -= size;
+		if (i2 >= size) i2 -= size;
+		if (i0 < 0) i0 += size;
 
-		const auto frac = readHead - i1;
+		const auto t = readHead - iFloor;
 		const auto v0 = buffer[i0];
 		const auto v1 = buffer[i1];
 		const auto v2 = buffer[i2];
@@ -77,7 +71,21 @@ namespace interpolation {
 		const auto c2 = v0 - 2.5f * v1 + 2.f * v2 - .5f * v3;
 		const auto c3 = 1.5f * (v1 - v2) + .5f * (v3 - v0);
 
-		return ((c3 * frac + c2) * frac + c1) * frac + c0;
+		return ((c3 * t + c2) * t + c1) * t + c0;
+	}
+
+	static float lagrange(const float* buffer, const float readHead, const int size, int N) {
+		const auto iFloor = std::floor(readHead);
+		const auto iFloorInt = static_cast<int>(iFloor);
+		auto yp = 0.f;
+		for (int i = 1; i <= N; ++i) {
+			auto p = buffer[iFloorInt + i];
+			for (int j = 1; j <= N; ++j)
+				if (j != i)
+					p *= (readHead - static_cast<float>(iFloorInt - j)) / static_cast<float>(i - j);
+			yp += p;
+		}
+		return yp;
 	}
 }
 
@@ -85,5 +93,6 @@ namespace interpolation {
 
 find out why this sinc interpolator makes noise in the synfun project's 3rd loop
 	(-80db but still audible)
+	more apparent on bigger resampling speed (oversampling needed?)
 
 */

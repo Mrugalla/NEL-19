@@ -1,6 +1,6 @@
 #pragma once
 
-static void paintKnob(juce::Graphics& g, juce::RangedAudioParameter& rap, juce::Rectangle<int> bounds,
+static void paintKnob(juce::Graphics& g, const Utils& utils, juce::RangedAudioParameter& rap, juce::Rectangle<int> bounds,
     float* attenuvertor = nullptr, float sumValue = 0.f, bool modDialIsTryingToRemove = false, bool isSelected = false) {
     const auto width = static_cast<float>(bounds.getWidth());
     const auto height = static_cast<float>(bounds.getHeight());
@@ -13,7 +13,7 @@ static void paintKnob(juce::Graphics& g, juce::RangedAudioParameter& rap, juce::
     const auto angleRange = endAngle - startAngle;
     const auto valueAngle = startAngle + angleRange * value;
 
-    g.setColour(juce::Colour(nelG::ColGreen));
+    g.setColour(utils.colours[Utils::Normal]);
     juce::Path pathNorm;
     pathNorm.addCentredArc(centre.x, centre.y, radius, radius,
         0.f, startAngle, endAngle,
@@ -28,7 +28,7 @@ static void paintKnob(juce::Graphics& g, juce::RangedAudioParameter& rap, juce::
 
     bool knobIsModulatable = attenuvertor != nullptr;
     if (knobIsModulatable) {
-        const auto modCol = !modDialIsTryingToRemove ? juce::Colour(nelG::ColGreenNeon) : juce::Colour(nelG::ColRed);
+        const auto modCol = !modDialIsTryingToRemove ? utils.colours[Utils::Modulation] : utils.colours[Utils::Abort];
         juce::Path pathMod;
         const auto modAngle = juce::jlimit(startAngle, endAngle, valueAngle + *attenuvertor * angleRange);
         pathMod.addCentredArc(centre.x, centre.y, radius, radius,
@@ -43,7 +43,7 @@ static void paintKnob(juce::Graphics& g, juce::RangedAudioParameter& rap, juce::
 
         if (!isSelected) {
             const auto shortedSumValLine = sumValueLine.withShortenedStart(radius - nelG::Thicc);
-            g.setColour(juce::Colour(nelG::ColBlack));
+            g.setColour(utils.colours[Utils::Background]);
             g.drawLine(shortedSumValLine, nelG::Thicc2);
             g.setColour(modCol);
             g.drawLine(shortedSumValLine, nelG::Thicc2);
@@ -57,9 +57,9 @@ static void paintKnob(juce::Graphics& g, juce::RangedAudioParameter& rap, juce::
     
     const auto valueLine = juce::Line<float>::fromStartAndAngle(centre, radius + 1.f, valueAngle);
     const auto tickBGThiccness = nelG::Thicc2 * 2.f;
-    g.setColour(juce::Colour(nelG::ColBlack));
+    g.setColour(utils.colours[Utils::Background]);
     g.drawLine(valueLine, tickBGThiccness);
-    g.setColour(juce::Colour(nelG::ColYellow));
+    g.setColour(utils.colours[Utils::Interactable]);
     g.drawLine(valueLine.withShortenedStart(radius - nelG::Thicc * 3.f), nelG::Thicc2);
 }
 
@@ -111,7 +111,7 @@ protected:
     }
 
     void paint(juce::Graphics& g) override {
-        paintKnob(g, rap, getLocalBounds());
+        paintKnob(g, utils, rap, getLocalBounds());
     }
     
     bool hitTest(int x, int y) override {
@@ -234,7 +234,7 @@ protected:
         bool interacting = isMouseButtonDown();
         auto bounds = getLocalBounds().toFloat().reduced(nelG::Thicc);
 
-        g.fillAll(juce::Colour(nelG::ColBlack));
+        g.fillAll(utils.colours[Utils::Background]);
         if (interacting) {
             bounds = bounds.reduced(nelG::Thicc);
             g.setColour(juce::Colour(0x77ffffff));
@@ -244,7 +244,7 @@ protected:
             g.setColour(juce::Colour(0x44ffffff));
             g.fillRoundedRectangle(bounds, nelG::Thicc);
         }
-        g.setColour(juce::Colour(nelG::ColYellow));
+        g.setColour(utils.colours[Utils::Interactable]);
         g.drawText(rap.getCurrentValueAsText(), bounds, juce::Justification::centred, false);
     }
     void mouseEnter(const juce::MouseEvent& evt) override {
@@ -294,8 +294,8 @@ protected:
     }
 
     void paint(juce::Graphics& g) override {
-        g.fillAll(juce::Colour(nelG::ColBlack));
-        g.setColour(juce::Colour(nelG::ColGreen));
+        g.fillAll(utils.colours[Utils::Background]);
+        g.setColour(utils.colours[Utils::Normal]);
 
         const auto width = static_cast<float>(getWidth());
         const auto height = static_cast<float>(getHeight());
@@ -317,7 +317,7 @@ protected:
             g.fillRect(valX, valY, valWidth, valHeight);
         }
         g.setFont(utils.font);
-        g.setColour(juce::Colour(nelG::ColYellow));
+        g.setColour(utils.colours[Utils::Interactable]);
         g.drawText(rap.getCurrentValueAsText(), getLocalBounds().toFloat(), juce::Justification::centred, false);
     }
     void mouseEnter(const juce::MouseEvent& evt) override {
@@ -394,18 +394,18 @@ struct ModulatableKnob :
 
         void paint(juce::Graphics& g) override {
             const auto bounds = getLocalBounds().toFloat().reduced(nelG::Thicc);
-            g.setColour(juce::Colour(nelG::ColBlack));
+            g.setColour(utils.colours[Utils::Background]);
             g.fillEllipse(bounds);
             {
                 if (selected)
                     if (tryRemove) {
-                        g.setColour(juce::Colour(nelG::ColRed));
+                        g.setColour(utils.colours[Utils::Abort]);
                         g.drawFittedText("!", getLocalBounds(), juce::Justification::centred, 1);
                     } 
                     else
-                        g.setColour(juce::Colour(nelG::ColGreenNeon));
+                        g.setColour(utils.colours[Utils::Modulation]);
                 else
-                    g.setColour(juce::Colour(nelG::ColGreen));
+                    g.setColour(utils.colours[Utils::Normal]);
             }
             g.drawEllipse(bounds, nelG::Thicc);
         }
@@ -501,7 +501,7 @@ protected:
     }
     
     void paint(juce::Graphics& g) override {
-        paintKnob(g, rap, getLocalBounds(), &attenuvertor, sumValue, modulatorDial.isTryingToRemove(), modulatorDial.isSelected());
+        paintKnob(g, utils, rap, getLocalBounds(), &attenuvertor, sumValue, modulatorDial.isTryingToRemove(), modulatorDial.isSelected());
     }
     
     bool hitTest(int x, int y) override {
@@ -653,11 +653,11 @@ protected:
     void paint(juce::Graphics& g) override {
         if (hoveredParameter == nullptr)
             if (selected)
-                g.setColour(juce::Colour(nelG::ColGreenNeon));
+                g.setColour(utils.colours[Utils::Modulation]);
             else
-                g.setColour(juce::Colour(nelG::ColGrey));
+                g.setColour(utils.colours[Utils::Inactive]);
         else
-            g.setColour(juce::Colour(nelG::ColYellow));
+            g.setColour(utils.colours[Utils::Interactable]);
 
         const auto tBounds = getLocalBounds().toFloat();
         g.drawRoundedRectangle(tBounds, 2, nelG::Thicc);

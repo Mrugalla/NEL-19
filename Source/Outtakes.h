@@ -2,6 +2,10 @@
 #include <JuceHeader.h>
 
 namespace outtake {
+    /*
+    extremely expensive method just to check what it would look
+    like to draw a cool pseudo-3d grid over a component
+    */
 	static void drawRandGrid(juce::Graphics& g, juce::Rectangle<int> bounds, int numVerticalLines = 32, int numHorizontalLines = 16, juce::Colour c = juce::Colours::white, float maxHillSize = .1f) {
         const auto width = static_cast<float>(bounds.getWidth());
         const auto height = static_cast<float>(bounds.getHeight());

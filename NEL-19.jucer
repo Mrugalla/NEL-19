@@ -18,19 +18,40 @@
             file="Source/Img/vst3_logo_small.png"/>
     </GROUP>
     <GROUP id="{FF8BE835-9B90-31CB-45F4-D4B15FDEFD04}" name="Source">
+      <GROUP id="{64C413BA-3699-8A57-746B-A094BA76D880}" name="dsp">
+        <FILE id="bv92ia" name="MidSideEncoder.h" compile="0" resource="0"
+              file="Source/dsp/MidSideEncoder.h"/>
+        <FILE id="NhBr3Z" name="Vibrato.h" compile="0" resource="0" file="Source/dsp/Vibrato.h"/>
+      </GROUP>
+      <GROUP id="{506F3931-B583-C784-A391-2F9193648856}" name="modsys">
+        <FILE id="XNErho" name="Destination.h" compile="0" resource="0" file="Source/modsys/Destination.h"/>
+        <FILE id="pPb3lJ" name="EnvelopeFollowerModulator.h" compile="0" resource="0"
+              file="Source/modsys/EnvelopeFollowerModulator.h"/>
+        <FILE id="LTKKv6" name="LFOModulator.h" compile="0" resource="0" file="Source/modsys/LFOModulator.h"/>
+        <FILE id="Bi64TZ" name="MacroModulator.h" compile="0" resource="0"
+              file="Source/modsys/MacroModulator.h"/>
+        <FILE id="VZYZ7Z" name="Matrix.h" compile="0" resource="0" file="Source/modsys/Matrix.h"/>
+        <FILE id="cxCTK5" name="ModSystem.h" compile="0" resource="0" file="Source/modsys/ModSystem.h"/>
+        <FILE id="WfEtwS" name="Modulator.h" compile="0" resource="0" file="Source/modsys/Modulator.h"/>
+        <FILE id="L4WToN" name="Parameter.h" compile="0" resource="0" file="Source/modsys/Parameter.h"/>
+        <FILE id="DTMHnv" name="PerlinModulator.h" compile="0" resource="0"
+              file="Source/modsys/PerlinModulator.h"/>
+        <FILE id="MCkq6t" name="RandomModulator.h" compile="0" resource="0"
+              file="Source/modsys/RandomModulator.h"/>
+        <FILE id="tHrdt8" name="Utils.h" compile="0" resource="0" file="Source/modsys/Utils.h"/>
+      </GROUP>
       <FILE id="jJ2XEr" name="Approx.h" compile="0" resource="0" file="Source/Approx.h"/>
       <FILE id="McjeaG" name="ParameterRandomizer.h" compile="0" resource="0"
             file="Source/ParameterRandomizer.h"/>
+      <FILE id="J7XIfH" name="Menu.h" compile="0" resource="0" file="Source/Menu.h"/>
       <FILE id="xZdKBx" name="Outtakes.h" compile="0" resource="0" file="Source/Outtakes.h"/>
       <FILE id="Mf0SnE" name="ModsComps.h" compile="0" resource="0" file="Source/ModsComps.h"/>
       <FILE id="B5d2nX" name="Parameter.h" compile="0" resource="0" file="Source/Parameter.h"/>
       <FILE id="RWsf1L" name="Interpolation.h" compile="0" resource="0" file="Source/Interpolation.h"/>
       <FILE id="ko9msz" name="Visualizer.h" compile="0" resource="0" file="Source/Visualizer.h"/>
-      <FILE id="L1EjYW" name="Vibrato.h" compile="0" resource="0" file="Source/Vibrato.h"/>
       <FILE id="xxe5Fr" name="NELG.h" compile="0" resource="0" file="Source/NELG.h"/>
       <FILE id="PdaT6g" name="Param.h" compile="0" resource="0" file="Source/Param.h"/>
       <FILE id="DNwWaN" name="Component.h" compile="0" resource="0" file="Source/Component.h"/>
-      <FILE id="mOXUBb" name="ModSystem.h" compile="0" resource="0" file="Source/ModSystem.h"/>
       <FILE id="Lu4iN5" name="ReleasePool.cpp" compile="1" resource="0" file="Source/ReleasePool.cpp"/>
       <FILE id="kaSrP6" name="ReleasePool.h" compile="0" resource="0" file="Source/ReleasePool.h"/>
       <FILE id="KltU2P" name="nel19.ttf" compile="0" resource="1" file="Source/Font/nel19.ttf"/>
@@ -42,6 +63,8 @@
             file="Source/PluginEditor.cpp"/>
       <FILE id="wgXSll" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>
     </GROUP>
+    <FILE id="yDKQym" name="optionsHierarchy.xml" compile="0" resource="1"
+          file="Source/optionsHierarchy.xml"/>
   </MAINGROUP>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"/>
   <EXPORTFORMATS>

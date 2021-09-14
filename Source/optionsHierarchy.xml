@@ -1,0 +1,10 @@
+<options>
+	<graphics>
+		<colours>
+			<colourwheel> background </colourwheel>
+		</colours>
+	</graphics>
+	<help>
+		<switchbutton> enable tooltips </switchbutton>
+	</help>
+</options>

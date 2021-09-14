@@ -21,7 +21,7 @@ namespace nelG {
     static constexpr unsigned int ColYellow = 0xfffffa8f;
     static constexpr unsigned int ColGreenNeon = 0xff99c550;
 
-    static juce::Rectangle<float> maxQuadIn(const juce::Rectangle<float>& b) {
+    static juce::Rectangle<float> maxQuadIn(const juce::Rectangle<float>& b) noexcept {
         const auto minDimen = std::min(b.getWidth(), b.getHeight());
         const auto x = b.getX() + .5f * (b.getWidth() - minDimen);
         const auto y = b.getY() + .5f * (b.getHeight() - minDimen);
@@ -106,8 +106,10 @@ namespace nelG {
                 rY[rY.size() - 1]
             };
         }
-        juce::Rectangle<float> operator()(int x, int y, int width = 1, int height = 1) const {
-            return { rX[x], rY[y], rX[x + width] - rX[x], rY[y + height] - rY[y] };
+        juce::Rectangle<float> operator()(int x, int y, int width = 1, int height = 1, bool isQuad = false) const {
+            juce::Rectangle<float> nBounds(rX[x], rY[y], rX[x + width] - rX[x], rY[y + height] - rY[y]);
+            if (!isQuad) return nBounds;
+            else return maxQuadIn(nBounds);
         }
         juce::Rectangle<float> bottomBar() const {
             return {
@@ -233,11 +235,6 @@ namespace nelG {
 
 /*
 
-remake colour sheme stuff so that customizable
-    SOLUTION 1:
-        nelG holds values to default colours for certain functions
-        certain functions: normal, interactable, modulation, inactive, background
-        all custom components refer to abstract function colours now
-        abstract function colours' colours can be changed in settings menu
-        changes are applied to all instances of the plugin simultanously
+
+        
 */

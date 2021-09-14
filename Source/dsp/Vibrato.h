@@ -90,7 +90,10 @@ namespace vibrato {
 			const auto delay = delayBuffer.getReadPointer(ch);
 			for (auto s = 0; s < numSamples; ++s) {
 				ringBuffer[writeHead[s]] = samples[s];
-				const auto val = interpolation::lanczosSinc(ringBuffer.data(), delay[s], size());
+				//const auto val = interpolation::lerp(ringBuffer.data(), delay[s], size());
+				//const auto val = interpolation::lanczosSinc(ringBuffer.data(), delay[s], size(), 8);
+				const auto val = interpolation::cubicHermiteSpline(ringBuffer.data(), delay[s], size());
+				//const auto val = interpolation::lagrange(ringBuffer.data(), delay[s], size(), 8);
 				samples[s] = mix(dry[s], val, dryWetMix[s]);
 			}
 		}
@@ -166,11 +169,13 @@ namespace vibrato {
 
 /*
 
+fix the lagrange interpolator and try implement lagrange with lower aliasing than hermite
+
 dryWetMix uses 2 sqrt in method. whole buffer calculates through twice, because buffer is const
 
 feature ideas:
 	m/s encoding
-	allpass instead delay
+	allpass instead delay (or in feedback loop, considering fb delay)
 
 	advanced settings
 		change fps of visualizer

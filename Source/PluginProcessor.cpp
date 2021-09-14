@@ -17,11 +17,12 @@ Nel19AudioProcessor::Nel19AudioProcessor()
     appProperties(),
     modRateRanges(),
     apvts(*this, nullptr, "parameters", param::createParameters(apvts, modRateRanges)),
-    params(),
     matrix(apvts),
     mtrxParams(),
     modsIDs(),
     modulatorsID("ModulatorsIdx"),
+
+    midSideProcessor(getChannelCountOfBus(false, 0)),
 
     vibDelay(),
     vibrato(vibDelay[0], matrix->getParameter(param::getID(param::ID::DryWetMix))->data(), getChannelCountOfBus(false, 0)),
@@ -32,60 +33,6 @@ Nel19AudioProcessor::Nel19AudioProcessor()
     appProperties.setStorageParameters(makeOptions());
 
     bool isMono = getChannelCountOfBus(false, 0) == 1;
-
-    // add all parameters to parameter vector (is this even needed? have them in matrix already)
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::Macro0)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::Macro1)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::Macro2)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::Macro3)));
-
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::EnvFolGain0)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::EnvFolAtk0)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::EnvFolRls0)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::EnvFolBias0)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::EnvFolWidth0)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::LFOSync0)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::LFORate0)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::LFOWidth0)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::LFOWaveTable0)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::LFOPolarity0)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::LFOPhase0)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::RandSync0)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::RandRate0)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::RandBias0)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::RandWidth0)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::RandSmooth0)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::PerlinSync0)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::PerlinRate0)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::PerlinOctaves0)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::PerlinWidth0)));
-
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::EnvFolGain1)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::EnvFolAtk1)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::EnvFolRls1)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::EnvFolBias1)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::EnvFolWidth1)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::LFOSync1)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::LFORate1)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::LFOWidth1)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::LFOWaveTable1)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::LFOPolarity1)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::LFOPhase1)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::RandSync1)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::RandRate1)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::RandBias1)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::RandWidth1)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::RandSmooth1)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::PerlinSync1)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::PerlinRate1)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::PerlinOctaves1)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::PerlinWidth1)));
-
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::Depth)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::ModulatorsMix)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::DryWetMix)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::Voices)));
-    params.push_back(apvts.getRawParameterValue(param::getID(param::ID::StereoConfig)));
 
     // activate all used non-modulator parameters
     matrix->activateParameter(param::getID(param::ID::Depth), true);
@@ -171,7 +118,6 @@ Nel19AudioProcessor::Nel19AudioProcessor()
         0
     )->id);
     modsIDs[0].push_back(matrix->addPerlinModulator(
-        param::getID(param::ID::PerlinSync0),
         param::getID(param::ID::PerlinRate0),
         param::getID(param::ID::PerlinOctaves0),
         param::getID(param::ID::PerlinWidth0),
@@ -207,7 +153,6 @@ Nel19AudioProcessor::Nel19AudioProcessor()
         1
     )->id);
     modsIDs[1].push_back(matrix->addPerlinModulator(
-        param::getID(param::ID::PerlinSync1),
         param::getID(param::ID::PerlinRate1),
         param::getID(param::ID::PerlinOctaves1),
         param::getID(param::ID::PerlinWidth1),
@@ -234,6 +179,7 @@ Nel19AudioProcessor::Nel19AudioProcessor()
     mtrxParams.resize(PID::EnumSize);
     mtrxParams[PID::Depth] = matrix->getParameterIndex(param::getID(param::ID::Depth));
     mtrxParams[PID::ModsMix] = matrix->getParameterIndex(param::getID(param::ID::ModulatorsMix));
+    mtrxParams[PID::StereoConfig] = matrix->getParameterIndex(param::getID(param::ID::StereoConfig));
 }
 
 juce::PropertiesFile::Options Nel19AudioProcessor::makeOptions() {
@@ -312,6 +258,8 @@ void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize) {
     m->setSmoothingLengthInSamples(param::getID(param::ID::DryWetMix), quick);
     m->setSmoothingLengthInSamples(param::getID(param::ID::Voices), instant);
     m->setSmoothingLengthInSamples(param::getID(param::ID::StereoConfig), instant);
+    m->setSmoothingLengthInSamples(param::getID(param::ID::LFOPhase0), medium);
+    m->setSmoothingLengthInSamples(param::getID(param::ID::LFOPhase1), medium);
     
     matrix.replaceUpdatedPtrWith(m);
 }
@@ -329,9 +277,11 @@ bool Nel19AudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) co
 
 void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) {
     if (!processBlockReady(buffer)) return;
+    midSideProcessor.setEnabled(matrix->getParameterValue(mtrxParams[StereoConfig]));
+    midSideProcessor.processBlockEncode(buffer);
     const auto mtrx = processBlockModSys(buffer);
     processBlockVibDelay(buffer, mtrx);
-    vibrato.processBlock(buffer);
+    midSideProcessor.processBlockDecode(buffer);
 }
 void Nel19AudioProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) {
     //if (!processBlockReady(buffer)) return;
@@ -402,7 +352,7 @@ void Nel19AudioProcessor::setStateInformation (const void* data, int sizeInBytes
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new Nel19AudioProcessor(); }
 
 /////////// PROCESS BLOCK EXTRA STEPS ///////////////////
-bool Nel19AudioProcessor::processBlockReady(juce::AudioBuffer<float>& buffer) noexcept {
+bool Nel19AudioProcessor::processBlockReady(juce::AudioBuffer<float>& buffer)  {
     if (buffer.getNumSamples() == 0) return false;
     juce::ScopedNoDenormals noDenormals;
     const auto totalNumInputChannels = getTotalNumInputChannels();
@@ -418,7 +368,7 @@ const std::shared_ptr<modSys2::Matrix> Nel19AudioProcessor::processBlockModSys(j
     mtrx->processBlock(buffer, getPlayHead());
     return mtrx;
 }
-void Nel19AudioProcessor::processBlockVibDelay(juce::AudioBuffer<float>& buffer, const std::shared_ptr<modSys2::Matrix>& mtrx) noexcept {
+void Nel19AudioProcessor::processBlockVibDelay(juce::AudioBuffer<float>& buffer, const std::shared_ptr<modSys2::Matrix>& mtrx)  {
     auto vd0 = vibDelay[0].getArrayOfWritePointers();
     const auto vd1 = vibDelay[1].getArrayOfReadPointers();
     for (auto ch = 0; ch < buffer.getNumChannels(); ++ch) {
@@ -436,12 +386,12 @@ void Nel19AudioProcessor::processBlockVibDelay(juce::AudioBuffer<float>& buffer,
     }
     const auto lastVal = vd0[0][buffer.getNumSamples() - 1];
     vibDelayVisualizerValue.store(lastVal);
+    vibrato.processBlock(buffer);
 }
 /////////////////////////////////////////////////////////
 
 /*
-* vector of atomic<float>* params even needed?
-* 
-modSys::Matrix' block sometimes not allocated in processBlock. wtf. why?
-solved with mutex in getState?
+
+implement processBlockBypassed
+
 */

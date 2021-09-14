@@ -10,12 +10,12 @@ namespace param {
 		EnvFolGain0, EnvFolAtk0, EnvFolRls0, EnvFolBias0, EnvFolWidth0, // modulator 0 params
 		LFOSync0, LFORate0, LFOWidth0, LFOWaveTable0, LFOPolarity0, LFOPhase0,
 		RandSync0, RandRate0, RandBias0, RandWidth0, RandSmooth0,
-		PerlinSync0, PerlinRate0, PerlinOctaves0, PerlinWidth0,
+		PerlinRate0, PerlinOctaves0, PerlinWidth0,
 
 		EnvFolGain1, EnvFolAtk1, EnvFolRls1, EnvFolBias1, EnvFolWidth1, // modulator 1 params
 		LFOSync1, LFORate1, LFOWidth1, LFOWaveTable1, LFOPolarity1, LFOPhase1,
 		RandSync1, RandRate1, RandBias1, RandWidth1, RandSmooth1,
-		PerlinSync1, PerlinRate1, PerlinOctaves1, PerlinWidth1,
+		PerlinRate1, PerlinOctaves1, PerlinWidth1,
 
 		Depth, ModulatorsMix, DryWetMix, Voices, StereoConfig, // non modulator params (crossfb?)
 		EnumSize
@@ -45,7 +45,6 @@ namespace param {
 		case ID::RandBias0: return "RandBias 0";
 		case ID::RandWidth0: return "RandWidth 0";
 		case ID::RandSmooth0: return "RandSmooth 0";
-		case ID::PerlinSync0: return "PerlinSync 0";
 		case ID::PerlinRate0: return "PerlinRate 0";
 		case ID::PerlinOctaves0: return "PerlinOctaves 0";
 		case ID::PerlinWidth0: return "PerlinWidth 0";
@@ -66,7 +65,6 @@ namespace param {
 		case ID::RandBias1: return "RandBias 1";
 		case ID::RandWidth1: return "RandWidth 1";
 		case ID::RandSmooth1: return "RandSmooth 1";
-		case ID::PerlinSync1: return "PerlinSync 1";
 		case ID::PerlinRate1: return "PerlinRate 1";
 		case ID::PerlinOctaves1: return "PerlinOctaves 1";
 		case ID::PerlinWidth1: return "PerlinWidth 1";
@@ -309,7 +307,7 @@ namespace param {
 			return static_cast<juce::String>(std::rint(value)).substring(0, 5) + " ms";
 		};
 		const auto syncStr = [](bool value, int) {
-			return value > .5f ? static_cast<juce::String>("Sync") : static_cast<juce::String>("Free");
+			return value ? static_cast<juce::String>("Sync") : static_cast<juce::String>("Free");
 		};
 		const auto wtStr = [](float value, int) {
 			return value < 1 ?
@@ -329,9 +327,9 @@ namespace param {
 				juce::String("Polarity Off") :
 				juce::String("Polarity On");
 		};
-		// [0, 1]
+		// [-1, 1]
 		const auto phaseStr = [](float value, int) {
-			return juce::String(std::floor(value * 360.f)) + " °";
+			return juce::String(std::floor(value * 180.f)) + " dgr";
 		};
 
 		parameters.push_back(createParameter(ID::Macro0, 0.f, percentStr));
@@ -370,7 +368,7 @@ namespace param {
 		parameters.push_back(createParameter(ID::LFOWidth0, 0.f, percentStrM1));
 		parameters.push_back(createParameter(ID::LFOWaveTable0, 0.f, wtStr, 0.f, 3.f));
 		parameters.push_back(createPBool(ID::LFOPolarity0, false, polarityStr));
-		parameters.push_back(createParameter(ID::LFOPhase0, 0.f, phaseStr));
+		parameters.push_back(createParameter(ID::LFOPhase0, 0.f, phaseStr, -1.f, 1.f));
 
 		rateStr = getRateStr(apvts, ID::RandSync0, modRateRanges("free"), tsStrings);
 
@@ -380,9 +378,6 @@ namespace param {
 		parameters.push_back(createParameter(ID::RandWidth0, 0.f, percentStr));
 		parameters.push_back(createParameter(ID::RandSmooth0, 1.f, percentStr));
 
-		rateStr = getRateStr(apvts, ID::PerlinSync0, modRateRanges("free"), tsStrings);
-
-		parameters.push_back(createPBool(ID::PerlinSync0, false, syncStr));
 		parameters.push_back(createParameter(ID::PerlinRate0, .5f, rateStr));
 		parameters.push_back(createParameter(ID::PerlinOctaves0, 1.f, octStr, 1.f, PerlinMaxOctaves, 1.f));
 		parameters.push_back(createParameter(ID::PerlinWidth0, 0.f, percentStr));
@@ -402,7 +397,7 @@ namespace param {
 		parameters.push_back(createParameter(ID::LFOWidth1, 0.f, percentStrM1));
 		parameters.push_back(createParameter(ID::LFOWaveTable1, 0.f, wtStr, 0.f, 3.f));
 		parameters.push_back(createPBool(ID::LFOPolarity1, false, polarityStr));
-		parameters.push_back(createParameter(ID::LFOPhase1, 0.f, phaseStr));
+		parameters.push_back(createParameter(ID::LFOPhase1, 0.f, phaseStr, -1.f, 1.f));
 
 		rateStr = getRateStr(apvts, ID::RandSync1, modRateRanges("free"), tsStrings);
 
@@ -412,9 +407,6 @@ namespace param {
 		parameters.push_back(createParameter(ID::RandWidth1, 0.f, percentStr));
 		parameters.push_back(createParameter(ID::RandSmooth1, 1.f, percentStr));
 
-		rateStr = getRateStr(apvts, ID::PerlinSync1, modRateRanges("free"), tsStrings);
-
-		parameters.push_back(createPBool(ID::PerlinSync1, false, syncStr));
 		parameters.push_back(createParameter(ID::PerlinRate1, .5f, rateStr));
 		parameters.push_back(createParameter(ID::PerlinOctaves1, 1.f, octStr, 1.f, PerlinMaxOctaves, 1.f));
 		parameters.push_back(createParameter(ID::PerlinWidth1, 0.f, percentStr));
@@ -424,7 +416,15 @@ namespace param {
 		parameters.push_back(createParameter(ID::ModulatorsMix, .5f, modsMixStr));
 		parameters.push_back(createParameter(ID::DryWetMix, 1.f, percentStr));
 		parameters.push_back(createParameter(ID::Voices, 1.f, voicesStr, 1.f, 8.f, 1.f));
+		parameters.push_back(createPBool(ID::StereoConfig, true, lrMsStr));
 
 		return { parameters.begin(), parameters.end() };
 	}
 };
+
+/*
+
+consider seperating free from temposync rate again because
+no one's ever going to automate that crap anyway
+
+*/

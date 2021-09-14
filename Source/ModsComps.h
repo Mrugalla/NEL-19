@@ -40,13 +40,12 @@ struct ModulatorPerlinComp :
     ModulatorPerlinComp(Nel19AudioProcessor& p, Utils& u, const juce::Identifier& mID, std::vector<Modulatable*>& modulatableParameters, int modulatorsIdx) :
         ModulatorComp(p, u, mID, modulatableParameters, modulatorsIdx),
         layout(
-            { 30, 50, 90, 50, 30 },
-            { 50, 60, 30 }
+            { 30, 70, 130, 70, 30 },
+            { 70, 90, 30 }
         ),
         rateP(processor, utils, "The rate at which new values are picked.", modsIdx == 0 ? param::ID::PerlinRate0 : param::ID::PerlinRate1),
         octavesP(processor, utils, "More Octaves increase the complexity of the modulation.", modsIdx == 0 ? param::ID::PerlinOctaves0 : param::ID::PerlinOctaves1),
-        widthP(processor, utils, "Increases the stereo-width of the modulation.", modsIdx == 0 ? param::ID::PerlinWidth0 : param::ID::PerlinWidth1),
-        tempoSyncP(processor, utils, "Switch between free-running or tempo-sync modulation.", modsIdx == 0 ? param::ID::PerlinSync0 : param::ID::PerlinSync1)
+        widthP(processor, utils, "Increases the stereo-width of the modulation.", modsIdx == 0 ? param::ID::PerlinWidth0 : param::ID::PerlinWidth1)    
     {
         modulatableParameters.push_back(&rateP);
         modulatableParameters.push_back(&octavesP);
@@ -54,18 +53,15 @@ struct ModulatorPerlinComp :
         this->randButton.addRandomizable(&rateP);
         this->randButton.addRandomizable(&octavesP);
         this->randButton.addRandomizable(&widthP);
-        this->randButton.addRandomizable(&tempoSyncP);
     }
     void setActive(bool e) override {
         rateP.setActive(e);
         octavesP.setActive(e);
         widthP.setActive(e);
-        tempoSyncP.setActive(e);
         Component::setVisible(e);
     }
     void initModulatables() override {
         auto top = getTopLevelComponent();
-        top->addChildComponent(tempoSyncP);
         top->addChildComponent(rateP);
         top->addChildComponent(octavesP);
         top->addChildComponent(widthP);
@@ -73,16 +69,14 @@ struct ModulatorPerlinComp :
 protected:
     nelG::Layout layout;
     ModulatableKnob rateP, octavesP, widthP;
-    Switch tempoSyncP;
 
     void paint(juce::Graphics& g) override {
         //layout.paintGrid(g);
-        g.fillAll(juce::Colour(nelG::ColBlack));
+        g.fillAll(utils.colours[Utils::Background]);
         //outtake::drawRandGrid(g, getLocalBounds(), 32, 16, juce::Colour(nelG::ColDarkGrey), .1f);
     }
     void resized() override {
         layout.setBounds(getBoundsInParent().toFloat());
-        layout.place(tempoSyncP, 1, 2, 1, 1, true);
         layout.place(rateP, 1, 1, 1, 1, true);
         layout.place(octavesP, 2, 1, 1, 1, true);
         layout.place(widthP, 3, 1, 1, 1, true);
@@ -144,7 +138,7 @@ protected:
 
     void paint(juce::Graphics& g) override {
         //layout.paintGrid(g);
-        g.fillAll(juce::Colour(nelG::ColBlack));
+        g.fillAll(utils.colours[Utils::Background]);
     }
     void resized() override {
         layout.setBounds(getBoundsInParent().toFloat());
@@ -209,7 +203,7 @@ protected:
 
     void paint(juce::Graphics& g) override {
         //layout.paintGrid(g);
-        g.fillAll(juce::Colour(nelG::ColBlack));
+        g.fillAll(utils.colours[Utils::Background]);
     }
     void resized() override {
         layout.setBounds(getBoundsInParent().toFloat());
@@ -224,18 +218,80 @@ protected:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ModulatorEnvelopeFollowerComp)
 };
 
+struct ModulatorRandComp :
+    public ModulatorComp
+{
+    ModulatorRandComp(Nel19AudioProcessor& p, Utils& u, const juce::Identifier& mID, std::vector<Modulatable*>& modulatableParameters, int modulatorsIdx) :
+        ModulatorComp(p, u, mID, modulatableParameters, modulatorsIdx),
+        layout(
+            { 30, 70, 70, 70, 70, 30 },
+            { 70, 90, 30 }
+        ),
+        rateP(processor, utils, "The rate at which new values are picked.", modsIdx == 0 ? param::ID::RandRate0 : param::ID::RandRate1),
+        biasP(processor, utils, "The bias of the values picked.", modsIdx == 0 ? param::ID::RandBias0 : param::ID::RandBias1),
+        widthP(processor, utils, "Increases the stereo-width of the modulation.", modsIdx == 0 ? param::ID::RandWidth0 : param::ID::RandWidth1),
+        smoothP(processor, utils, "Increases the smoothness of the modulation.", modsIdx == 0 ? param::ID::RandSmooth0 : param::ID::RandSmooth1),
+        syncP(processor, utils, "Switches between free or tempo-sync modulation.", modsIdx == 0 ? param::ID::RandSync0 : param::ID::RandSync1)
+    {
+        modulatableParameters.push_back(&rateP);
+        modulatableParameters.push_back(&biasP);
+        modulatableParameters.push_back(&widthP);
+        modulatableParameters.push_back(&smoothP);
+        this->randButton.addRandomizable(&rateP);
+        this->randButton.addRandomizable(&biasP);
+        this->randButton.addRandomizable(&widthP);
+        this->randButton.addRandomizable(&smoothP);
+        this->randButton.addRandomizable(&syncP);
+    }
+    void setActive(bool e) override {
+        rateP.setActive(e);
+        biasP.setActive(e);
+        widthP.setActive(e);
+        smoothP.setActive(e);
+        syncP.setActive(e);
+        Component::setVisible(e);
+    }
+    void initModulatables() override {
+        auto top = getTopLevelComponent();
+        top->addChildComponent(rateP);
+        top->addChildComponent(biasP);
+        top->addChildComponent(widthP);
+        top->addChildComponent(smoothP);
+        top->addChildComponent(syncP);
+    }
+protected:
+    nelG::Layout layout;
+    ModulatableKnob rateP, biasP, widthP, smoothP;
+    Switch syncP;
+
+    void paint(juce::Graphics& g) override {
+        //layout.paintGrid(g);
+        g.fillAll(utils.colours[Utils::Background]);
+    }
+    void resized() override {
+        layout.setBounds(getBoundsInParent().toFloat());
+        layout.place(rateP, 1, 1, 1, 1, true);
+        layout.place(biasP, 2, 1, 1, 1, true);
+        layout.place(widthP, 3, 1, 1, 1, true);
+        layout.place(smoothP, 4, 1, 1, 1, true);
+        layout.place(syncP, 1, 2, 1, 1, true);
+        ModulatorComp::resized();
+    }
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ModulatorRandComp)
+};
+
 /*
 * 
 * to do
 * each modulator has
 *   name/id             CHECK
-*   visualizer?
 *   parameters          CHECK
 *       & randomizer    CHECK
 *   preset menu?
-*   selector            CHECK kinda
+*   selector            CHECK almost
 *
 * modulators can be lfo or env
 *   triggers: midi, automation, transient detection
-*   envelope follower triggered by envelope detection? hm
+*   envelope follower triggered by envelope detection? hm, maybe not
 */
