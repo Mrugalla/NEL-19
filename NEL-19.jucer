@@ -18,6 +18,9 @@
             file="Source/Img/vst3_logo_small.png"/>
     </GROUP>
     <GROUP id="{FF8BE835-9B90-31CB-45F4-D4B15FDEFD04}" name="Source">
+      <GROUP id="{37A90D57-856D-DDA5-A367-4EC832EDC7CF}" name="xml">
+        <FILE id="ld5eYo" name="menu.xml" compile="0" resource="1" file="Source/xml/menu.xml"/>
+      </GROUP>
       <GROUP id="{64C413BA-3699-8A57-746B-A094BA76D880}" name="dsp">
         <FILE id="bv92ia" name="MidSideEncoder.h" compile="0" resource="0"
               file="Source/dsp/MidSideEncoder.h"/>
@@ -63,8 +66,6 @@
             file="Source/PluginEditor.cpp"/>
       <FILE id="wgXSll" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>
     </GROUP>
-    <FILE id="yDKQym" name="optionsHierarchy.xml" compile="0" resource="1"
-          file="Source/optionsHierarchy.xml"/>
   </MAINGROUP>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"/>
   <EXPORTFORMATS>

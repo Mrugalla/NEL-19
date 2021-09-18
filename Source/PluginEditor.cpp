@@ -6,7 +6,7 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     audioProcessor(p),
     utils(p),
     layout(
-        { 30, 150, 50, 50, 100 },
+        { 30, 150, 30, 30, 120 },
         { 50, 50, 150, 150, 50, 30 }
     ),
     layoutMacros(
@@ -14,8 +14,8 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
         { 25, 12, 25, 12, 25, 12, 25, 12 }
     ),
     layoutDepthMix(
-        { 50, 120, 50 },
-        { 50, 120, 50 }
+        { 1 },
+        { 70, 50 }
     ),
     layoutBottomBar(
         { 250, 90 },
@@ -44,11 +44,11 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     macroDragger1(p, utils, "drag this to modulate a parameter.", "macro1", modulatables),
     macroDragger2(p, utils, "drag this to modulate a parameter.", "macro2", modulatables),
     macroDragger3(p, utils, "drag this to modulate a parameter.", "macro3", modulatables),
-    modSelector(),
     popUp(p, utils),
     modulatorComps(),
     visualizer(p, utils),
-    optionsButton(p, utils, "All the extra stuff.", []() { }, [](juce::Graphics& g, const menu2::Button& b) { })
+    menu(nullptr),
+    menuButton(p, utils, "All the extra stuff.", [this]() { menu2::openMenu(menu, audioProcessor, utils, *this, layout(1, 1, 4, 4).toNearestInt() , menuButton); }, [this](juce::Graphics& g, const menu2::Button& b) { menu2::paintMenuButton(g, menuButton, utils, menu.get()); })
 {
     layout.addNamedLocation("top bar", 0, 0, 5, 1, false, false, false);
     layout.addNamedLocation("macros", 0, 1, 1, 4, false, false, false);
@@ -99,58 +99,38 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     addAndMakeVisible(dryWetMix);
     if(numChannels == 2) addAndMakeVisible(midSideSwitch);
 
-    // modulation selector stuff init:
+    // modulation components init stuff:
     auto matrix = audioProcessor.matrix.getCopyOfUpdatedPtr();
-    const auto numModulatorComps = modulatorComps.size();
-    for (auto mcs = 0; mcs < numModulatorComps; ++mcs) {
-        // create and add modulator components + their modulatables
-        enum { EnvFol, LFO, Rand, Perlin, NumMods };
-        modulatorComps[mcs][EnvFol] = std::make_unique<ModulatorEnvelopeFollowerComp>(
-            p, utils, audioProcessor.modsIDs[mcs][EnvFol], modulatables, mcs
-        );
-        modulatorComps[mcs][LFO] = std::make_unique<ModulatorLFOComp>(
-            p, utils, audioProcessor.modsIDs[mcs][LFO], modulatables, mcs
-        );
-        modulatorComps[mcs][Rand] = std::make_unique<ModulatorRandComp>(
-            p, utils, audioProcessor.modsIDs[mcs][Rand], modulatables, mcs
-        );
-        modulatorComps[mcs][Perlin] = std::make_unique<ModulatorPerlinComp>(
-            p, utils, audioProcessor.modsIDs[mcs][Perlin], modulatables, mcs
-        );
-        for (auto ms = 0; ms < NumMods; ++ms) {
-            addChildComponent(*modulatorComps[mcs][ms]);
-            modulatorComps[mcs][ms]->initModulatables();
-        }
-
-        modSelector.push_back(std::make_unique<DropDownMenu>(p, utils, "select a modulator."));
-
-        addAndMakeVisible(*modSelector[mcs]);
-        addChildComponent(modSelector[mcs]->list);
-        modSelector[mcs]->addEntry("Envelope Follower");
-        modSelector[mcs]->addEntry("LFO");
-        modSelector[mcs]->addEntry("Random Classic");
-        modSelector[mcs]->addEntry("Random Perlin");
-
-        // setting up functionality for the modulator-selector dropdown
-        modSelector[mcs]->setOnSelect([this, sel = mcs](int idx) {
+    enum { EnvFol, LFO, Rand, Perlin, NumMods };
+    for (auto mcs = 0; mcs < modulatorComps.size(); ++mcs) {
+        // behaviour for changing the selected modulator[mcs]
+        auto onModReplace = [this, sel = mcs](int idx) {
             auto matrixCopy = audioProcessor.matrix.getCopyOfUpdatedPtr();
             for (const auto& id : audioProcessor.modsIDs[sel])
                 matrixCopy->setModulatorActive(id, false);
             matrixCopy->setModulatorActive(audioProcessor.modsIDs[sel][idx], true);
             audioProcessor.matrix.replaceUpdatedPtrWith(matrixCopy);
-            resetModulatorComponent(sel, idx);
-        });
+            resetModulatorComp(sel, idx);
+        };
 
-        modSelector[mcs]->setOnDown([this, sel = mcs]() {
-            auto modsChild = audioProcessor.apvts.state.getChildWithName(audioProcessor.modulatorsID);
-            for (auto i = 0; i < audioProcessor.modsIDs[sel].size(); ++i) {
-                auto& id = audioProcessor.modsIDs[sel][i];
-                auto mod = audioProcessor.matrix->getModulator(id);
-                auto active = mod->isActive();
-                if (active)
-                    return modSelector[sel]->setActive(i);
-            }
-        });
+        // create and add modulator components + their modulatables
+        modulatorComps[mcs][EnvFol] = std::make_unique<ModulatorEnvelopeFollowerComp>(
+            p, utils, audioProcessor.modsIDs[mcs][EnvFol], modulatables, mcs, onModReplace
+        );
+        modulatorComps[mcs][LFO] = std::make_unique<ModulatorLFOComp>(
+            p, utils, audioProcessor.modsIDs[mcs][LFO], modulatables, mcs, onModReplace
+        );
+        modulatorComps[mcs][Rand] = std::make_unique<ModulatorRandComp>(
+            p, utils, audioProcessor.modsIDs[mcs][Rand], modulatables, mcs, onModReplace
+        );
+        modulatorComps[mcs][Perlin] = std::make_unique<ModulatorPerlinComp>(
+            p, utils, audioProcessor.modsIDs[mcs][Perlin], modulatables, mcs, onModReplace
+        );
+
+        for (auto ms = 0; ms < NumMods; ++ms) {
+            addChildComponent(modulatorComps[mcs][ms].get());
+            modulatorComps[mcs][ms]->initModulatables();
+        }
 
         // loading current modulatorselectors' states
         for (auto m = 0; m < audioProcessor.modsIDs[mcs].size(); ++m) {
@@ -158,21 +138,29 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
             const auto mod = matrix->getModulator(id);
             bool modValid = mod != nullptr && mod->isActive();
             if (modValid) {
-                modSelector[mcs]->setActive(m);
-                resetModulatorComponent(mcs, m);
+                resetModulatorComp(mcs, m);
                 break;
             }
         }
     }
-    audioProcessor.matrix.replaceUpdatedPtrWith(matrix);
 
     addAndMakeVisible(macroDragger0);
     addAndMakeVisible(macroDragger1);
     addAndMakeVisible(macroDragger2);
     addAndMakeVisible(macroDragger3);
 
-    addAndMakeVisible(optionsButton);
+    std::vector<std::function<void(juce::Graphics&, Comp*, bool)>> paintModOptions;
+    paintModOptions.push_back(ModulatorComp::paintModOption(utils, "Envelope\nFollower"));
+    paintModOptions.push_back(ModulatorComp::paintModOption(utils, "LFO"));
+    paintModOptions.push_back(ModulatorComp::paintModOption(utils, "Classic\nRand"));
+    paintModOptions.push_back(ModulatorComp::paintModOption(utils, "Perlin\nNoise"));
+    for (auto mcs = 0; mcs < modulatorComps.size(); ++mcs)
+        for (auto ms = 0; ms < NumMods; ++ms)
+            modulatorComps[mcs][ms]->init(paintModOptions);
 
+    audioProcessor.matrix.replaceUpdatedPtrWith(matrix);
+
+    addAndMakeVisible(menuButton);
     addAndMakeVisible(popUp);
 
     setOpaque(true);
@@ -181,8 +169,6 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     setResizable(true, true);
     startTimerHz(16);
     setSize(nelG::Width, nelG::Height);
-
-    //menu2::createMenuHierarchy(audioProcessor.apvts.state, utils);
 }
 void Nel19AudioProcessorEditor::resized() {
     layout.setBounds(getLocalBounds().toFloat().reduced(8.f));
@@ -192,8 +178,8 @@ void Nel19AudioProcessorEditor::resized() {
     layoutParams.setBounds(layout(4, 1, 1, 4));
     layoutTopBar.setBounds(layout.topBar());
 
-    layoutTopBar.place(optionsButton, 0, 0, 1, 1, true);
-    //layout.place(optionsMenu.get(), 1, 1, 4, 4);
+    layoutTopBar.place(menuButton, 0, 0, 1, 1, true);
+    layout.place(menu.get(), 1, 1, 4, 4);
     
     layoutBottomBar.place(buildDate, 1, 0, 1, 1, false);
     layoutBottomBar.place(tooltips, 0, 0, 1, 1, false);
@@ -204,14 +190,15 @@ void Nel19AudioProcessorEditor::resized() {
     layoutParams.place(midSideSwitch, 1, 2, 1, 1, false);
 
     for (auto mcs = 0; mcs < 2; ++mcs) {
-        layout.place(*modSelector[mcs], 2, 1 + mcs * 3, 1, 1, false);
-        layout.place(modSelector[mcs]->list, 2, 2, 1, 2, false);
-        for(auto mm = 0; mm < modulatorComps[mcs].size(); ++mm)
+        //layout.place(*modSelector2[mcs], 2, 1 + mcs * 3, 1, 1, false);
+        //layout.place(modSelector[mcs]->list, 2, 2, 1, 2, false);
+        for (auto mm = 0; mm < modulatorComps[mcs].size(); ++mm)
             layout.place(*modulatorComps[mcs][mm], 1, 1 + mcs * 2, 1, 2, false);
     }   
 
-    layoutDepthMix.place(modulatorsMix, 0, 0, 3, 3, true);
-    layoutDepthMix.place(depth, 1, 1, 1, 1, true);
+    layoutDepthMix.place(depth, 0, 0, 1, 1, true);
+    layoutDepthMix.place(modulatorsMix, 0, 1, 1, 1, true);
+
     layoutParams.place(dryWetMix, 0, 1, 2, 1, true);
     layoutParams.place(visualizer, 0, 0, 3, 1, false);
 
@@ -226,7 +213,7 @@ void Nel19AudioProcessorEditor::paint(juce::Graphics& g) {
     layoutParams.paintGrid(g);
     layoutTopBar.paintGrid(g);
 }
-void Nel19AudioProcessorEditor::mouseEnter(const juce::MouseEvent&) { utils.tooltip = nullptr; }
+void Nel19AudioProcessorEditor::mouseEnter(const juce::MouseEvent&) { utils.updateTooltip(nullptr); }
 void Nel19AudioProcessorEditor::mouseMove(const juce::MouseEvent& evt) {
     /*
     layout.mouseMove(evt.position);
@@ -246,7 +233,7 @@ void Nel19AudioProcessorEditor::timerCallback() {
     for(auto modulatable : modulatables)
         modulatable->updateModSys(matrix);
 }
-void Nel19AudioProcessorEditor::resetModulatorComponent(int modIdx, int modTypeIdx) {
+void Nel19AudioProcessorEditor::resetModulatorComp(int modIdx, int modTypeIdx) {
     for (auto& mc : modulatorComps[modIdx])
         mc->setActive(false);
     modulatorComps[modIdx][modTypeIdx]->setActive(true);

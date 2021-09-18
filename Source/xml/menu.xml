@@ -1,0 +1,23 @@
+<menu id="options">
+  <menu id="graphics" tooltip="individualize the appearance of the plugin here.">
+    <menu id="colours" tooltip="individualize the colour sheme of the plugin here.">
+      <colourselector id="background"/>
+      <colourselector id="normal"/>
+      <colourselector id="interactable"/>
+      <colourselector id="modulation"/>
+      <colourselector id="inactive"/>
+      <colourselector id="abort"/>
+      <colourselector id="hoverBg"/>
+    </menu>
+  </menu>
+  <menu id="help" tooltip="get help! literally.">
+    <switch id="tooltips" tooltip="turn on/off tooltips here.">
+      <option id="disable"/>
+      <option id="enable"/>
+    </switch>
+    <switch id="parameter popup" tooltip="turn on/off parameter popup here.">
+      <option id="disable"/>
+      <option id="enable"/>
+    </switch>
+  </menu>
+</menu>

@@ -64,7 +64,7 @@ static void paintKnob(juce::Graphics& g, const Utils& utils, juce::RangedAudioPa
 }
 
 struct Parameter {
-    Parameter(Nel19AudioProcessor& p, param::ID pID, Component& comp,
+    Parameter(Nel19AudioProcessor& p, param::ID pID, Comp& comp,
         std::function<void(float)> attachLambda = nullptr) :
         rap(*p.apvts.getParameter(param::getID(pID))),
         attach(rap, attachLambda == nullptr ? [&c = comp](float) { c.repaint(); } : attachLambda, nullptr),
@@ -86,15 +86,15 @@ struct Parameter {
     juce::RangedAudioParameter& rap;
     juce::ParameterAttachment attach;
 protected:
-    Component& itself;
+    Comp& itself;
 };
 
 struct Knob :
-    public Component,
+    public Comp,
     public Parameter
 {
     Knob(Nel19AudioProcessor& p, Utils& u, const juce::String& tooltp, param::ID pID, juce::Identifier mID = nullptr, bool withRadialHittest = false) :
-        Component(p, u, tooltp, Utils::Cursor::Hover),
+        Comp(p, u, tooltp, Utils::Cursor::Hover),
         Parameter(p, pID, *this),
         modID(mID),
         dragStartValue(0.f), scrollSpeed(0.f),
@@ -124,10 +124,8 @@ protected:
     }
 
     void mouseEnter(const juce::MouseEvent& evt) override {
+        Comp::mouseEnter(evt);
         updatePopUp();
-    }
-    void mouseMove(const juce::MouseEvent& evt) override {
-        Component::mouseMove(evt);
     }
     void mouseDown(const juce::MouseEvent& evt) override {
         dragStartValue = rap.getValue();
@@ -196,12 +194,12 @@ protected:
 };
 
 struct Modulatable :
-    public Component,
+    public Comp,
     public modSys2::Identifiable,
     public Parameter
 {
     Modulatable(Nel19AudioProcessor& p, Utils& u, const juce::String& tooltp, param::ID pID) :
-        Component(p, u, tooltp, Utils::Cursor::Hover),
+        Comp(p, u, tooltp, Utils::Cursor::Hover),
         Parameter(p, pID, *this),
         modSys2::Identifiable(param::getID(pID))
     {
@@ -212,11 +210,11 @@ struct Modulatable :
 };
 
 struct Switch :
-    public Component,
+    public Comp,
     public Parameter
 {
     Switch(Nel19AudioProcessor& p, Utils& u, const juce::String& tooltp, param::ID pID) :
-        Component(p, u, tooltp, Utils::Cursor::Hover),
+        Comp(p, u, tooltp, Utils::Cursor::Hover),
         Parameter(p, pID, *this)
     {
     }
@@ -255,7 +253,7 @@ protected:
         repaint();
     }
     void mouseMove(const juce::MouseEvent& evt) override {
-        Component::mouseMove(evt);
+        Comp::mouseMove(evt);
     }
     void mouseDown(const juce::MouseEvent& evt) override {
         repaint();
@@ -272,12 +270,12 @@ protected:
 
 struct WaveformChooser :
     public modSys2::Identifiable,
-    public Component,
+    public Comp,
     public Parameter
 {
     WaveformChooser(Nel19AudioProcessor& p, Utils& u, const juce::String& tooltp, param::ID pID) :
         modSys2::Identifiable(param::getID(pID)),
-        Component(p, u, tooltp, Utils::Cursor::Hover),
+        Comp(p, u, tooltp, Utils::Cursor::Hover),
         Parameter(p, pID, *this, [this](float value) { updateWaveForm(); repaint(); }),
         waveForm(),
         waveFormIdx(-1)
@@ -321,14 +319,12 @@ protected:
         g.drawText(rap.getCurrentValueAsText(), getLocalBounds().toFloat(), juce::Justification::centred, false);
     }
     void mouseEnter(const juce::MouseEvent& evt) override {
+        Comp::mouseEnter(evt);
         updatePopUp();
         repaint();
     }
     void mouseExit(const juce::MouseEvent& evt) override {
         repaint();
-    }
-    void mouseMove(const juce::MouseEvent& evt) override {
-        Component::mouseMove(evt);
     }
     void mouseDown(const juce::MouseEvent& evt) override {
         repaint();
@@ -368,10 +364,10 @@ struct ModulatableKnob :
     public Modulatable
 {
     struct ModulatorDial :
-        public Component
+        public Comp
     {
         ModulatorDial(Nel19AudioProcessor& p, Utils& u, ModulatableKnob& par) :
-            Component(p, u, "modulation attenuvertor", Utils::Cursor::Hover),
+            Comp(p, u, "modulation attenuvertor", Utils::Cursor::Hover),
             param(par),
             startAttenuvertor(0.f),
             selected(false),
@@ -514,10 +510,8 @@ protected:
     }
 
     void mouseEnter(const juce::MouseEvent& evt) override {
+        Comp::mouseEnter(evt);
         updatePopUp();
-    }
-    void mouseMove(const juce::MouseEvent& evt) override {
-        Component::mouseMove(evt);
     }
     void mouseDown(const juce::MouseEvent& evt) override {
         dragStartValue = rap.getValue();
@@ -592,10 +586,10 @@ protected:
 };
 
 struct ModDragger :
-    public Component
+    public Comp
 {
     ModDragger(Nel19AudioProcessor& p, Utils& u, const juce::String& tooltp, const juce::String&& mID, std::vector<Modulatable*>& modulatableParameters) :
-        Component(p, u, tooltp, Utils::Cursor::Hover),
+        Comp(p, u, tooltp, Utils::Cursor::Hover),
         id(mID),
         draggerfall(),
         bounds(0, 0, 0, 0),

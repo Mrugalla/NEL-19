@@ -1,46 +1,48 @@
 #pragma once
-#include <JuceHeader.h>
 #include <functional>
 
 struct Utils {
-    enum { Background, Normal, Interactable, Modulation, Inactive, Abort, SideNote, EnumSize }; // colours
+    enum ColourID { Background, Normal, Interactable, Modulation, Inactive, Abort, HoverButton, EnumSize };
     struct ColourSheme {
         ColourSheme(Nel19AudioProcessor& p) :
             colour(),
             coloursID("colours")
         {
-            auto state = p.apvts.state;
-            auto coloursState = state.getChildWithName(coloursID);
-            if (!coloursState.isValid()) {
-                colour[Background] = juce::Colour(nelG::ColBlack);
-                colour[Normal] = juce::Colour(nelG::ColGreen);
-                colour[Interactable] = juce::Colour(nelG::ColYellow);
-                colour[Modulation] = juce::Colour(nelG::ColGreenNeon);
-                colour[Inactive] = juce::Colour(nelG::ColGrey);
-                colour[Abort] = juce::Colour(nelG::ColRed);
-                colour[SideNote] = juce::Colour(0x55ffffff);
+            for (auto d = 0; d < EnumSize; ++d)
+                colour[d] = getDefault(d);
 
-                coloursState = juce::ValueTree(coloursID);
-                for (auto i = 0; i < EnumSize; ++i)
-                    coloursState.setProperty(identify(i), static_cast<juce::int64>(colour[i].getARGB()), nullptr);
-            }
-            else {
-                for (auto i = 0; i < EnumSize; ++i) {
-                    auto prop = coloursState.getProperty(identify(i), 0).isInt64();
-                    auto var = static_cast<juce::uint32>(prop);
-                    colour[i] = juce::Colour(var);
+            auto user = p.appProperties.getUserSettings();
+            if (user->isValidFile()) {
+                for (auto c = 0; c < EnumSize; ++c) {
+                    auto colID = "colour" + identify(c);
+                    auto colAsString = user->getValue(colID);
+                    if(colAsString != "")
+                        colour[c] = juce::Colour::fromString(colAsString);
+                    user->setValue(colID, colour[c].toString());
                 }
+            }
+        }
+        juce::Colour getDefault(const int i) const {
+            switch (i) {
+            case ColourID::Background: return juce::Colour(nelG::ColBlack);
+            case ColourID::Normal: return juce::Colour(nelG::ColGreen);
+            case ColourID::Interactable: return juce::Colour(nelG::ColYellow);
+            case ColourID::Modulation: return juce::Colour(nelG::ColGreenNeon);
+            case ColourID::Inactive: return juce::Colour(nelG::ColGrey);
+            case ColourID::Abort: return juce::Colour(nelG::ColRed);
+            case ColourID::HoverButton: return juce::Colour(0x55ffffff);
+            default: return juce::Colour(0x00000000);
             }
         }
         juce::String identify(int i) const {
             switch (i) {
-            case Background: return "Background";
-            case Normal: return "Normal";
-            case Interactable: return "Interactable";
-            case Modulation: return "Modulation";
-            case Inactive: return "Inactive";
-            case Abort: return "Abort";
-            case SideNote: return "SideNote";
+            case ColourID::Background: return "Background";
+            case ColourID::Normal: return "Normal";
+            case ColourID::Interactable: return "Interactable";
+            case ColourID::Modulation: return "Modulation";
+            case ColourID::Inactive: return "Inactive";
+            case ColourID::Abort: return "Abort";
+            case ColourID::HoverButton: return "HoverButton";
             default: return "";
             }
         }
@@ -53,15 +55,8 @@ struct Utils {
                     return;
                 }
         }
-        std::array<juce::Colour, EnumSize> colour;
+        std::array<juce::Colour, ColourID::EnumSize> colour;
         juce::Identifier coloursID;
-        /*
-        implement options menu
-        implement sub-menu for look and feel
-        implement sub-menu for colours
-        every colour has https://docs.juce.com/develop/classColourSelector.html
-        if a colour has changed: repaint all components
-        */
     };
 
     enum Cursor { Norm, Hover, Cross };
@@ -75,12 +70,15 @@ struct Utils {
     {
         // CURSOR
         const auto scale = 3;
-        const auto cursorImage = nelG::load(BinaryData::cursor_png, BinaryData::cursor_pngSize, scale);
+        auto cursorImage = nelG::load(BinaryData::cursor_png, BinaryData::cursor_pngSize, scale);
         auto cursorHoverImage = cursorImage.createCopy();
+        juce::Colour genericGreen(nelG::ColGreen);
         for (auto x = 0; x < cursorImage.getWidth(); ++x)
             for (auto y = 0; y < cursorImage.getHeight(); ++y)
-                if (cursorImage.getPixelAt(x, y) == colours[Normal])
+                if (cursorImage.getPixelAt(x, y) == genericGreen) {
+                    cursorImage.setPixelAt(x, y, colours[ColourID::Normal]);
                     cursorHoverImage.setPixelAt(x, y, colours[Interactable]);
+                }
         const juce::MouseCursor cursor(cursorImage, 0, 0);
         juce::MouseCursor cursorHover(cursorHoverImage, 0, 0);
         cursors.push_back(cursor);
@@ -100,21 +98,39 @@ struct Utils {
             user->setValue(popUpID, popUpEnabled);
         }
     }
-    void switchToolTip(Nel19AudioProcessor& p) {
+    void switchToolTipEnabled(Nel19AudioProcessor& p) { setTooltipEnabled(p, !tooltipEnabled); }
+    void setTooltipEnabled(Nel19AudioProcessor& p, bool e) {
         auto user = p.appProperties.getUserSettings();
         if (user->isValidFile()) {
-            tooltipEnabled = !user->getBoolValue(tooltipID, tooltipEnabled);
+            tooltipEnabled = e;
             user->setValue(tooltipID, tooltipEnabled);
         }
     }
-    void switchPopUp(Nel19AudioProcessor& p) {
+    void switchPopUpEnabled(Nel19AudioProcessor& p) { setPopUpEnabled(p, !popUpEnabled); }
+    void setPopUpEnabled(Nel19AudioProcessor& p, bool e) {
         auto user = p.appProperties.getUserSettings();
         if (user->isValidFile()) {
-            popUpEnabled = !user->getBoolValue(popUpID, popUpEnabled);
-            user->setValue(popUpID, popUpEnabled);
+            popUpEnabled = e;
+            user->setValue(popUpID, e);
+        }
+    }
+    
+    void save(Nel19AudioProcessor& p, const ColourID i, const juce::Colour col = juce::Colour(0x00000000)) {
+        auto user = p.appProperties.getUserSettings();
+        if (user->isValidFile()) {
+            if (col.isTransparent())
+                colours[i] = colours.getDefault(i);
+            else
+                colours[i] = col;
+            const auto colID = "colour" + colours.identify(i);
+            user->setValue(colID, colours[i].toString());
         }
     }
 
+    void updateTooltip(juce::String* msg) {
+        if (!tooltipEnabled) return;
+        tooltip = msg;
+    }
     void updatePopUp(const juce::String&& msg) {
         if (popUp != msg) {
             popUp = msg;
@@ -135,14 +151,16 @@ private:
     }
 };
 
-struct Component :
+struct Comp :
     public juce::Component
 {
-    Component(Nel19AudioProcessor& p, Utils& u, const juce::String& tooltp = "", Utils::Cursor curs = Utils::Cursor::Norm) :
+    Comp(Nel19AudioProcessor& p, Utils& u, const juce::String& tooltp = "", Utils::Cursor curs = Utils::Cursor::Norm) :
         processor(p),
         utils(u),
         tooltip(tooltp)
-    { setMouseCursor(utils.cursors[curs]); }
+    {
+        setMouseCursor(utils.cursors[curs]);
+    }
 protected:
     Nel19AudioProcessor& processor;
     Utils& utils;
@@ -154,17 +172,17 @@ protected:
 #endif
     }
 
-    void mouseMove(const juce::MouseEvent&) override { utils.tooltip = &tooltip; }
+    void mouseEnter(const juce::MouseEvent&) override { utils.updateTooltip(&tooltip); }
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Component)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Comp)
 };
 
-struct TooltipComponent :
-    public Component,
+struct TooltipComp :
+    public Comp,
     public juce::Timer
 {
-    TooltipComponent(Nel19AudioProcessor& p, Utils& u) :
-        Component(p, u, "Tooltips are shown here."),
+    TooltipComp(Nel19AudioProcessor& p, Utils& u) :
+        Comp(p, u, "Tooltips are shown here."),
         tooltip(nullptr),
         enabled(true)
     { startTimerHz(24); }
@@ -181,6 +199,7 @@ protected:
             return;
         }
         if (!enabled) {
+            if (!utils.tooltipEnabled) return;
             startTimerHz(24);
             enabled = true;
             tooltip = utils.tooltip;
@@ -192,37 +211,36 @@ protected:
         repaint();
     }
     void paint(juce::Graphics& g) override {
-        if (tooltip == nullptr) return;
-        g.setColour(utils.colours[Utils::SideNote]);
+        if (!enabled || tooltip == nullptr) return;
+        g.setColour(utils.colours[Utils::Normal]);
         g.drawFittedText(*tooltip, getLocalBounds(), juce::Justification::centredLeft, 1);
     }
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TooltipComponent)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TooltipComp)
 };
 
-struct BuildDateComponent :
-    public Component
+struct BuildDateComp :
+    public Comp
 {
-    BuildDateComponent(Nel19AudioProcessor& p, Utils& u) :
-        Component(p, u, "identifies plugin version.")
-    { buildDate = static_cast<juce::String>(__DATE__); }
+    BuildDateComp(Nel19AudioProcessor& p, Utils& u) :
+        Comp(p, u, "identifies plugin version."),
+        buildDate(static_cast<juce::String>(__DATE__))
+    { setBufferedToImage(true); }
 protected:
     juce::String buildDate;
     void paint(juce::Graphics& g) override {
-        g.setFont(utils.font);
-        g.setColour(utils.colours[Utils::SideNote]);
+        g.setColour(utils.colours[Utils::Normal]);
         g.drawFittedText(buildDate, getLocalBounds(), juce::Justification::centredRight, 1);
     }
-
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(BuildDateComponent)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(BuildDateComp)
 };
 
-struct PopUpComponent :
-    public Component,
+struct PopUpComp :
+    public Comp,
     public juce::Timer
 {
-    PopUpComponent(Nel19AudioProcessor& p, Utils& u, float durationInMs = 1000.f) :
-        Component(p, u),
+    PopUpComp(Nel19AudioProcessor& p, Utils& u, float durationInMs = 1000.f) :
+        Comp(p, u),
         idx(0), duration(0)
     {
         const auto fps = 24.f;
@@ -251,170 +269,18 @@ protected:
         repaint();
     }
     void paint(juce::Graphics& g) override {
+        if (!utils.popUpEnabled) return;
         g.fillAll(juce::Colour(0x55000000));
-        g.setColour(juce::Colour(0xbbffffff));
+        g.setColour(juce::Colour(0xffffffff));
         g.drawFittedText(utils.popUp, getLocalBounds(), juce::Justification::centred, 2);
     }
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PopUpComponent)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PopUpComp)
 };
 
 #include "Parameter.h"
 
 #include "ParameterRandomizer.h"
-
-struct DropDownMenu :
-    public Component
-{
-    class List :
-        public Component
-    {
-        struct Entry
-        {
-            Entry(juce::String&& _name) :
-                bounds(),
-                name(_name),
-                selected(false), hovered(false)
-            {}
-            void paint(juce::Graphics& g) {
-                if (hovered) {
-                    g.setColour(juce::Colour(0x22ffffff));
-                    g.fillRect(bounds);
-                }
-                    
-                if (selected)
-                    g.setColour(juce::Colour(nelG::ColYellow));
-                else
-                    g.setColour(juce::Colour(nelG::ColGreen));
-                g.drawRect(bounds.toFloat());
-                g.drawFittedText(name, bounds, juce::Justification::centred, 1);
-            }
-
-            juce::Rectangle<int> bounds;
-            juce::String name;
-            bool selected, hovered;
-        };
-    public:
-        std::vector<Entry> entries;
-        List(Nel19AudioProcessor& p, Utils& u) :
-            Component(p, u, "", Utils::Cursor::Hover),
-            entries()
-        {}
-
-        void addEntry(juce::String&& entryName) {
-            entries.push_back(std::move(entryName));
-        }
-    protected:
-        void paint(juce::Graphics& g) override {
-            g.fillAll(juce::Colour(nelG::ColBlack));
-            g.setColour(juce::Colour(nelG::ColGreen));
-            g.drawRect(getLocalBounds().toFloat());
-            for (auto& entry: entries)
-                entry.paint(g);
-        }
-        void resized() {
-            const auto numEntries = static_cast<float>(entries.size());
-            const auto width = static_cast<float>(getWidth());
-            const auto height = static_cast<float>(getHeight());
-            const auto entryHeight = height / numEntries;
-            const auto x = 0.f;
-            auto y = 0.f;
-            for (auto e = 0; e < numEntries; ++e) {
-                juce::Rectangle<float> entryArea(x, y, width, entryHeight);
-                entries[e].bounds = entryArea.toNearestInt();
-                y += entryHeight;
-            }
-        }
-
-        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(List)
-    };
-
-    DropDownMenu(Nel19AudioProcessor& p, Utils& u, const juce::String& tooltp) :
-        Component(p, u, tooltp, Utils::Cursor::Hover),
-        list(p, u),
-        onSelect(nullptr), onDown(nullptr),
-        hovering(false), drag(false)
-    {}
-    void setOnSelect(const std::function<void(int)>& os) { onSelect = os; }
-    void setOnDown(const std::function<void()>& od) { onDown = od; }
-    void setActive(int entryIdx) noexcept {
-        for (auto& entry : list.entries)
-            entry.selected = false;
-        list.entries[entryIdx].selected = true;
-    }
-    void addEntry(juce::String&& entryName) { list.addEntry(std::move(entryName)); }
-    List list;
-protected:
-    std::function<void(int)> onSelect;
-    std::function<void()> onDown;
-    bool hovering, drag;
-    void paint(juce::Graphics& g) override {
-        if (drag) {
-            g.setColour(juce::Colour(0x77ffffff));
-            g.fillRect(getLocalBounds().toFloat());
-        }
-        if (hovering)
-            g.setColour(utils.colours[Utils::Interactable]);
-        else
-            g.setColour(utils.colours[Utils::Normal]);
-        g.drawRect(getLocalBounds().toFloat());
-        g.drawFittedText("<< select", getLocalBounds(), juce::Justification::centred, 1);
-    }
-    void mouseEnter(const juce::MouseEvent& evt) override {
-        hovering = true;
-        repaint();
-    }
-    void mouseExit(const juce::MouseEvent& evt) override {
-        hovering = false;
-        repaint();
-    }
-    void mouseDown(const juce::MouseEvent& evt) override {
-        if (onDown != nullptr) onDown();
-        list.setVisible(true);
-        drag = true;
-        repaint();
-    }
-    void mouseDrag(const juce::MouseEvent& evt) override {
-        const auto pos = juce::Desktop::getMousePosition() - list.getScreenPosition();
-        for (auto& entry : list.entries)
-            if (entry.bounds.contains(pos)) {
-                if (!entry.hovered) {
-                    for (auto& entry1 : list.entries)
-                        entry1.hovered = false;
-                    entry.hovered = true;
-                    list.repaint();
-                    return;
-                }
-            }  
-    }
-    void mouseUp(const juce::MouseEvent& evt) override {
-        const auto selectionIdx = selectListEntry();
-        list.setVisible(false);
-        drag = false;
-        if (evt.mouseWasDraggedSinceMouseDown() && onSelect != nullptr)
-            if(selectionIdx != -1)
-                onSelect(selectionIdx);
-        repaint();
-    }
-
-    int selectListEntry() {
-        const auto pos = juce::Desktop::getMousePosition() - list.getScreenPosition();
-        for (auto e = 0; e < list.entries.size(); ++e) {
-            auto& entry = list.entries[e];
-            if (entry.bounds.contains(pos)) {
-                for (auto& entry1 : list.entries) {
-                    entry1.selected = false;
-                    entry1.hovered = false;
-                }
-                entry.selected = true;
-                return e;
-            }
-        }
-        return -1;
-    }
-
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(DropDownMenu)
-};
 
 #include "ModsComps.h"
 
@@ -426,15 +292,10 @@ protected:
 
 make seperate headers for each thing
 
-utils:
-    - more sophisticated fonts handling system for when i'll have more fonts
+utils
+    more sophisticated fonts handling system for when i'll have more fonts
 
-poup component
+poup Comp
     stays at currently touched mod (because that's where the eyes look at)
-
-dropdownmenu
-    looks really bad atm, fix :>
-
-
 
 */

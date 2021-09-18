@@ -427,4 +427,6 @@ namespace param {
 consider seperating free from temposync rate again because
 no one's ever going to automate that crap anyway
 
+depth parameter on 9% draws 9.% but should 9%
+
 */

@@ -1,7 +1,7 @@
 #pragma once
 
 class VisualizerComp :
-    public Component,
+    public Comp,
     public juce::Timer
 {
     struct SideScroller {
@@ -16,6 +16,7 @@ class VisualizerComp :
             img = juce::Image(juce::Image::ARGB, bounds.getWidth(), bounds.getHeight(), true);
         }
         void scroll(float value /* [-1, 1] */) {
+            if (!img.isValid()) return;
             inc();
             const auto height = static_cast<float>(img.getHeight());
             const auto yEnd = static_cast<int>(height - (value * .5f + .5f) * height);
@@ -34,6 +35,7 @@ class VisualizerComp :
                 }
         }
         void paint(juce::Graphics& g) {
+            if (!img.isValid()) return;
             const auto width = img.getWidth();
             const auto height = img.getHeight();
             const auto w0 = width - idx;
@@ -63,7 +65,7 @@ class VisualizerComp :
     };
 public:
     VisualizerComp(Nel19AudioProcessor& p, Utils& u) :
-        Component(p, u, "The Vibrato is visualized here."),
+        Comp(p, u, "The Vibrato is visualized here."),
         sideScroller(u)
     {
         startTimerHz(24);

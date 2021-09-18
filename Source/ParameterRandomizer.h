@@ -4,10 +4,10 @@
 #include <JuceHeader.h>
 
 struct RandomizerButton :
-    public Component
+    public Comp
 {
     RandomizerButton(Nel19AudioProcessor& p, Utils& u) :
-        Component(p, u, makeTooltip(), Utils::Cursor::Hover),
+        Comp(p, u, makeTooltip(), Utils::Cursor::Hover),
         randomizables()
     {
     }
