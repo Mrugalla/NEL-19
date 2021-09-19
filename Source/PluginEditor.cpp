@@ -183,31 +183,28 @@ void Nel19AudioProcessorEditor::resized() {
     
     layoutBottomBar.place(buildDate, 1, 0, 1, 1, false);
     layoutBottomBar.place(tooltips, 0, 0, 1, 1, false);
-    layoutMacros.place(macro0, 0, 0, 1, 1, true);
-    layoutMacros.place(macro1, 0, 2, 1, 1, true);
-    layoutMacros.place(macro2, 0, 4, 1, 1, true);
-    layoutMacros.place(macro3, 0, 6, 1, 1, true);
-    layoutMacros.place(macroDragger0, 0, 1, 1, 1, true);
-    layoutMacros.place(macroDragger1, 0, 3, 1, 1, true);
-    layoutMacros.place(macroDragger2, 0, 5, 1, 1, true);
-    layoutMacros.place(macroDragger3, 0, 7, 1, 1, true);
+    layoutMacros.place(macro0, 0, 0, 1, 1);
+    layoutMacros.place(macro1, 0, 2, 1, 1);
+    layoutMacros.place(macro2, 0, 4, 1, 1);
+    layoutMacros.place(macro3, 0, 6, 1, 1);
+    macroDragger0.setQBounds(layoutMacros(0, 1, 1, 1, true).toNearestInt());
+    macroDragger1.setQBounds(layoutMacros(0, 3, 1, 1, true).toNearestInt());
+    macroDragger2.setQBounds(layoutMacros(0, 5, 1, 1, true).toNearestInt());
+    macroDragger3.setQBounds(layoutMacros(0, 7, 1, 1, true).toNearestInt());
 
     layoutParams.place(midSideSwitch, 1, 2, 1, 1, false);
 
-    for (auto mcs = 0; mcs < 2; ++mcs) {
-        //layout.place(*modSelector2[mcs], 2, 1 + mcs * 3, 1, 1, false);
-        //layout.place(modSelector[mcs]->list, 2, 2, 1, 2, false);
+    for (auto mcs = 0; mcs < 2; ++mcs)
         for (auto mm = 0; mm < modulatorComps[mcs].size(); ++mm)
-            layout.place(*modulatorComps[mcs][mm], 1, 1 + mcs * 2, 1, 2, false);
-    }   
+            layout.place(*modulatorComps[mcs][mm], 1, 1 + mcs * 2, 1, 2); 
 
-    layoutDepthMix.place(depth, 0, 0, 1, 1, true);
-    layoutDepthMix.place(modulatorsMix, 0, 1, 1, 1, true);
+    layoutDepthMix.place(depth,         0, 0, 1, 1);
+    layoutDepthMix.place(modulatorsMix, 0, 1, 1, 1);
 
-    layoutParams.place(dryWetMix, 0, 1, 2, 1, true);
-    layoutParams.place(visualizer, 0, 0, 3, 1, false);
+    layoutParams.place(dryWetMix,  0, 1, 2, 1);
+    layoutParams.place(visualizer, 0, 0, 3, 1);
 
-    popUp.setBounds({0, 0, 100, 50});
+    popUp.setBounds({0, 0, 100, 30});
 }
 void Nel19AudioProcessorEditor::paint(juce::Graphics& g) {
     g.fillAll(utils.colours[Utils::Background]);

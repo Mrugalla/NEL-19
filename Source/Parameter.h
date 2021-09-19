@@ -26,9 +26,7 @@ namespace pComp {
         juce::ParameterAttachment attach;
         bool modulatable, active;
     protected:
-        void updatePopUp(Utils& utils) {
-            utils.updatePopUp(getName() + "\n" + rap.getCurrentValueAsText());
-        }
+        void updatePopUp(Utils& utils) { utils.updatePopUp(rap.getCurrentValueAsText()); }
     };
 
     class Knob :
@@ -123,10 +121,106 @@ namespace pComp {
 
             JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ModulatorDial)
         };
+
+        struct Dial :
+            public Comp
+        {
+            Dial(Nel19AudioProcessor& p, Utils& u, juce::String&& tooltp, Knob& _knob) :
+                Comp(p, u, tooltp, Utils::Cursor::Hover),
+                knob(_knob)
+            {
+                setInterceptsMouseClicks(false, false);
+            }
+        protected:
+            const Knob& knob;
+            void paint(juce::Graphics& g) override {
+                const auto width = static_cast<float>(getWidth());
+                const auto height = static_cast<float>(getHeight());
+                const auto value = knob.rap.getValue();
+                juce::PathStrokeType strokeType(nelG::Thicc, juce::PathStrokeType::JointStyle::curved, juce::PathStrokeType::EndCapStyle::rounded);
+                const juce::Point<float> centre(width * .5f, height * .5f);
+                const auto radius = std::min(centre.x, centre.y) - nelG::Thicc;
+                const auto startAngle = -nelG::PiQuart * 3.f;
+                const auto endAngle = nelG::PiQuart * 3.f;
+                const auto angleRange = endAngle - startAngle;
+                const auto valueAngle = startAngle + angleRange * value;
+
+                g.setColour(utils.colours[Utils::Normal]);
+                juce::Path pathNorm;
+                pathNorm.addCentredArc(centre.x, centre.y, radius, radius,
+                    0.f, startAngle, endAngle,
+                    true
+                );
+                const auto innerRad = radius - nelG::Thicc2;
+                pathNorm.addCentredArc(centre.x, centre.y, innerRad, innerRad,
+                    0.f, startAngle, endAngle,
+                    true
+                );
+                g.strokePath(pathNorm, strokeType);
+
+                if (knob.modulatable) {
+                    const auto modDialIsTryingToRemove = knob.modulatorDial.isTryingToRemove();
+                    const auto modCol = !modDialIsTryingToRemove ? utils.colours[Utils::Modulation] : utils.colours[Utils::Abort];
+                    juce::Path pathMod;
+                    const auto modAngle = juce::jlimit(startAngle, endAngle, valueAngle + knob.attenuvertor * angleRange);
+                    pathMod.addCentredArc(centre.x, centre.y, radius, radius,
+                        0.f, valueAngle, modAngle,
+                        true
+                    );
+                    g.setColour(modCol);
+                    g.strokePath(pathMod, strokeType);
+
+                    const auto sumValueAngle = knob.sumValue * angleRange + startAngle;
+                    const auto sumValueLine = juce::Line<float>::fromStartAndAngle(centre, radius + 1.f, sumValueAngle);
+
+                    const auto isDestOfSelectedMod = knob.modulatorDial.isSelected();
+                    if (!isDestOfSelectedMod) {
+                        const auto shortedSumValLine = sumValueLine.withShortenedStart(radius - nelG::Thicc);
+                        g.setColour(utils.colours[Utils::Background]);
+                        g.drawLine(shortedSumValLine, nelG::Thicc2);
+                        g.setColour(modCol);
+                        g.drawLine(shortedSumValLine, nelG::Thicc2);
+                    }
+                    else {
+                        const auto shortedSumValLine = sumValueLine.withShortenedStart(radius - nelG::Thicc * 3.f);
+                        g.setColour(modCol);
+                        g.drawLine(shortedSumValLine, nelG::Thicc2);
+                    }
+                }
+
+                const auto valueLine = juce::Line<float>::fromStartAndAngle(centre, radius + 1.f, valueAngle);
+                const auto tickBGThiccness = nelG::Thicc2 * 2.f;
+                g.setColour(utils.colours[Utils::Background]);
+                g.drawLine(valueLine, tickBGThiccness);
+                g.setColour(utils.colours[Utils::Interactable]);
+                g.drawLine(valueLine.withShortenedStart(radius - nelG::Thicc * 3.f), nelG::Thicc2);
+            }
+            JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Dial)
+        };
+
+        struct Label :
+            public Comp
+        {
+            Label(Nel19AudioProcessor& p, Utils& u, juce::String&& tooltp, juce::String&& _name) :
+                Comp(p, u, tooltp, Utils::Cursor::Hover)
+            {
+                setName(_name);
+            }
+        protected:
+            void paint(juce::Graphics& g) override {
+                g.setColour(utils.colours[Utils::ColourID::Normal]);
+                //g.setFont(utils.font);
+                g.drawFittedText(getName(), getLocalBounds(), juce::Justification::centred, 1);
+            }
+
+            JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Label)
+        };
     public:
         Knob(Nel19AudioProcessor& p, Utils& u, param::ID pID, juce::String&& tooltp, juce::String&& _name,
-            juce::Identifier _attachedModID = juce::Identifier(), bool _modulatable = true) :
+            juce::Identifier _attachedModID = juce::Identifier(), bool _modulatable = true, bool showLabel = true) :
             Parameter(p, u, std::move(tooltp), std::move(_name), pID, onParamChange(_modulatable), _modulatable),
+            dial(p, u, std::move(tooltp), *this),
+            label(p, u, std::move(tooltp), std::move(_name)),
             modulatorDial(p, u, *this),
             attachedModID(_attachedModID),
             dragStartValue(0.f),
@@ -134,6 +228,9 @@ namespace pComp {
             attenuvertor(0.f),
             sumValue(0.f)
         {
+            addAndMakeVisible(dial);
+            if(showLabel)
+                addAndMakeVisible(label);
             attach.sendInitialUpdate();
             if (modulatable)
                 addAndMakeVisible(modulatorDial);
@@ -158,6 +255,8 @@ namespace pComp {
                 repaint();
         }
     protected:
+        Dial dial;
+        Label label;
         ModulatorDial modulatorDial;
         juce::Identifier attachedModID;
         float dragStartValue, scrollSpeed, attenuvertor, sumValue;
@@ -227,77 +326,28 @@ namespace pComp {
         }
 
     private:
-        void paint(juce::Graphics& g) override {
-            const auto width = static_cast<float>(getWidth());
-            const auto height = static_cast<float>(getHeight());
-            const auto value = rap.getValue();
-            juce::PathStrokeType strokeType(nelG::Thicc, juce::PathStrokeType::JointStyle::curved, juce::PathStrokeType::EndCapStyle::rounded);
-            const juce::Point<float> centre(width * .5f, height * .5f);
-            const auto radius = std::min(centre.x, centre.y) - nelG::Thicc;
-            const auto startAngle = -nelG::PiQuart * 3.f;
-            const auto endAngle = nelG::PiQuart * 3.f;
-            const auto angleRange = endAngle - startAngle;
-            const auto valueAngle = startAngle + angleRange * value;
-
-            g.setColour(utils.colours[Utils::Normal]);
-            juce::Path pathNorm;
-            pathNorm.addCentredArc(centre.x, centre.y, radius, radius,
-                0.f, startAngle, endAngle,
-                true
-            );
-            const auto innerRad = radius - nelG::Thicc2;
-            pathNorm.addCentredArc(centre.x, centre.y, innerRad, innerRad,
-                0.f, startAngle, endAngle,
-                true
-            );
-            g.strokePath(pathNorm, strokeType);
-
-            if (modulatable) {
-                const auto modDialIsTryingToRemove = modulatorDial.isTryingToRemove();
-                const auto modCol = !modDialIsTryingToRemove ? utils.colours[Utils::Modulation] : utils.colours[Utils::Abort];
-                juce::Path pathMod;
-                const auto modAngle = juce::jlimit(startAngle, endAngle, valueAngle + attenuvertor * angleRange);
-                pathMod.addCentredArc(centre.x, centre.y, radius, radius,
-                    0.f, valueAngle, modAngle,
-                    true
-                );
-                g.setColour(modCol);
-                g.strokePath(pathMod, strokeType);
-
-                const auto sumValueAngle = sumValue * angleRange + startAngle;
-                const auto sumValueLine = juce::Line<float>::fromStartAndAngle(centre, radius + 1.f, sumValueAngle);
-
-                const auto isDestOfSelectedMod = modulatorDial.isSelected();
-                if (!isDestOfSelectedMod) {
-                    const auto shortedSumValLine = sumValueLine.withShortenedStart(radius - nelG::Thicc);
-                    g.setColour(utils.colours[Utils::Background]);
-                    g.drawLine(shortedSumValLine, nelG::Thicc2);
-                    g.setColour(modCol);
-                    g.drawLine(shortedSumValLine, nelG::Thicc2);
-                }
-                else {
-                    const auto shortedSumValLine = sumValueLine.withShortenedStart(radius - nelG::Thicc * 3.f);
-                    g.setColour(modCol);
-                    g.drawLine(shortedSumValLine, nelG::Thicc2);
-                }
-            }
-
-            const auto valueLine = juce::Line<float>::fromStartAndAngle(centre, radius + 1.f, valueAngle);
-            const auto tickBGThiccness = nelG::Thicc2 * 2.f;
-            g.setColour(utils.colours[Utils::Background]);
-            g.drawLine(valueLine, tickBGThiccness);
-            g.setColour(utils.colours[Utils::Interactable]);
-            g.drawLine(valueLine.withShortenedStart(radius - nelG::Thicc * 3.f), nelG::Thicc2);
-        }
         void resized() override {
+            auto bounds = getLocalBounds().toFloat();
+            if (label.isVisible()) {
+                const auto x = 0.f;
+                const auto y = 0.f;
+                const auto w = bounds.getWidth();
+                const auto h = bounds.getHeight() * .2f;
+                const juce::Rectangle<float> labelBounds(x, y, w, h);
+                label.setBounds(labelBounds.toNearestInt());
+                bounds.setY(h);
+                bounds.setHeight(bounds.getHeight() - h);
+            }
+            const auto dialBounds = nelG::maxQuadIn(bounds);
+            dial.setBounds(dialBounds.toNearestInt());
             if (modulatable) {
-                const auto width = static_cast<float>(getWidth());
-                const auto height = static_cast<float>(getHeight());
-                const auto dialWidth = width / nelG::Pi - nelG::Thicc;
-                const auto dialHeight = height / nelG::Pi - nelG::Thicc;
-                const auto dialX = (width - dialWidth) * .5f;
-                const auto dialY = (height - dialHeight);
-                juce::Rectangle<float> dialArea(dialX, dialY, dialWidth, dialHeight);
+                const auto width = static_cast<float>(dialBounds.getWidth());
+                const auto height = static_cast<float>(dialBounds.getHeight());
+                const auto w = width / nelG::Pi - nelG::Thicc;
+                const auto h = height / nelG::Pi - nelG::Thicc;
+                const auto x = dialBounds.getX() + (width - w) * .5f;
+                const auto y = dialBounds.getY() + (height - h);
+                const juce::Rectangle<float> dialArea(x, y, w, h);
                 modulatorDial.setBounds(dialArea.toNearestInt());
             }
         }
@@ -455,6 +505,10 @@ namespace pComp {
                 selected = s;
                 repaint();
             }
+        }
+        void setQBounds(juce::Rectangle<int> b) {
+            bounds = b;
+            setBounds(b);
         }
     protected:
         juce::Identifier id;

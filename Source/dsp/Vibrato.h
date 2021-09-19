@@ -168,7 +168,6 @@ namespace vibrato {
 #undef LookAheadEnabled
 
 /*
-
 fix the lagrange interpolator and try implement lagrange with lower aliasing than hermite
 
 dryWetMix uses 2 sqrt in method. whole buffer calculates through twice, because buffer is const
@@ -186,5 +185,4 @@ feature ideas:
 		waveshaper
 		wavefolder
 		bitcrusher
-
 */

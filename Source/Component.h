@@ -2,7 +2,7 @@
 #include <functional>
 
 struct Utils {
-    enum ColourID { Background, Normal, Interactable, Modulation, Inactive, Abort, HoverButton, EnumSize };
+    enum ColourID { Background, Normal, Interactable, Modulation, Inactive, Abort, HoverButton, Darken, EnumSize };
     struct ColourSheme {
         ColourSheme(Nel19AudioProcessor& p) :
             colour(),
@@ -31,6 +31,7 @@ struct Utils {
             case ColourID::Inactive: return juce::Colour(nelG::ColGrey);
             case ColourID::Abort: return juce::Colour(nelG::ColRed);
             case ColourID::HoverButton: return juce::Colour(0x55ffffff);
+            case ColourID::Darken: return juce::Colour(0x87000000);
             default: return juce::Colour(0x00000000);
             }
         }
@@ -43,6 +44,7 @@ struct Utils {
             case ColourID::Inactive: return "Inactive";
             case ColourID::Abort: return "Abort";
             case ColourID::HoverButton: return "HoverButton";
+            case ColourID::Darken: return "Darken";
             default: return "";
             }
         }
@@ -277,8 +279,10 @@ protected:
     }
     void paint(juce::Graphics& g) override {
         if (!utils.popUpEnabled) return;
-        g.fillAll(juce::Colour(0x55000000));
-        g.setColour(juce::Colour(0xffffffff));
+        const auto bounds = getLocalBounds().toFloat().reduced(nelG::Thicc);
+        g.setColour(utils.colours[Utils::ColourID::Darken]);
+        g.fillRoundedRectangle(bounds, nelG::Thicc);
+        g.setColour(utils.colours[Utils::ColourID::Interactable]);
         g.drawFittedText(utils.popUp, getLocalBounds(), juce::Justification::centred, 2);
     }
 

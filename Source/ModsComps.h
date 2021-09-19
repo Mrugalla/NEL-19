@@ -52,6 +52,7 @@ protected:
 
     void paint(juce::Graphics& g) override { onPaint(g, this); }
 
+    void mouseEnter(const juce::MouseEvent& evt) override { Comp::mouseEnter(evt); repaint(); }
     void mouseExit(const juce::MouseEvent& evt) override { repaint(); }
     void mouseDown(const juce::MouseEvent& evt) override { setVisibleOptions(true); }
     void mouseDrag(const juce::MouseEvent& evt) override {
@@ -99,6 +100,23 @@ class ModulatorComp :
     public modSys2::Identifiable
 {
     enum Mods{ EnvFol, LFO, Rand, Perlin, NumMods };
+
+    struct Label :
+        public Comp
+    {
+        Label(Nel19AudioProcessor& p, Utils& u, juce::String&& _name) :
+            Comp(p, u)
+        {
+            setName(_name);
+            setBufferedToImage(true);
+        }
+        void paint(juce::Graphics& g) override {
+            g.setFont(utils.font);
+            g.setColour(utils.colours[Utils::ColourID::Modulation]);
+            g.drawFittedText(getName(), getLocalBounds(), juce::Justification::centredRight, 1);
+        }
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Label)
+    };
 public:
     static std::function<void(juce::Graphics&, Comp*, bool)> paintModOption(const Utils& u, const juce::String&& modName) {
         return [&utils = u, name = modName](juce::Graphics& g, Comp* comp, bool hover) {
@@ -119,16 +137,18 @@ public:
     }
 
     ModulatorComp(Nel19AudioProcessor& p, Utils& u, const juce::Identifier& mID, std::vector<pComp::Parameter*>& _modulatables, int modulatorsIdx,
-        std::function<void(int)> onModReplace) :
+        std::function<void(int)> onModReplace, juce::String&& _name) :
         Comp(p, u),
         modSys2::Identifiable(mID),
         modulatables(_modulatables),
         randButton(processor, utils),
         replaceModButton(p, u, "drag to replace this modulator.", onModReplace, paintReplaceModButton(), NumMods),
+        label(p, u, std::move(_name)),
         modsIdx(modulatorsIdx)
     {
         addAndMakeVisible(randButton);
         addAndMakeVisible(replaceModButton);
+        addAndMakeVisible(label);
     }
     void init(const std::vector<std::function<void(juce::Graphics&, Comp*, bool)>>& modPaints) {
         replaceModButton.init(modPaints);
@@ -139,6 +159,7 @@ protected:
     std::vector<pComp::Parameter*>& modulatables;
     RandomizerButton randButton;
     QuickAccessMenu replaceModButton;
+    Label label;
     int modsIdx;
 
     void resized() override {
@@ -146,10 +167,19 @@ protected:
         const auto height = static_cast<float>(getHeight());
         auto rbX = width * .85f;
         const auto rbY = height * .05f;
-        const auto rbWidth = std::min(width, height) * .2f;
+        const auto margin = .2f;
+        const auto rbWidth = std::min(width, height) * margin;
         randButton.setBounds(juce::Rectangle<float>(rbX, rbY, rbWidth, rbWidth).toNearestInt());
-        rbX -= rbWidth * 1.2;
+        rbX -= rbWidth * (margin + 1.f);
         replaceModButton.setBounds(juce::Rectangle<float>(rbX, rbY, rbWidth, rbWidth).toNearestInt());
+        {
+            const auto w = rbX - rbWidth * margin;
+            const auto x = 0.f;
+            const auto y = rbY;
+            const auto h = rbWidth;
+            label.setBounds(juce::Rectangle<float>(x,y,w,h).toNearestInt());
+        }
+        
     }
 private:
     std::function<void(juce::Graphics& g, Comp* comp)> paintReplaceModButton() {
@@ -178,14 +208,14 @@ struct ModulatorPerlinComp :
 {
     ModulatorPerlinComp(Nel19AudioProcessor& p, Utils& u, const juce::Identifier& mID, std::vector<pComp::Parameter*>& mods, int modulatorsIdx,
         std::function<void(int)> onModReplace) :
-        ModulatorComp(p, u, mID, mods, modulatorsIdx, onModReplace),
+        ModulatorComp(p, u, mID, mods, modulatorsIdx, onModReplace, "Perlin Noise"),
         layout(
             { 30, 70, 130, 70, 30 },
             { 70, 90, 30 }
         ),
         rateP(processor, utils, modsIdx == 0 ? param::ID::PerlinRate0 : param::ID::PerlinRate1, "The rate at which new values are picked.", "Rate"),
         octavesP(processor, utils, modsIdx == 0 ? param::ID::PerlinOctaves0 : param::ID::PerlinOctaves1, "More Octaves increase the complexity of the modulation.", "Octaves"),
-        widthP(processor, utils, modsIdx == 0 ? param::ID::PerlinWidth0 : param::ID::PerlinWidth1, "Increases the stereo-width of the modulation.", "Stereo-Width")
+        widthP(processor, utils, modsIdx == 0 ? param::ID::PerlinWidth0 : param::ID::PerlinWidth1, "Increases the Stereo-Width of the modulation.", "Width")
     {
         this->modulatables.push_back(&rateP);
         this->modulatables.push_back(&octavesP);
@@ -217,9 +247,9 @@ protected:
     }
     void resized() override {
         layout.setBounds(getBoundsInParent().toFloat());
-        layout.place(rateP, 1, 1, 1, 1, true);
-        layout.place(octavesP, 2, 1, 1, 1, true);
-        layout.place(widthP, 3, 1, 1, 1, true);
+        layout.place(rateP, 1, 1, 1, 1);
+        layout.place(octavesP, 2, 1, 1, 1);
+        layout.place(widthP, 3, 1, 1, 1);
         ModulatorComp::resized();
     }
 
@@ -231,13 +261,13 @@ struct ModulatorLFOComp :
 {
     ModulatorLFOComp(Nel19AudioProcessor& p, Utils& u, const juce::Identifier& mID, std::vector<pComp::Parameter*>& mods, int modulatorsIdx,
         std::function<void(int)> onModReplace) :
-        ModulatorComp(p, u, mID, mods, modulatorsIdx, onModReplace),
+        ModulatorComp(p, u, mID, mods, modulatorsIdx, onModReplace, "LFO"),
         layout(
             { 30, 50, 90, 50, 50, 30 },
             { 50, 60, 30 }
         ),
         rateP(processor, utils, modsIdx == 0 ? param::ID::LFORate0 : param::ID::LFORate1, "The rate at which new values are picked.", "Rate"),
-        widthP(processor, utils, modsIdx == 0 ? param::ID::LFOWidth0 : param::ID::LFOWidth1, "Increases the stereo-width of the modulation.", "Streo-Width"),
+        widthP(processor, utils, modsIdx == 0 ? param::ID::LFOWidth0 : param::ID::LFOWidth1, "Increases the Stereo-Width of the modulation.", "Width"),
         phaseP(processor, utils, modsIdx == 0 ? param::ID::LFOPhase0 : param::ID::LFOPhase1, "Defines the phase of the waveform.", "Phase"),
         waveformP(processor, utils, "Change the waveform of this modulator.", "Waveform", modsIdx == 0 ? param::ID::LFOWaveTable0 : param::ID::LFOWaveTable1),
         tempoSyncP(processor, utils, "Switch between free-running or tempo-sync modulation.", "Tempo-Sync", modsIdx == 0 ? param::ID::LFOSync0 : param::ID::LFOSync1),
@@ -284,10 +314,10 @@ protected:
     void resized() override {
         layout.setBounds(getBoundsInParent().toFloat());
         layout.place(tempoSyncP, 1, 2, 1, 1, true);
-        layout.place(rateP, 1, 1, 1, 1, true);
+        layout.place(rateP, 1, 1, 1, 1);
         layout.place(waveformP, 2, 1, 1, 1, true);
-        layout.place(widthP, 3, 1, 1, 1, true);
-        layout.place(phaseP, 4, 1, 1, 1, true);
+        layout.place(widthP, 3, 1, 1, 1);
+        layout.place(phaseP, 4, 1, 1, 1);
         layout.place(polarityP, 4, 2, 1, 1, true);
         ModulatorComp::resized();
     }
@@ -300,7 +330,7 @@ struct ModulatorEnvelopeFollowerComp :
 {
     ModulatorEnvelopeFollowerComp(Nel19AudioProcessor& p, Utils& u, const juce::Identifier& mID, std::vector<pComp::Parameter*>& mods, int modulatorsIdx,
         std::function<void(int)> onModReplace) :
-        ModulatorComp(p, u, mID, mods, modulatorsIdx, onModReplace),
+        ModulatorComp(p, u, mID, mods, modulatorsIdx, onModReplace, "Envelope Follower"),
         layout(
             { 30, 40, 80, 80, 50, 50, 30 },
             { 50, 60, 30 }
@@ -309,7 +339,7 @@ struct ModulatorEnvelopeFollowerComp :
         rlsP(processor, utils, modsIdx == 0 ? param::ID::EnvFolRls0 : param::ID::EnvFolRls1, "Set how long the modulator needs to release.", "Release"),
         gainP(processor, utils, modsIdx == 0 ? param::ID::EnvFolGain0 : param::ID::EnvFolGain1, "Define the modulator's input gain.", "Gain"),
         biasP(processor, utils, modsIdx == 0 ? param::ID::EnvFolBias0 : param::ID::EnvFolBias1, "Changes the character of the modulation.", "Bias"),
-        widthP(processor, utils, modsIdx == 0 ? param::ID::EnvFolWidth0 : param::ID::EnvFolWidth1, "Changes the stereo-width of the modulator.", "Stereo-Width")
+        widthP(processor, utils, modsIdx == 0 ? param::ID::EnvFolWidth0 : param::ID::EnvFolWidth1, "Changes the Stereo-Width of the modulator.", "Width")
     {
         this->modulatables.push_back(&atkP);
         this->modulatables.push_back(&rlsP);
@@ -349,11 +379,11 @@ protected:
     }
     void resized() override {
         layout.setBounds(getBoundsInParent().toFloat());
-        layout.place(gainP, 1, 1, 1, 1, true);
-        layout.place(atkP, 2, 1, 1, 1, true);
-        layout.place(rlsP, 3, 1, 1, 1, true);
-        layout.place(biasP, 4, 1, 1, 1, true);
-        layout.place(widthP, 5, 1, 1, 1, true);
+        layout.place(gainP, 1, 1, 1, 1);
+        layout.place(atkP, 2, 1, 1, 1);
+        layout.place(rlsP, 3, 1, 1, 1);
+        layout.place(biasP, 4, 1, 1, 1);
+        layout.place(widthP, 5, 1, 1, 1);
         ModulatorComp::resized();
     }
 
@@ -365,14 +395,14 @@ struct ModulatorRandComp :
 {
     ModulatorRandComp(Nel19AudioProcessor& p, Utils& u, const juce::Identifier& mID, std::vector<pComp::Parameter*>& mods, int modulatorsIdx,
         std::function<void(int)> onModReplace) :
-        ModulatorComp(p, u, mID, mods, modulatorsIdx, onModReplace),
+        ModulatorComp(p, u, mID, mods, modulatorsIdx, onModReplace, "Classic Random"),
         layout(
             { 30, 70, 70, 70, 70, 30 },
             { 70, 90, 30 }
         ),
         rateP(processor, utils, modsIdx == 0 ? param::ID::RandRate0 : param::ID::RandRate1, "The rate at which new values are picked.", "Rate"),
         biasP(processor, utils, modsIdx == 0 ? param::ID::RandBias0 : param::ID::RandBias1, "The bias of the values picked.", "Bias"),
-        widthP(processor, utils, modsIdx == 0 ? param::ID::RandWidth0 : param::ID::RandWidth1, "Increases the stereo-width of the modulation.", "Stereo-Width"),
+        widthP(processor, utils, modsIdx == 0 ? param::ID::RandWidth0 : param::ID::RandWidth1, "Increases the Stereo-Width of the modulation.", "Width"),
         smoothP(processor, utils, modsIdx == 0 ? param::ID::RandSmooth0 : param::ID::RandSmooth1, "Increases the smoothness of the modulation.", "Smooth"),
         syncP(processor, utils, "Switches between free or tempo-sync modulation.", "Tempo-Sync", modsIdx == 0 ? param::ID::RandSync0 : param::ID::RandSync1)
     {
@@ -413,10 +443,10 @@ protected:
     }
     void resized() override {
         layout.setBounds(getBoundsInParent().toFloat());
-        layout.place(rateP, 1, 1, 1, 1, true);
-        layout.place(biasP, 2, 1, 1, 1, true);
-        layout.place(widthP, 3, 1, 1, 1, true);
-        layout.place(smoothP, 4, 1, 1, 1, true);
+        layout.place(rateP, 1, 1, 1, 1);
+        layout.place(biasP, 2, 1, 1, 1);
+        layout.place(widthP, 3, 1, 1, 1);
+        layout.place(smoothP, 4, 1, 1, 1);
         layout.place(syncP, 1, 2, 1, 1, true);
         ModulatorComp::resized();
     }
@@ -428,7 +458,6 @@ protected:
 * 
 * to do
 * each modulator has
-*   name/id
 *   preset menu
 *
 * modulators can be lfo or env

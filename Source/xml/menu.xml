@@ -8,6 +8,7 @@
       <colourselector id="inactive"/>
       <colourselector id="abort"/>
       <colourselector id="hoverBg"/>
+      <colourselector id="darken"/>
     </menu>
   </menu>
   <menu id="help" tooltip="get help! literally.">
