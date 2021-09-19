@@ -56,7 +56,7 @@ private:
 */
 template<class Type>
 struct ThreadSafePtr {
-    ThreadSafePtr(const Type&& args) :
+    ThreadSafePtr(Type&& args) :
         curPtr(std::make_shared<Type>(args)),
         updatedPtr(curPtr),
         spinLock()
@@ -89,7 +89,7 @@ struct ThreadSafePtr {
         return curPtr;
     }
     const std::shared_ptr<Type>& operator->() const noexcept { return curPtr; }
-    void dbgReferenceCount(juce::String start = "") const noexcept {
+    void dbgReferenceCount(juce::String&& start = juce::String("")) const {
         DBG(start);
         ReleasePool::theReleasePool.dbg();
         DBG("current: " << curPtr.use_count() << " :: " << "updated: " << updatedPtr.use_count());

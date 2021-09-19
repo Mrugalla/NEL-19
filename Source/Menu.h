@@ -179,12 +179,122 @@ namespace menu2 {
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SwitchButton)
 	};
 
-	/* generic menu for holding any trees of sub menus */
+	/* generic textbox */
+	struct TextBox :
+		public Comp,
+		public juce::Timer
+	{
+		TextBox(Nel19AudioProcessor& p, Utils& u, const juce::String& tooltp, const juce::String& _name,
+			std::function<bool(const juce::String& txt)> _onUpdate, std::function<juce::String()> onDefaultText, juce::String&& _unit = "") :
+			Comp(p, u, tooltp),
+			onUpdate(_onUpdate),
+			txt(onDefaultText()),
+			txtDefault(txt),
+			unit(_unit),
+			pos(txt.length()),
+			showTick(false)
+		{
+			setName(_name);
+			setWantsKeyboardFocus(true);
+		}
+	protected:
+		std::function<bool(const juce::String& txt)> onUpdate;
+		juce::String txt, txtDefault, unit;
+		int pos;
+		bool showTick;
+
+		void mouseUp(const juce::MouseEvent& evt) override {
+			if (evt.mouseWasDraggedSinceMouseDown()) return;
+			startTimer(1000.f / 1.5f);
+			grabKeyboardFocus();
+		}
+
+		void paint(juce::Graphics& g) override {
+			const auto bounds = getLocalBounds().toFloat().reduced(nelG::Thicc);
+			g.setFont(utils.font);
+			g.setColour(utils.colours[Utils::ColourID::Background]);
+			g.fillRoundedRectangle(bounds, nelG::Thicc);
+			g.setColour(utils.colours[Utils::ColourID::Interactable]);
+			g.drawRoundedRectangle(bounds, nelG::Thicc, nelG::Thicc);
+			if (showTick) {
+				const auto txt2Paint = getName() + ": " + txt.substring(0, pos) + "|" + txt.substring(pos) + unit;
+				g.drawFittedText(txt2Paint, getLocalBounds(), juce::Justification::centred, 1);
+			}
+			else
+				g.drawFittedText(getName() + ": " + txt + unit, getLocalBounds(), juce::Justification::centred, 1);
+
+		}
+		void resized() override {
+			const auto width = static_cast<float>(getWidth());
+			const auto height = static_cast<float>(getHeight());
+		}
+		void timerCallback() override {
+			if (!hasKeyboardFocus(true)) return;
+			showTick = !showTick;
+			repaint();
+		}
+
+		bool keyPressed(const juce::KeyPress& key) override {
+			const auto code = key.getKeyCode();
+			if (code == juce::KeyPress::escapeKey) {
+				backToDefault();
+				repaintWithTick();
+			}
+			else if (code == juce::KeyPress::backspaceKey) {
+				if (txt.length() > 0) {
+					txt = txt.substring(0, pos - 1) + txt.substring(pos);
+					--pos;
+					repaintWithTick();
+				}
+			}
+			else if (code == juce::KeyPress::deleteKey) {
+				if (txt.length() > 0) {
+					txt = txt.substring(0, pos) + txt.substring(pos + 1);
+					repaintWithTick();
+				}
+			}
+			else if (code == juce::KeyPress::leftKey) {
+				if (pos > 0) --pos;
+				repaintWithTick();
+			}
+			else if (code == juce::KeyPress::rightKey) {
+				if (pos < txt.length()) ++pos;
+				repaintWithTick();
+			}
+			else if (code == juce::KeyPress::returnKey) {
+				bool successful = onUpdate(txt);
+				if (successful)
+					txtDefault = txt;
+				else
+					backToDefault();
+				repaintWithTick();
+			}
+			else {
+				// character is text
+				txt = txt.substring(0, pos) + key.getTextCharacter() + txt.substring(pos);
+				++pos;
+				repaintWithTick();
+			}
+			return true;
+		}
+		void repaintWithTick() {
+			showTick = true;
+			repaint();
+		}
+		void backToDefault() {
+			txt = txtDefault;
+			pos = txt.length();
+		}
+
+		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TextBox)
+	};
+
+	/* recursive menu for holding any trees of sub menus and components */
 	class Menu :
 		public Comp,
 		public juce::Timer
 	{
-		enum ID { ID, MENU, TOOLTIP, COLOURSELECTOR, SWITCH, NumIDs };
+		enum ID { ID, MENU, TOOLTIP, COLOURSELECTOR, SWITCH, TEXTBOX, NumIDs };
 	public:
 		Menu(Nel19AudioProcessor& p, Utils& u, juce::ValueTree _xml, Menu* _parent = nullptr) :
 			Comp(p, u),
@@ -194,7 +304,7 @@ namespace menu2 {
 			colourSelector(nullptr),
 			parent(_parent)
 		{
-			std::array<juce::Identifier, NumIDs> id = { "id", "menu", "tooltip", "colourselector", "switch" };
+			std::array<juce::Identifier, NumIDs> id = { "id", "menu", "tooltip", "colourselector", "switch", "textbox" };
 			addEntries(id);
 			addAndMakeVisible(nameLabel);
 			startTimerHz(12);
@@ -249,6 +359,8 @@ namespace menu2 {
 					addColourSelector(id, child, i);
 				else if (type == id[SWITCH])
 					addSwitchButton(id, child, i);
+				else if (type == id[TEXTBOX])
+					addTextBox(id, child, i);
 			}
 		}
 		void addSubMenuButton(const std::array<juce::Identifier, NumIDs>& id, juce::ValueTree child, const int i) {
@@ -318,6 +430,32 @@ namespace menu2 {
 				const auto onSwitch = [this](bool e) { utils.setPopUpEnabled(processor, e); };
 				const auto onIsEnabled = [this]() { return utils.popUpEnabled; };
 				addSwitchButton(id, child, i, onSwitch, buttonName, onIsEnabled);
+			}
+		}
+		void addTextBox(const std::array<juce::Identifier, NumIDs>& id, juce::ValueTree child, const int i) {
+			const auto buttonName = child.getProperty(id[ID]).toString();
+			// buttonName must match id in menu.xml
+			if (buttonName == "buffersize") {
+				const auto onUpdate = [this](const juce::String& txt) {
+					const auto newDelaySize = txt.getFloatValue();
+					if (newDelaySize <= 0)
+						return false; // delay can't be below 0ms
+					else if (newDelaySize > 10000.f)
+						return false; // delay can't be longer than 10 sec
+					auto user = processor.appProperties.getUserSettings();
+					user->setValue("vibDelaySize", newDelaySize);
+					processor.vibrato.resizeDelaySafe(processor, newDelaySize);
+					return true;
+				};
+				const auto onDefaultStr = [this]() {
+					const auto dly = processor.vibrato.getSizeInMs(processor);
+					return juce::String(dly).substring(0, 4);
+				};
+				const auto tooltp = child.getProperty(id[TOOLTIP]);
+				entries.push_back(std::make_unique<TextBox>(
+					processor, utils, tooltp.toString(), buttonName, onUpdate, onDefaultStr, " ms"
+				));
+				addAndMakeVisible(entries.back().get());
 			}
 		}
 
@@ -393,7 +531,3 @@ namespace menu2 {
 		openButton.repaint();
 	}
 }
-
-/*
-rename "normal colour" to outline/text
-*/

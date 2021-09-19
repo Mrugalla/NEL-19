@@ -236,17 +236,19 @@ void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize) {
     vibrato.prepareToPlay(maxBufferSize);
     for(auto& vd: vibDelay)
         vd.setSize(channelCount, maxBufferSize);
-    //size_t delaySize = size_t(sec / 1000.f * 7.f); // 7ms for testing
-    size_t delaySize = size_t(sec / 1000.f * 420.f); // 420ms for testing
-    vibrato.resizeDelay(*this, delaySize);
-    const auto latency = delaySize / 2;
+    
+    auto user = appProperties.getUserSettings();
+    const auto vibDelaySize = user->getDoubleValue("vibDelaySize", 4.);
+    const size_t vds = size_t(vibDelaySize * sec / 1000.f);
+    vibrato.resizeDelay(*this, vds);
+    const auto vdLatency = vds / 2;
     
     auto m = matrix.getCopyOfUpdatedPtr();
     m->prepareToPlay(
         channelCount,
         maxBufferSize,
         sampleRate,
-        latency
+        vdLatency
     );
 
     m->setSmoothingLengthInSamples(param::getID(param::ID::Macro0), quick);
@@ -386,7 +388,7 @@ void Nel19AudioProcessor::processBlockVibDelay(juce::AudioBuffer<float>& buffer,
     }
     const auto lastVal = vd0[0][buffer.getNumSamples() - 1];
     vibDelayVisualizerValue.store(lastVal);
-    vibrato.processBlock(buffer);
+    vibrato.processBlock(*this, buffer);
 }
 /////////////////////////////////////////////////////////
 

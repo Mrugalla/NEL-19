@@ -1,4 +1,7 @@
 <menu id="options">
+  <menu id="audio" tooltip="change properties of the core of the plugin">
+    <textbox id="buffersize" tooltip="adjust the size of the vibrato's delay buffer."/>
+  </menu>
   <menu id="graphics" tooltip="individualize the appearance of the plugin here.">
     <menu id="colours" tooltip="individualize the colour sheme of the plugin here.">
       <colourselector id="background"/>

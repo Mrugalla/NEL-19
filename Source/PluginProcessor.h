@@ -68,9 +68,6 @@ private:
 
 /*
 
-find out why sometimes crashes daw on init (probably some noexcept thing)
-
-
 debugger:
 
 steinberg validator
