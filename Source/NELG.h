@@ -1,6 +1,6 @@
 #pragma once
 #include <JuceHeader.h>
-#define DebugLayout true && JUCE_DEBUG
+#define DebugLayout false && JUCE_DEBUG
 
 namespace nelG {
     static constexpr float Pi = 3.14159265359f;

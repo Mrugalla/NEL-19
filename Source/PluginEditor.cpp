@@ -31,19 +31,19 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     ),
     buildDate(p, utils),
     tooltips(p, utils),
-    macro0(p, utils, "modulate parameters with a macro.", param::ID::Macro0, param::getID(param::ID::Macro0)),
-    macro1(p, utils, "modulate parameters with a macro.", param::ID::Macro1, param::getID(param::ID::Macro1)),
-    macro2(p, utils, "modulate parameters with a macro.", param::ID::Macro2, param::getID(param::ID::Macro2)),
-    macro3(p, utils, "modulate parameters with a macro.", param::ID::Macro3, param::getID(param::ID::Macro3)),
-    modulatorsMix(p, utils, "mix the modulators.", param::ID::ModulatorsMix),
-    depth(p, utils, "set the depth of the vibrato.", param::ID::Depth, true),
-    dryWetMix(p, utils, "mix the dry signal with the vibrated one.", param::ID::DryWetMix),
-    midSideSwitch(p, utils, "switch between l/r & m/s processing.", param::ID::StereoConfig),
+    macro0(p, utils, param::ID::Macro0, "modulate parameters with a macro.", "Macro 0", param::getID(param::ID::Macro0), false),
+    macro1(p, utils, param::ID::Macro1, "modulate parameters with a macro.", "Macro 1", param::getID(param::ID::Macro1), false),
+    macro2(p, utils, param::ID::Macro2, "modulate parameters with a macro.", "Macro 2", param::getID(param::ID::Macro2), false),
+    macro3(p, utils, param::ID::Macro3, "modulate parameters with a macro.", "Macro 3", param::getID(param::ID::Macro3), false),
+    modulatorsMix(p, utils, param::ID::ModulatorsMix, "mix the modulators.", "Mods Mix"),
+    depth(p, utils, param::ID::Depth, "set the depth of the vibrato.", "Depth"),
+    dryWetMix(p, utils, param::ID::DryWetMix, "mix the dry signal with the vibrated one.", "Dry/Wet-Mix"),
+    midSideSwitch(p, utils, "switch between l/r & m/s processing.", "Stereo-Config", param::ID::StereoConfig),
     modulatables({ &depth, &modulatorsMix, &dryWetMix }) ,
-    macroDragger0(p, utils, "drag this to modulate a parameter.", "macro0", modulatables),
-    macroDragger1(p, utils, "drag this to modulate a parameter.", "macro1", modulatables),
-    macroDragger2(p, utils, "drag this to modulate a parameter.", "macro2", modulatables),
-    macroDragger3(p, utils, "drag this to modulate a parameter.", "macro3", modulatables),
+    macroDragger0(p, utils, "drag this to modulate a parameter.", param::getID(param::ID::Macro0), modulatables),
+    macroDragger1(p, utils, "drag this to modulate a parameter.", param::getID(param::ID::Macro1), modulatables),
+    macroDragger2(p, utils, "drag this to modulate a parameter.", param::getID(param::ID::Macro2), modulatables),
+    macroDragger3(p, utils, "drag this to modulate a parameter.", param::getID(param::ID::Macro3), modulatables),
     popUp(p, utils),
     modulatorComps(),
     visualizer(p, utils),
@@ -183,10 +183,15 @@ void Nel19AudioProcessorEditor::resized() {
     
     layoutBottomBar.place(buildDate, 1, 0, 1, 1, false);
     layoutBottomBar.place(tooltips, 0, 0, 1, 1, false);
-    layoutMacros.place(macro0, 0, 0, 1, 1, true); macroDragger0.setQBounds(layoutMacros(0, 1, 1, 1));
-    layoutMacros.place(macro1, 0, 2, 1, 1, true); macroDragger1.setQBounds(layoutMacros(0, 3, 1, 1));
-    layoutMacros.place(macro2, 0, 4, 1, 1, true); macroDragger2.setQBounds(layoutMacros(0, 5, 1, 1));
-    layoutMacros.place(macro3, 0, 6, 1, 1, true); macroDragger3.setQBounds(layoutMacros(0, 7, 1, 1));
+    layoutMacros.place(macro0, 0, 0, 1, 1, true);
+    layoutMacros.place(macro1, 0, 2, 1, 1, true);
+    layoutMacros.place(macro2, 0, 4, 1, 1, true);
+    layoutMacros.place(macro3, 0, 6, 1, 1, true);
+    layoutMacros.place(macroDragger0, 0, 1, 1, 1, true);
+    layoutMacros.place(macroDragger1, 0, 3, 1, 1, true);
+    layoutMacros.place(macroDragger2, 0, 5, 1, 1, true);
+    layoutMacros.place(macroDragger3, 0, 7, 1, 1, true);
+
     layoutParams.place(midSideSwitch, 1, 2, 1, 1, false);
 
     for (auto mcs = 0; mcs < 2; ++mcs) {
@@ -235,6 +240,6 @@ void Nel19AudioProcessorEditor::timerCallback() {
 }
 void Nel19AudioProcessorEditor::resetModulatorComp(int modIdx, int modTypeIdx) {
     for (auto& mc : modulatorComps[modIdx])
-        mc->setActive(false);
-    modulatorComps[modIdx][modTypeIdx]->setActive(true);
+        mc->setVisible(false);
+    modulatorComps[modIdx][modTypeIdx]->setVisible(true);
 }

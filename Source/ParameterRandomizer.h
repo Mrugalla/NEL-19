@@ -11,11 +11,11 @@ struct RandomizerButton :
         randomizables()
     {
     }
-    void addRandomizable(Parameter* randomizableParameter) {
+    void addRandomizable(pComp::Parameter* randomizableParameter) {
         randomizables.push_back(randomizableParameter);
     }
 protected:
-    std::vector<Parameter*> randomizables;
+    std::vector<pComp::Parameter*> randomizables;
 
     void paint(juce::Graphics& g) override {
         const auto width = static_cast<float>(getWidth());
@@ -31,7 +31,13 @@ protected:
         bounds.reduce(nelG::Thicc, nelG::Thicc);
         g.setColour(utils.colours[Utils::Background]);
         g.fillRoundedRectangle(bounds, nelG::Thicc);
-        g.setColour(utils.colours[Utils::Normal]);
+        if (isMouseOver()) {
+            g.setColour(utils.colours[Utils::HoverButton]);
+            g.fillRoundedRectangle(bounds, nelG::Thicc);
+            g.setColour(utils.colours[Utils::Interactable]);
+        }
+        else
+            g.setColour(utils.colours[Utils::Normal]);
         g.drawRoundedRectangle(bounds, nelG::Thicc, nelG::Thicc);
 
         minDimen = std::min(bounds.getWidth(), bounds.getHeight());
@@ -47,18 +53,26 @@ protected:
             g.fillEllipse(x1 - pointRadius, y - pointRadius, pointSize, pointSize);
         }
     }
+    void mouseEnter(const juce::MouseEvent& evt) override {
+        Comp::mouseEnter(evt);
+        repaint();
+    }
     void mouseUp(const juce::MouseEvent& evt) override {
         if (evt.mouseWasDraggedSinceMouseDown()) return;
         juce::Random rand;
         for (auto randomizable : randomizables)
-            if(randomizable->isActive())
+            if(randomizable->active)
                 randomizable->setValueNormalized(rand.nextFloat());
         tooltip = makeTooltip();
     }
-    void mouseExit(const juce::MouseEvent&) override { tooltip = makeTooltip(); }
+    void mouseExit(const juce::MouseEvent&) override {
+        tooltip = makeTooltip();
+        repaint();
+    }
+
     juce::String makeTooltip() {
         juce::Random rand;
-        static constexpr float count = 134.f;
+        static constexpr float count = 142.f;
         const auto v = static_cast<int>(std::rint(rand.nextFloat() * count));
         switch (v) {
         case 0: return "Do it!";
@@ -196,6 +210,14 @@ protected:
         case 132: return "There is a strong correlation between you and awesomeness.";
         case 133: return "Yes! Yes! Yes!";
         case 134: return "Up for a surprise?";
+        case 135: return "This is not a plugin. It is electricity arranged swag-wise.";
+        case 136: return "Chairs do not exist.";
+        case 137: return "There are giant spiders all over my house and I have no idea what to do.";
+        case 138: return "My cat is lying on my lap purring and she's so cute omg!!";
+        case 139: return "I come here and add more text whenever I procrastinate from fixing bugs.";
+        case 140: return "Meow :3";
+        case 141: return "N.. Nyan? uwu";
+        case 142: return "Let's Go!";
         default: "Are you sure?";
         }
         return "You are not supposed to read this message!";

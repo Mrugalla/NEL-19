@@ -17,11 +17,11 @@ private:
 
     BuildDateComp buildDate;
     TooltipComp tooltips;
-    Knob macro0, macro1, macro2, macro3;
-    ModulatableKnob modulatorsMix, depth, dryWetMix;
-    Switch midSideSwitch;
-    std::vector<Modulatable*> modulatables;
-    ModDragger macroDragger0, macroDragger1, macroDragger2, macroDragger3;
+    pComp::Knob macro0, macro1, macro2, macro3;
+    pComp::Knob modulatorsMix, depth, dryWetMix;
+    pComp::Switch midSideSwitch;
+    std::vector<pComp::Parameter*> modulatables;
+    pComp::ModDragger macroDragger0, macroDragger1, macroDragger2, macroDragger3;
     PopUpComp popUp;
     std::array<std::array<std::unique_ptr<ModulatorComp>, 4>, 2> modulatorComps;
     VisualizerComp visualizer;

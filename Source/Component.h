@@ -131,7 +131,7 @@ struct Utils {
         if (!tooltipEnabled) return;
         tooltip = msg;
     }
-    void updatePopUp(const juce::String&& msg) {
+    void updatePopUp(const juce::String& msg) {
         if (popUp != msg) {
             popUp = msg;
             popUpUpdated = true;
@@ -155,6 +155,13 @@ struct Comp :
     public juce::Component
 {
     Comp(Nel19AudioProcessor& p, Utils& u, const juce::String& tooltp = "", Utils::Cursor curs = Utils::Cursor::Norm) :
+        processor(p),
+        utils(u),
+        tooltip(tooltp)
+    {
+        setMouseCursor(utils.cursors[curs]);
+    }
+    Comp(Nel19AudioProcessor& p, Utils& u, juce::String&& tooltp, Utils::Cursor curs = Utils::Cursor::Norm) :
         processor(p),
         utils(u),
         tooltip(tooltp)

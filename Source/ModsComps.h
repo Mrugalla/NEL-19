@@ -118,11 +118,11 @@ public:
         };
     }
 
-    ModulatorComp(Nel19AudioProcessor& p, Utils& u, const juce::Identifier& mID, std::vector<Modulatable*>& modulatableParameters, int modulatorsIdx,
+    ModulatorComp(Nel19AudioProcessor& p, Utils& u, const juce::Identifier& mID, std::vector<pComp::Parameter*>& _modulatables, int modulatorsIdx,
         std::function<void(int)> onModReplace) :
         Comp(p, u),
         modSys2::Identifiable(mID),
-        modulatables(modulatableParameters),
+        modulatables(_modulatables),
         randButton(processor, utils),
         replaceModButton(p, u, "drag to replace this modulator.", onModReplace, paintReplaceModButton(), NumMods),
         modsIdx(modulatorsIdx)
@@ -134,10 +134,9 @@ public:
         replaceModButton.init(modPaints);
     }
 
-    virtual void setActive(bool e) { setVisible(e); }
     virtual void initModulatables() {}
 protected:
-    std::vector<Modulatable*>& modulatables;
+    std::vector<pComp::Parameter*>& modulatables;
     RandomizerButton randButton;
     QuickAccessMenu replaceModButton;
     int modsIdx;
@@ -177,28 +176,28 @@ private:
 struct ModulatorPerlinComp :
     public ModulatorComp
 {
-    ModulatorPerlinComp(Nel19AudioProcessor& p, Utils& u, const juce::Identifier& mID, std::vector<Modulatable*>& modulatableParameters, int modulatorsIdx,
+    ModulatorPerlinComp(Nel19AudioProcessor& p, Utils& u, const juce::Identifier& mID, std::vector<pComp::Parameter*>& mods, int modulatorsIdx,
         std::function<void(int)> onModReplace) :
-        ModulatorComp(p, u, mID, modulatableParameters, modulatorsIdx, onModReplace),
+        ModulatorComp(p, u, mID, mods, modulatorsIdx, onModReplace),
         layout(
             { 30, 70, 130, 70, 30 },
             { 70, 90, 30 }
         ),
-        rateP(processor, utils, "The rate at which new values are picked.", modsIdx == 0 ? param::ID::PerlinRate0 : param::ID::PerlinRate1),
-        octavesP(processor, utils, "More Octaves increase the complexity of the modulation.", modsIdx == 0 ? param::ID::PerlinOctaves0 : param::ID::PerlinOctaves1),
-        widthP(processor, utils, "Increases the stereo-width of the modulation.", modsIdx == 0 ? param::ID::PerlinWidth0 : param::ID::PerlinWidth1)    
+        rateP(processor, utils, modsIdx == 0 ? param::ID::PerlinRate0 : param::ID::PerlinRate1, "The rate at which new values are picked.", "Rate"),
+        octavesP(processor, utils, modsIdx == 0 ? param::ID::PerlinOctaves0 : param::ID::PerlinOctaves1, "More Octaves increase the complexity of the modulation.", "Octaves"),
+        widthP(processor, utils, modsIdx == 0 ? param::ID::PerlinWidth0 : param::ID::PerlinWidth1, "Increases the stereo-width of the modulation.", "Stereo-Width")
     {
-        modulatableParameters.push_back(&rateP);
-        modulatableParameters.push_back(&octavesP);
-        modulatableParameters.push_back(&widthP);
+        this->modulatables.push_back(&rateP);
+        this->modulatables.push_back(&octavesP);
+        this->modulatables.push_back(&widthP);
         this->randButton.addRandomizable(&rateP);
         this->randButton.addRandomizable(&octavesP);
         this->randButton.addRandomizable(&widthP);
     }
-    void setActive(bool e) override {
-        rateP.setActive(e);
-        octavesP.setActive(e);
-        widthP.setActive(e);
+    void setVisible(bool e) override {
+        rateP.setVisible(e);
+        octavesP.setVisible(e);
+        widthP.setVisible(e);
         Comp::setVisible(e);
     }
     void initModulatables() override {
@@ -209,7 +208,7 @@ struct ModulatorPerlinComp :
     }
 protected:
     nelG::Layout layout;
-    ModulatableKnob rateP, octavesP, widthP;
+    pComp::Knob rateP, octavesP, widthP;
 
     void paint(juce::Graphics& g) override {
         //layout.paintGrid(g);
@@ -230,23 +229,23 @@ protected:
 struct ModulatorLFOComp :
     public ModulatorComp
 {
-    ModulatorLFOComp(Nel19AudioProcessor& p, Utils& u, const juce::Identifier& mID, std::vector<Modulatable*>& modulatableParameters, int modulatorsIdx,
+    ModulatorLFOComp(Nel19AudioProcessor& p, Utils& u, const juce::Identifier& mID, std::vector<pComp::Parameter*>& mods, int modulatorsIdx,
         std::function<void(int)> onModReplace) :
-        ModulatorComp(p, u, mID, modulatableParameters, modulatorsIdx, onModReplace),
+        ModulatorComp(p, u, mID, mods, modulatorsIdx, onModReplace),
         layout(
             { 30, 50, 90, 50, 50, 30 },
             { 50, 60, 30 }
         ),
-        rateP(processor, utils, "The rate at which new values are picked.", modsIdx == 0 ? param::ID::LFORate0 : param::ID::LFORate1),
-        widthP(processor, utils, "Increases the stereo-width of the modulation.", modsIdx == 0 ? param::ID::LFOWidth0 : param::ID::LFOWidth1),
-        phaseP(processor, utils, "PHASE", modsIdx == 0 ? param::ID::LFOPhase0 : param::ID::LFOPhase1),
-        waveformP(processor, utils, "Change the waveform of this modulator.", modsIdx == 0 ? param::ID::LFOWaveTable0 : param::ID::LFOWaveTable1),
-        tempoSyncP(processor, utils, "Switch between free-running or tempo-sync modulation.", modsIdx == 0 ? param::ID::LFOSync0 : param::ID::LFOSync1),
-        polarityP(processor, utils, "POLARITY", modsIdx == 0 ? param::ID::LFOPolarity0 : param::ID::LFOPolarity1)
+        rateP(processor, utils, modsIdx == 0 ? param::ID::LFORate0 : param::ID::LFORate1, "The rate at which new values are picked.", "Rate"),
+        widthP(processor, utils, modsIdx == 0 ? param::ID::LFOWidth0 : param::ID::LFOWidth1, "Increases the stereo-width of the modulation.", "Streo-Width"),
+        phaseP(processor, utils, modsIdx == 0 ? param::ID::LFOPhase0 : param::ID::LFOPhase1, "Defines the phase of the waveform.", "Phase"),
+        waveformP(processor, utils, "Change the waveform of this modulator.", "Waveform", modsIdx == 0 ? param::ID::LFOWaveTable0 : param::ID::LFOWaveTable1),
+        tempoSyncP(processor, utils, "Switch between free-running or tempo-sync modulation.", "Tempo-Sync", modsIdx == 0 ? param::ID::LFOSync0 : param::ID::LFOSync1),
+        polarityP(processor, utils, "Flip the polarity of this modulator.", "Polarity", modsIdx == 0 ? param::ID::LFOPolarity0 : param::ID::LFOPolarity1)
     {
-        modulatableParameters.push_back(&rateP);
-        modulatableParameters.push_back(&widthP);
-        modulatableParameters.push_back(&phaseP);
+        this->modulatables.push_back(&rateP);
+        this->modulatables.push_back(&widthP);
+        this->modulatables.push_back(&phaseP);
         this->randButton.addRandomizable(&rateP);
         this->randButton.addRandomizable(&widthP);
         this->randButton.addRandomizable(&waveformP);
@@ -254,14 +253,14 @@ struct ModulatorLFOComp :
         this->randButton.addRandomizable(&polarityP);
         this->randButton.addRandomizable(&phaseP);
     }
-    void setActive(bool e) override {
+    void setVisible(bool e) override {
         Comp::setVisible(e);
-        rateP.setActive(e);
-        widthP.setActive(e);
-        waveformP.setActive(e);
-        tempoSyncP.setActive(e);
-        polarityP.setActive(e);
-        phaseP.setActive(e);
+        rateP.setVisible(e);
+        widthP.setVisible(e);
+        waveformP.setVisible(e);
+        tempoSyncP.setVisible(e);
+        polarityP.setVisible(e);
+        phaseP.setVisible(e);
     }
     void initModulatables() override {
         auto top = getTopLevelComponent();
@@ -274,9 +273,9 @@ struct ModulatorLFOComp :
     }
 protected:
     nelG::Layout layout;
-    ModulatableKnob rateP, widthP, phaseP;
-    WaveformChooser waveformP;
-    Switch tempoSyncP, polarityP;
+    pComp::Knob rateP, widthP, phaseP;
+    pComp::WaveformChooser waveformP;
+    pComp::Switch tempoSyncP, polarityP;
 
     void paint(juce::Graphics& g) override {
         //layout.paintGrid(g);
@@ -299,24 +298,24 @@ protected:
 struct ModulatorEnvelopeFollowerComp :
     public ModulatorComp
 {
-    ModulatorEnvelopeFollowerComp(Nel19AudioProcessor& p, Utils& u, const juce::Identifier& mID, std::vector<Modulatable*>& modulatableParameters, int modulatorsIdx,
+    ModulatorEnvelopeFollowerComp(Nel19AudioProcessor& p, Utils& u, const juce::Identifier& mID, std::vector<pComp::Parameter*>& mods, int modulatorsIdx,
         std::function<void(int)> onModReplace) :
-        ModulatorComp(p, u, mID, modulatableParameters, modulatorsIdx, onModReplace),
+        ModulatorComp(p, u, mID, mods, modulatorsIdx, onModReplace),
         layout(
             { 30, 40, 80, 80, 50, 50, 30 },
             { 50, 60, 30 }
         ),
-        atkP(processor, utils, "Set how fast the modulator reacts to transients.", modsIdx == 0 ? param::ID::EnvFolAtk0 : param::ID::EnvFolAtk1),
-        rlsP(processor, utils, "Set how long the modulator needs to release.", modsIdx == 0 ? param::ID::EnvFolRls0 : param::ID::EnvFolRls1),
-        gainP(processor, utils, "Define the modulator's input gain.", modsIdx == 0 ? param::ID::EnvFolGain0 : param::ID::EnvFolGain1),
-        biasP(processor, utils, "Changes the character of the modulation.", modsIdx == 0 ? param::ID::EnvFolBias0 : param::ID::EnvFolBias1),
-        widthP(processor, utils, "Changes the stereo-width of the modulator.", modsIdx == 0 ? param::ID::EnvFolWidth0 : param::ID::EnvFolWidth1)
+        atkP(processor, utils, modsIdx == 0 ? param::ID::EnvFolAtk0 : param::ID::EnvFolAtk1, "Set how fast the modulator reacts to transients.", "Attack"),
+        rlsP(processor, utils, modsIdx == 0 ? param::ID::EnvFolRls0 : param::ID::EnvFolRls1, "Set how long the modulator needs to release.", "Release"),
+        gainP(processor, utils, modsIdx == 0 ? param::ID::EnvFolGain0 : param::ID::EnvFolGain1, "Define the modulator's input gain.", "Gain"),
+        biasP(processor, utils, modsIdx == 0 ? param::ID::EnvFolBias0 : param::ID::EnvFolBias1, "Changes the character of the modulation.", "Bias"),
+        widthP(processor, utils, modsIdx == 0 ? param::ID::EnvFolWidth0 : param::ID::EnvFolWidth1, "Changes the stereo-width of the modulator.", "Stereo-Width")
     {
-        modulatableParameters.push_back(&atkP);
-        modulatableParameters.push_back(&rlsP);
-        modulatableParameters.push_back(&gainP);
-        modulatableParameters.push_back(&biasP);
-        modulatableParameters.push_back(&widthP);
+        this->modulatables.push_back(&atkP);
+        this->modulatables.push_back(&rlsP);
+        this->modulatables.push_back(&gainP);
+        this->modulatables.push_back(&biasP);
+        this->modulatables.push_back(&widthP);
 
         this->randButton.addRandomizable(&atkP);
         this->randButton.addRandomizable(&rlsP);
@@ -324,13 +323,13 @@ struct ModulatorEnvelopeFollowerComp :
         this->randButton.addRandomizable(&biasP);
         this->randButton.addRandomizable(&widthP);
     }
-    void setActive(bool e) override {
+    void setVisible(bool e) override {
         Comp::setVisible(e);
-        atkP.setActive(e);
-        rlsP.setActive(e);
-        gainP.setActive(e);
-        biasP.setActive(e);
-        widthP.setActive(e);
+        atkP.setVisible(e);
+        rlsP.setVisible(e);
+        gainP.setVisible(e);
+        biasP.setVisible(e);
+        widthP.setVisible(e);
     }
     void initModulatables() override {
         auto top = getTopLevelComponent();
@@ -342,7 +341,7 @@ struct ModulatorEnvelopeFollowerComp :
     }
 protected:
     nelG::Layout layout;
-    ModulatableKnob atkP, rlsP, gainP, biasP, widthP;
+    pComp::Knob atkP, rlsP, gainP, biasP, widthP;
 
     void paint(juce::Graphics& g) override {
         //layout.paintGrid(g);
@@ -364,35 +363,35 @@ protected:
 struct ModulatorRandComp :
     public ModulatorComp
 {
-    ModulatorRandComp(Nel19AudioProcessor& p, Utils& u, const juce::Identifier& mID, std::vector<Modulatable*>& modulatableParameters, int modulatorsIdx,
+    ModulatorRandComp(Nel19AudioProcessor& p, Utils& u, const juce::Identifier& mID, std::vector<pComp::Parameter*>& mods, int modulatorsIdx,
         std::function<void(int)> onModReplace) :
-        ModulatorComp(p, u, mID, modulatableParameters, modulatorsIdx, onModReplace),
+        ModulatorComp(p, u, mID, mods, modulatorsIdx, onModReplace),
         layout(
             { 30, 70, 70, 70, 70, 30 },
             { 70, 90, 30 }
         ),
-        rateP(processor, utils, "The rate at which new values are picked.", modsIdx == 0 ? param::ID::RandRate0 : param::ID::RandRate1),
-        biasP(processor, utils, "The bias of the values picked.", modsIdx == 0 ? param::ID::RandBias0 : param::ID::RandBias1),
-        widthP(processor, utils, "Increases the stereo-width of the modulation.", modsIdx == 0 ? param::ID::RandWidth0 : param::ID::RandWidth1),
-        smoothP(processor, utils, "Increases the smoothness of the modulation.", modsIdx == 0 ? param::ID::RandSmooth0 : param::ID::RandSmooth1),
-        syncP(processor, utils, "Switches between free or tempo-sync modulation.", modsIdx == 0 ? param::ID::RandSync0 : param::ID::RandSync1)
+        rateP(processor, utils, modsIdx == 0 ? param::ID::RandRate0 : param::ID::RandRate1, "The rate at which new values are picked.", "Rate"),
+        biasP(processor, utils, modsIdx == 0 ? param::ID::RandBias0 : param::ID::RandBias1, "The bias of the values picked.", "Bias"),
+        widthP(processor, utils, modsIdx == 0 ? param::ID::RandWidth0 : param::ID::RandWidth1, "Increases the stereo-width of the modulation.", "Stereo-Width"),
+        smoothP(processor, utils, modsIdx == 0 ? param::ID::RandSmooth0 : param::ID::RandSmooth1, "Increases the smoothness of the modulation.", "Smooth"),
+        syncP(processor, utils, "Switches between free or tempo-sync modulation.", "Tempo-Sync", modsIdx == 0 ? param::ID::RandSync0 : param::ID::RandSync1)
     {
-        modulatableParameters.push_back(&rateP);
-        modulatableParameters.push_back(&biasP);
-        modulatableParameters.push_back(&widthP);
-        modulatableParameters.push_back(&smoothP);
+        this->modulatables.push_back(&rateP);
+        this->modulatables.push_back(&biasP);
+        this->modulatables.push_back(&widthP);
+        this->modulatables.push_back(&smoothP);
         this->randButton.addRandomizable(&rateP);
         this->randButton.addRandomizable(&biasP);
         this->randButton.addRandomizable(&widthP);
         this->randButton.addRandomizable(&smoothP);
         this->randButton.addRandomizable(&syncP);
     }
-    void setActive(bool e) override {
-        rateP.setActive(e);
-        biasP.setActive(e);
-        widthP.setActive(e);
-        smoothP.setActive(e);
-        syncP.setActive(e);
+    void setVisible(bool e) override {
+        rateP.setVisible(e);
+        biasP.setVisible(e);
+        widthP.setVisible(e);
+        smoothP.setVisible(e);
+        syncP.setVisible(e);
         Comp::setVisible(e);
     }
     void initModulatables() override {
@@ -405,8 +404,8 @@ struct ModulatorRandComp :
     }
 protected:
     nelG::Layout layout;
-    ModulatableKnob rateP, biasP, widthP, smoothP;
-    Switch syncP;
+    pComp::Knob rateP, biasP, widthP, smoothP;
+    pComp::Switch syncP;
 
     void paint(juce::Graphics& g) override {
         //layout.paintGrid(g);
