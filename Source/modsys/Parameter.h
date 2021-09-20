@@ -88,6 +88,11 @@ namespace modSys2 {
 			const auto normalised = rap->convertTo0to1(targetValue);
 			smoothing.processBlock(block.getWritePointer(0), normalised, numSamples);
 		}
+		void processBlockEmpty() noexcept {
+			const auto targetValue = parameter->load();
+			const auto normalised = rap->convertTo0to1(targetValue);
+			*block.getWritePointer(0, 0) = normalised;
+		}
 		void storeSumValue(const int lastSample) noexcept { sumValue.set(get(lastSample)); }
 		void set(const float value, const int s) noexcept {
 			auto samples = block.getWritePointer(0);

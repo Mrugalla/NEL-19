@@ -316,9 +316,9 @@ protected:
         layout.place(tempoSyncP, 1, 2, 1, 1, true);
         layout.place(rateP, 1, 1, 1, 1);
         layout.place(waveformP, 2, 1, 1, 1, true);
-        layout.place(widthP, 3, 1, 1, 1);
-        layout.place(phaseP, 4, 1, 1, 1);
-        layout.place(polarityP, 4, 2, 1, 1, true);
+        layout.place(phaseP, 3, 1, 1, 1);
+        layout.place(polarityP, 3, 2, 1, 1, true);
+        layout.place(widthP, 4, 1, 1, 1);
         ModulatorComp::resized();
     }
 

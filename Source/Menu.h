@@ -531,3 +531,9 @@ namespace menu2 {
 		openButton.repaint();
 	}
 }
+
+/*
+
+components with setBuffered(true) don't repaint from the colourSelector
+
+*/

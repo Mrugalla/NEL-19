@@ -62,6 +62,7 @@ private:
     bool processBlockReady(juce::AudioBuffer<float>&);
     const std::shared_ptr<modSys2::Matrix> processBlockModSys(juce::AudioBuffer<float>&);
     void processBlockVibDelay(juce::AudioBuffer<float>&, const std::shared_ptr<modSys2::Matrix>&);
+    void processBlockEmpty();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Nel19AudioProcessor)
 };

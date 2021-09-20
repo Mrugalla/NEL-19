@@ -49,7 +49,8 @@ namespace modSys2 {
 			for (auto& wt : wts)
 				waveTables.addWaveTable(wt);
 		}
-		void prepareToPlay(const int numChannels, const int blockSize, const double sampleRate, const size_t latency = 0) {
+		void prepareToPlay(const int numChannels, int blockSize, const double sampleRate, const size_t latency = 0) {
+			if (blockSize < 1) blockSize = 1;
 			for (auto& p : parameters)
 				p->prepareToPlay(blockSize, sampleRate);
 			for (auto& m : modulators)
@@ -240,6 +241,37 @@ namespace modSys2 {
 					p->limit(numSamples);
 					p->storeSumValue(lastSample);
 				}
+		}
+		void processBlockEmpty() {
+			const auto modBlockData = block.getArrayOfWritePointers();
+			for (auto p : parameters)
+				if (p->isActive())
+					p->processBlockEmpty();
+			for (auto m : modulators)
+				if (m->isActive()) {
+					//m->processBlockEmpty(block);
+					m->storeOutValue(modBlockData, 1);
+					m->processDestinations(block, 1);
+				}
+			for (auto p : parameters)
+				if (p->isActive()) {
+					p->limit(1);
+					p->storeSumValue(1);
+				}
+			//for (auto m : modulators)
+				//if (m->isActive()) {
+					//m->processBlockEmpty(block);
+					//m->storeOutValue(modBlockData);
+					//m->processDestinationsEmpty(block);
+				//}
+			/*
+			const auto lastSample = numSamples - 1;
+			for (auto p : parameters)
+				if (p->isActive()) {
+					p->limit(numSamples);
+					p->storeSumValue(lastSample);
+				}
+			*/
 		}
 		// GET
 		std::shared_ptr<Modulator> getSelectedModulator() noexcept { return selectedModulator; }
