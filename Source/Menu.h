@@ -99,7 +99,7 @@ namespace menu2 {
 		}
 		void update() {
 			utils.colours[colIdx] = selector.getCurrentColour();
-			getTopLevelComponent()->repaint();
+			Utils::repaintStrict(getTopLevelComponent());
 		}
 	protected:
 		juce::ColourSelector selector;
@@ -387,7 +387,7 @@ namespace menu2 {
 					auto top = getTopLevelComponent();
 					colourSelector->setVisible(false);
 					setVisibleAllMenus(true);
-					top->repaint();
+					Utils::repaintStrict(top);
 				};
 				colourSelector.reset(new ColourSelector(processor, utils, idx, onExit));
 				auto top = getTopLevelComponent();

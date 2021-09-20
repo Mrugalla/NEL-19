@@ -117,6 +117,12 @@ struct Utils {
         }
     }
     
+    static void repaintStrict(juce::Component* comp) {
+        comp->repaint();
+        for (auto c : comp->getChildren())
+            repaintStrict(c);
+    }
+
     void save(Nel19AudioProcessor& p, const ColourID i, const juce::Colour col = juce::Colour(0x00000000)) {
         auto user = p.appProperties.getUserSettings();
         if (user->isValidFile()) {
