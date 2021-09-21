@@ -1,6 +1,12 @@
 <menu id="options">
-  <menu id="audio" tooltip="change properties of the core of the plugin">
+  <menu id="audio" tooltip="adjust properties of this instance's core dsp">
     <textbox id="buffersize" tooltip="adjust the size of the vibrato's delay buffer."/>
+    <switch id="interpolation" tooltip="select the method that is used to interplate the delay.">
+      <option id="lerp"/>
+      <option id="spline"/>
+      <option id="lagrange"/>
+      <option id="sinc"/>
+    </switch>
   </menu>
   <menu id="graphics" tooltip="individualize the appearance of the plugin here.">
     <menu id="colours" tooltip="individualize the colour sheme of the plugin here.">

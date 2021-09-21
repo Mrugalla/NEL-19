@@ -238,11 +238,21 @@ void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize) {
         vd.setSize(channelCount, maxBufferSize);
     
     auto user = appProperties.getUserSettings();
-    const auto vibDelaySize = user->getDoubleValue("vibDelaySize", 4.);
-    const size_t vds = size_t(vibDelaySize * sec / 1000.f);
+
+    juce::String vibDelaySizeID("vibDelaySize");
+    auto vibDelaySize = static_cast<float>(apvts.state.getProperty(vibDelaySizeID, "-1"));
+    if(vibDelaySize < 0.f)
+        vibDelaySize = static_cast<float>(user->getDoubleValue(vibDelaySizeID, 4.));
+    const size_t vds = static_cast<size_t>(vibDelaySize * sec / 1000.f);
     vibrato.resizeDelay(*this, vds);
     const auto vdLatency = vds / 2;
     
+    juce::String vibInterpolationID("vibInterpolation");
+    auto vibInterpolation = static_cast<int>(apvts.state.getProperty(vibInterpolationID, "-1"));
+    if (vibInterpolation < 0.f)
+        vibInterpolation = user->getIntValue(vibInterpolationID, vibrato::InterpolationType::Spline);
+    vibrato.setInterpolationType(static_cast<vibrato::InterpolationType>(vibInterpolation));
+
     auto m = matrix.getCopyOfUpdatedPtr();
     m->prepareToPlay(
         channelCount,
@@ -278,8 +288,6 @@ bool Nel19AudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) co
 }
 
 void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) {
-    if (buffer.getNumSamples() == 0)
-        return processBlockEmpty();
     if (!processBlockReady(buffer)) return;
     midSideProcessor.setEnabled(matrix->getParameterValue(mtrxParams[StereoConfig]));
     midSideProcessor.processBlockEncode(buffer);
@@ -288,8 +296,6 @@ void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     midSideProcessor.processBlockDecode(buffer);
 }
 void Nel19AudioProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) {
-    if (buffer.getNumSamples() == 0)
-        return processBlockEmpty();
     if (!processBlockReady(buffer)) return;
     const auto mtrx = processBlockModSys(buffer);
     auto vd0 = vibDelay[0].getArrayOfWritePointers();
@@ -370,6 +376,10 @@ juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new Nel19Audio
 
 /////////// PROCESS BLOCK EXTRA STEPS ///////////////////
 bool Nel19AudioProcessor::processBlockReady(juce::AudioBuffer<float>& buffer)  {
+    if (buffer.getNumSamples() == 0) {
+        processBlockEmpty();
+        return false;
+    }  
     juce::ScopedNoDenormals noDenormals;
     const auto totalNumInputChannels = getTotalNumInputChannels();
     const auto totalNumOutputChannels = getTotalNumOutputChannels();

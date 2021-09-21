@@ -145,35 +145,49 @@ namespace menu2 {
 		public Comp
 	{
 		SwitchButton(Nel19AudioProcessor& p, Utils& u, const juce::String& tooltp, const juce::String& name,
-			std::function<void(bool)> onSwitch, std::array<juce::var, 2> options, std::function<bool()> onIsEnabled
+			std::function<void(int)> onSwitch, const std::vector<juce::var>& options,
+			std::function<int(int)> onIsEnabled
 		) :
-			Comp(p, u, ""),
+			Comp(p, u, tooltp),
 			label(utils, name),
-			button0(p, u, tooltp, [os = onSwitch, &b = button1]() { os(false); b.repaint(); }, [this, isEnabled = onIsEnabled](juce::Graphics& g, const Button& b) { paintMenuButton(g, b, utils, !isEnabled()); }),
-			button1(p, u, tooltp, [os = onSwitch, &b = button0]() { os(true);  b.repaint(); }, [this, isEnabled = onIsEnabled](juce::Graphics& g, const Button& b) { paintMenuButton(g, b, utils, isEnabled()); })
+			buttons()
 		{
-			button0.setName(options[0].toString());
-			button1.setName(options[1].toString());
+			for (auto i = 0; i < options.size(); ++i) {
+				auto onClick = [os = onSwitch, &btns = buttons, j = i]() {
+					os(j);
+					for(auto& btn: btns)
+						btn->repaint();
+				};
+				auto onPaint = [this, isEnabled = onIsEnabled, j = i](juce::Graphics& g, const Button& b) {
+					paintMenuButton(g, b, utils, isEnabled(j));
+				};
+
+				buttons.push_back(std::make_unique<Button>(
+					p, u, tooltp, onClick, onPaint
+				));
+				buttons[i]->setName(options[i].toString());
+				addAndMakeVisible(buttons[i].get());
+			}
+
 			addAndMakeVisible(label);
-			addAndMakeVisible(button0);
-			addAndMakeVisible(button1);
 		}
 	protected:
 		Label label;
-		Button button0, button1;
+		std::vector<std::unique_ptr<Button>> buttons;
 
 		void resized() override {
 			auto x = 0.f;
 			const auto y = 0.f;
 			const auto width = static_cast<float>(getWidth());
 			const auto height = static_cast<float>(getHeight());
-			const auto compWidth = width / 3.f;
+			const auto compWidth = width / static_cast<float>(buttons.size() + 1);
 
 			label.setBounds(juce::Rectangle<float>(x, y, compWidth, height).toNearestInt());
 			x += compWidth;
-			button0.setBounds(juce::Rectangle<float>(x, y, compWidth, height).toNearestInt());
-			x += compWidth;
-			button1.setBounds(juce::Rectangle<float>(x, y, compWidth, height).toNearestInt());
+			for (auto& btn : buttons) {
+				btn->setBounds(juce::Rectangle<float>(x, y, compWidth, height).toNearestInt());
+				x += compWidth;
+			}
 		}
 
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SwitchButton)
@@ -324,7 +338,8 @@ namespace menu2 {
 		}
 
 		void paint(juce::Graphics& g) override {
-			//g.setColour(juce::Colour(0xee000000));
+			g.setColour(utils.colours[Utils::ColourID::Darken]);
+			const auto bounds = getLocalBounds().toFloat().reduced(nelG::Thicc2);
 			g.fillRoundedRectangle(getLocalBounds().toFloat(), nelG::Thicc2);
 		}
 		void resized() override {
@@ -340,7 +355,7 @@ namespace menu2 {
 			const auto entryHeight = entriesHeight / static_cast<float>(entries.size());
 			auto entryY = entriesY;
 			for (auto& e : entries) {
-				e->setBounds(juce::Rectangle<float>(0.f, entryY, width, entryHeight).toNearestInt());
+				e->setBounds(juce::Rectangle<float>(0.f, entryY, width, entryHeight).reduced(1).toNearestInt());
 				entryY += entryHeight;
 			}
 		}
@@ -408,11 +423,13 @@ namespace menu2 {
 			addAndMakeVisible(*entries.back().get());
 		}
 		void addSwitchButton(const std::array<juce::Identifier, NumIDs>& id, juce::ValueTree child, const int i,
-			std::function<void(bool)> onSwitch, const juce::String& buttonName, std::function<bool()> onIsEnabled) {
+			std::function<void(int)> onSwitch, const juce::String& buttonName, std::function<bool(int)> onIsEnabled) {
 			const auto tooltp = child.getProperty(id[TOOLTIP]);
-			std::array<juce::var, 2> options;
-			for (auto c = 0; c < 2; ++c)
-				options[c] = child.getChild(c).getProperty(id[ID]);
+			std::vector<juce::var> options;
+			for (auto c = 0; c < child.getNumChildren(); ++c) {
+				auto optionChild = child.getChild(c);
+				options.push_back(optionChild.getProperty(id[ID]));
+			}
 			entries.push_back(std::make_unique<SwitchButton>(
 				processor, utils, tooltp.toString(), buttonName, onSwitch, options, onIsEnabled
 			));
@@ -422,13 +439,36 @@ namespace menu2 {
 			const auto buttonName = child.getProperty(id[ID]).toString();
 			// buttonName must match id in menu.xml
 			if (buttonName == "tooltips") {
-				const auto onSwitch = [this](bool e) { utils.setTooltipEnabled(processor, e); };
-				const auto onIsEnabled = [this]() { return utils.tooltipEnabled; };
+				const auto onSwitch = [this](int e) {
+					if (e == 0)
+						utils.setTooltipEnabled(processor, false);
+					else
+						utils.setTooltipEnabled(processor, true);
+				};
+				const auto onIsEnabled = [this](int i) { return (utils.tooltipEnabled ? 1 : 0) == i; };
 				addSwitchButton(id, child, i, onSwitch, buttonName, onIsEnabled);
 			}
 			else if (buttonName == "parameter popup") {
-				const auto onSwitch = [this](bool e) { utils.setPopUpEnabled(processor, e); };
-				const auto onIsEnabled = [this]() { return utils.popUpEnabled; };
+				const auto onSwitch = [this](int e) {
+					if (e == 0)
+						utils.setPopUpEnabled(processor, false);
+					else
+						utils.setPopUpEnabled(processor, true);
+				};
+				const auto onIsEnabled = [this](int i) { return (utils.popUpEnabled ? 1 : 0) == i; };
+				addSwitchButton(id, child, i, onSwitch, buttonName, onIsEnabled);
+			}
+			else if (buttonName == "interpolation") {
+				const auto onSwitch = [this](int e) {
+					processor.vibrato.setInterpolationType(static_cast<vibrato::InterpolationType>(e));
+					juce::String vibInterpolationID("vibInterpolation");
+					processor.apvts.state.setProperty(vibInterpolationID, e, nullptr);
+					auto user = processor.appProperties.getUserSettings();
+					user->setValue(vibInterpolationID, e);
+				};
+				const auto onIsEnabled = [this](int i) {
+					return static_cast<int>(processor.vibrato.getInterpolationType()) == i;
+				};
 				addSwitchButton(id, child, i, onSwitch, buttonName, onIsEnabled);
 			}
 		}
@@ -443,7 +483,9 @@ namespace menu2 {
 					else if (newDelaySize > 10000.f)
 						return false; // delay can't be longer than 10 sec
 					auto user = processor.appProperties.getUserSettings();
-					user->setValue("vibDelaySize", newDelaySize);
+					juce::String vibDelaySizeID("vibDelaySize");
+					user->setValue(vibDelaySizeID, newDelaySize);
+					processor.apvts.state.setProperty(vibDelaySizeID, newDelaySize, nullptr);
 					processor.vibrato.resizeDelaySafe(processor, newDelaySize);
 					return true;
 				};
@@ -534,6 +576,5 @@ namespace menu2 {
 
 /*
 
-components with setBuffered(true) don't repaint from the colourSelector
 
 */

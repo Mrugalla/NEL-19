@@ -9,6 +9,8 @@ namespace vibrato {
 		return std::sqrt(1.f - m) * a + std::sqrt(m) * b;
 	}
 
+	enum InterpolationType { Lerp, Spline, LagRange, Sinc, NumInterpolationTypes };
+
 	struct FFDelay {
 		FFDelay() :
 			ringBuffer(),
@@ -39,13 +41,11 @@ namespace vibrato {
 	};
 
 	struct Delay {
-		enum InterpolationType { Lerp, Spline };
-
-		Delay(juce::AudioBuffer<float>& vibBuf, int channel) :
+		Delay(juce::AudioBuffer<float>& vibBuf, int channel, InterpolationType it = InterpolationType::Spline) :
 			delayBuffer(vibBuf),
 			ringBuffer(),
 			delaySize(0.f), delayMid(0.f),
-			interpolationType(InterpolationType::Spline),
+			interpolationType(it),
 			ch(channel)
 		{
 		}
@@ -54,6 +54,7 @@ namespace vibrato {
 			delaySize = static_cast<float>(s);
 			delayMid = s * .5f;
 		}
+		void setInterpolationType(const InterpolationType t) noexcept { interpolationType = t; }
 		// PROCESS
 		void processBlock(float* samples, const float* dry, const float* dryWetMix, const int numSamples, const size_t* writeHead) noexcept {
 			
@@ -66,6 +67,7 @@ namespace vibrato {
 		}
 		// GET
 		const size_t size() const noexcept { return ringBuffer.size(); }
+		const InterpolationType getInterpolationType() const noexcept { return interpolationType; }
 	private:
 		juce::AudioBuffer<float>& delayBuffer;
 		std::vector<float> ringBuffer;
@@ -94,6 +96,8 @@ namespace vibrato {
 			switch (interpolationType) {
 			case InterpolationType::Lerp: return processBlockDelayLERP(samples, dry, dryWetMix, numSamples, writeHead);
 			case InterpolationType::Spline: return processBlockDelaySPLINE(samples, dry, dryWetMix, numSamples, writeHead);
+			case InterpolationType::LagRange: return processBlockDelayLAGRANGE(samples, dry, dryWetMix, numSamples, writeHead);
+			case InterpolationType::Sinc: return processBlockDelaySINC(samples, dry, dryWetMix, numSamples, writeHead);
 			}
 		}
 		void processBlockDelayLERP(float* samples, const float* dry, const float* dryWetMix, const int numSamples, const size_t* writeHead) noexcept {
@@ -109,6 +113,22 @@ namespace vibrato {
 			for (auto s = 0; s < numSamples; ++s) {
 				ringBuffer[writeHead[s]] = samples[s];
 				const auto val = interpolation::cubicHermiteSpline(ringBuffer.data(), delay[s], size());
+				samples[s] = mix(dry[s], val, dryWetMix[s]);
+			}
+		}
+		void processBlockDelayLAGRANGE(float* samples, const float* dry, const float* dryWetMix, const int numSamples, const size_t* writeHead) noexcept {
+			const auto delay = delayBuffer.getReadPointer(ch);
+			for (auto s = 0; s < numSamples; ++s) {
+				ringBuffer[writeHead[s]] = samples[s];
+				const auto val = interpolation::lagrange(ringBuffer.data(), delay[s], size(), 9);
+				samples[s] = mix(dry[s], val, dryWetMix[s]);
+			}
+		}
+		void processBlockDelaySINC(float* samples, const float* dry, const float* dryWetMix, const int numSamples, const size_t* writeHead) noexcept {
+			const auto delay = delayBuffer.getReadPointer(ch);
+			for (auto s = 0; s < numSamples; ++s) {
+				ringBuffer[writeHead[s]] = samples[s];
+				const auto val = interpolation::lanczosSinc(ringBuffer.data(), delay[s], size(), 9);
 				samples[s] = mix(dry[s], val, dryWetMix[s]);
 			}
 		}
@@ -153,8 +173,12 @@ namespace vibrato {
 #endif
 			DBG(ringBufferSize());
 		}
+		// PARAMETERS
 		void resizeDelaySafe(juce::AudioProcessor& p, const float ms) {
 			rBufferSize = static_cast<size_t>(ms * static_cast<float>(p.getSampleRate()) / 1000.f);
+		}
+		void setInterpolationType(InterpolationType t) noexcept {
+			for (auto& d : delay) d.setInterpolationType(t);
 		}
 		// PROCESS
 		void processBlock(juce::AudioProcessor& p, juce::AudioBuffer<float>& audioBuffer) noexcept {
@@ -180,6 +204,7 @@ namespace vibrato {
 			auto dlyTime = static_cast<double>(1000. * ringBufferSize()) / p.getSampleRate();
 			return static_cast<float>(dlyTime);
 		}
+		const InterpolationType getInterpolationType() const noexcept { return delay[0].getInterpolationType(); }
 	private:
 		juce::AudioBuffer<float> dryBuffer;
 		std::vector<FFDelay> dryDelay;
@@ -206,7 +231,10 @@ namespace vibrato {
 #undef LookAheadEnabled
 
 /*
-fix the lagrange interpolator and try implement lagrange with lower aliasing than hermite
+lagrange interpolator
+	worse in lowend
+	better in highend
+	>> brittle noise in highend when used on mixed signal (inter-modulation?)
 
 dryWetMix uses 2 sqrt in method. whole buffer calculates through twice, because buffer is const
 

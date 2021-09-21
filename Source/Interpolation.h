@@ -74,22 +74,28 @@ namespace interpolation {
 		return ((c3 * t + c2) * t + c1) * t + c0;
 	}
 
-	static float lagrange(const float* buffer, const float readHead, const int size, int N) {
-		const auto iFloor = std::floor(readHead);
-		const auto iFloorInt = static_cast<int>(iFloor);
-		auto yp = 0.f;
-		for (int i = 1; i <= N; ++i) {
-			auto p = buffer[iFloorInt + i];
-			for (int j = 1; j <= N; ++j)
+	static float lagrange(const float* buffer, const float readHead, const int size, const int N) {
+		const float iFloor = std::floor(readHead);
+		const int iFloorInt = static_cast<int>(iFloor);
+		float yp = 0.f;
+		for (int i = 0; i < N; ++i) {
+			float p = 1.f;
+			for (int j = 0; j < N; ++j)
 				if (j != i)
-					p *= (readHead - static_cast<float>(iFloorInt - j)) / static_cast<float>(i - j);
-			yp += p;
+					p *= (readHead - static_cast<float>(iFloorInt + j)) / static_cast<float>(i - j);
+			const int idx = iFloorInt + i;
+			if (idx < size)
+				yp += p * buffer[idx];
+			else
+				yp += p * buffer[idx - size];
 		}
 		return yp;
 	}
 }
 
 /*
+
+lagrange needs fix too
 
 find out why this sinc interpolator makes noise in the synfun project's 3rd loop
 	(-80db but still audible)
