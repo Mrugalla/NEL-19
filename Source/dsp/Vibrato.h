@@ -244,7 +244,6 @@ feature ideas:
 
 	advanced settings
 		change fps of visualizer
-		change interpolation type of vibrato
 
 	post processing modulation output before going into vibrato
 		lowpass

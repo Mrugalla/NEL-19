@@ -69,6 +69,7 @@ public:
         sideScroller(u)
     {
         startTimerHz(24);
+        setBufferedToImage(true);
     }
 protected:
     SideScroller sideScroller;

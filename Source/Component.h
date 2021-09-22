@@ -200,7 +200,9 @@ struct TooltipComp :
         Comp(p, u, "Tooltips are shown here."),
         tooltip(nullptr),
         enabled(true)
-    { startTimerHz(24); }
+    {
+        startTimerHz(24); setBufferedToImage(true);
+    }
 protected:
     juce::String* tooltip;
     bool enabled;
@@ -262,6 +264,7 @@ struct PopUpComp :
         duration = static_cast<int>(durationInMs * fps / 1000.f);
         setInterceptsMouseClicks(false, false);
         startTimerHz(fps);
+        setBufferedToImage(true);
     }
 protected:
     int idx, duration;

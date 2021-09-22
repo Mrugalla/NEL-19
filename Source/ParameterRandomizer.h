@@ -10,6 +10,7 @@ struct RandomizerButton :
         Comp(p, u, makeTooltip(), Utils::Cursor::Hover),
         randomizables()
     {
+        setBufferedToImage(true);
     }
     void addRandomizable(pComp::Parameter* randomizableParameter) {
         randomizables.push_back(randomizableParameter);

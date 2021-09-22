@@ -206,15 +206,7 @@ void Nel19AudioProcessorEditor::resized() {
 
     popUp.setBounds({0, 0, 100, 30});
 }
-void Nel19AudioProcessorEditor::paint(juce::Graphics& g) {
-    g.fillAll(utils.colours[Utils::Background]);
-    layout.paintGrid(g);
-    layoutMacros.paintGrid(g);
-    layoutDepthMix.paintGrid(g);
-    layoutBottomBar.paintGrid(g);
-    layoutParams.paintGrid(g);
-    layoutTopBar.paintGrid(g);
-}
+void Nel19AudioProcessorEditor::paint(juce::Graphics& g) { g.fillAll(utils.colours[Utils::Background]); }
 void Nel19AudioProcessorEditor::mouseEnter(const juce::MouseEvent&) { utils.updateTooltip(nullptr); }
 void Nel19AudioProcessorEditor::mouseMove(const juce::MouseEvent& evt) {
     /*

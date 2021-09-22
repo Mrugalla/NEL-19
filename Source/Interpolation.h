@@ -83,11 +83,10 @@ namespace interpolation {
 			for (int j = 0; j < N; ++j)
 				if (j != i)
 					p *= (readHead - static_cast<float>(iFloorInt + j)) / static_cast<float>(i - j);
-			const int idx = iFloorInt + i;
-			if (idx < size)
-				yp += p * buffer[idx];
-			else
-				yp += p * buffer[idx - size];
+			int idx = iFloorInt + i;
+			if (idx >= size)
+				idx -= size;
+			yp += p * buffer[idx];
 		}
 		return yp;
 	}

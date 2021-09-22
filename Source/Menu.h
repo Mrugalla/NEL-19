@@ -9,12 +9,16 @@ namespace menu2 {
 			Comp(p, u, tooltp, Utils::Cursor::Hover),
 			onClick(_onClick),
 			onPaint(_onPaint)
-		{}
+		{
+			setBufferedToImage(true);
+		}
 		Button(Nel19AudioProcessor& p, Utils& u, const juce::String& tooltp, std::function<void()> _onClick, std::function<void(juce::Graphics&, const Button&)> _onPaint) :
 			Comp(p, u, tooltp, Utils::Cursor::Hover),
 			onClick(_onClick),
 			onPaint(_onPaint)
-		{}
+		{
+			setBufferedToImage(true);
+		}
 	protected:
 		std::function<void()> onClick;
 		std::function<void(juce::Graphics&, const Button&)> onPaint;
@@ -65,6 +69,7 @@ namespace menu2 {
 			setFont(utils.font);
 			setColour(juce::Label::ColourIds::backgroundColourId, utils.colours[Utils::Background]);
 			setColour(juce::Label::ColourIds::textColourId, utils.colours[Utils::Normal]);
+			setBufferedToImage(true);
 		}
 	protected:
 		Utils& utils;
@@ -96,6 +101,7 @@ namespace menu2 {
 			addAndMakeVisible(defaultButton);	defaultButton.setName("default");
 
 			selector.setCurrentColour(startColour);
+			setBufferedToImage(true);
 		}
 		void update() {
 			utils.colours[colIdx] = selector.getCurrentColour();
@@ -170,6 +176,7 @@ namespace menu2 {
 			}
 
 			addAndMakeVisible(label);
+			setBufferedToImage(true);
 		}
 	protected:
 		Label label;
@@ -210,6 +217,7 @@ namespace menu2 {
 		{
 			setName(_name);
 			setWantsKeyboardFocus(true);
+			setBufferedToImage(true);
 		}
 	protected:
 		std::function<bool(const juce::String& txt)> onUpdate;
@@ -322,6 +330,7 @@ namespace menu2 {
 			addEntries(id);
 			addAndMakeVisible(nameLabel);
 			startTimerHz(12);
+			setBufferedToImage(true);
 		}
 	protected:
 		juce::ValueTree xml;

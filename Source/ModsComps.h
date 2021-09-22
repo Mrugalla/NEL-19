@@ -11,16 +11,24 @@ class QuickAccessMenu :
             Comp(p, u, "", Utils::Cursor::Hover),
             onPaint(_onPaint),
             hovering(false)
-        {}
+        {
+            setBufferedToImage(true);
+        }
         void update(juce::Point<int> dragPos) {
-            hovering = getScreenBounds().contains(dragPos);
-            repaint();
+            const auto hvr = getScreenBounds().contains(dragPos);
+            if (hovering != hvr) {
+                hovering = hvr;
+                repaint();
+            }
         }
     protected:
         std::function<void(juce::Graphics&, Comp*, bool)> onPaint;
         bool hovering;
 
-        void paint(juce::Graphics& g) override { if (onPaint) onPaint(g, this, hovering); }
+        void paint(juce::Graphics& g) override {
+            if (onPaint)
+                onPaint(g, this, hovering);
+        }
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Option)
     };
 public:
@@ -34,6 +42,7 @@ public:
         options(),
         numOptions(_numOptions)
     {
+        setBufferedToImage(true);
     }
     void init(const std::vector<std::function<void(juce::Graphics&, Comp*, bool)>>& _onPaint)
     {

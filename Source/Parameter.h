@@ -15,6 +15,7 @@ namespace pComp {
             active(_active)
         {
             setName(_name);
+            setBufferedToImage(true);
         }
         /* only implemented by modulatables */
         virtual void updateModSys(const std::shared_ptr<modSys2::Matrix>& matrix){}
@@ -42,6 +43,7 @@ namespace pComp {
                 selected(false),
                 tryRemove(false)
             {
+                setBufferedToImage(true);
             }
             bool select(bool e) noexcept {
                 if (selected != e) {
@@ -496,7 +498,9 @@ namespace pComp {
             modulatables(modulatableParameters),
             hoveredParameter(nullptr),
             selected(false)
-        {}
+        {
+            setBufferedToImage(true);
+        }
         void timerCallback(const std::shared_ptr<modSys2::Matrix>& matrix) {
             const auto mod = matrix->getModulator(id);
             const auto selection = matrix->getSelectedModulator();
