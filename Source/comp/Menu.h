@@ -347,16 +347,20 @@ namespace menu2 {
 		}
 
 		void paint(juce::Graphics& g) override {
-			g.setColour(utils.colours[Utils::ColourID::Darken]);
-			const auto bounds = getLocalBounds().toFloat().reduced(nelG::Thicc2);
-			g.fillRoundedRectangle(getLocalBounds().toFloat(), nelG::Thicc2);
+			g.fillAll(utils.colours[Utils::ColourID::Background]);
 		}
 		void resized() override {
 			const auto width = static_cast<float>(getWidth());
 			const auto height = static_cast<float>(getHeight());
-			const auto nameLabelHeight = height * .2f;
-			juce::Rectangle<float> nameLabelBounds(0.f, 0.f, width, nameLabelHeight);
-			nameLabel.setBounds(nameLabelBounds.toNearestInt());
+			juce::Rectangle<float> nameLabelBounds;
+			{
+				const auto w = static_cast<float>(nameLabel.getFont().getStringWidth(nameLabel.getText())) + nelG::Thicc2;
+				const auto h = height * .2f;
+				const auto x = (width - w) * .5f;
+				const auto y = 0.f;
+				nameLabelBounds.setBounds(x, y, w, h);
+				nameLabel.setBounds(nameLabelBounds.toNearestInt());
+			}
 			if (entries.size() == 0) return;
 			const auto entriesY = nameLabelBounds.getBottom();
 			const auto entriesHeight = height - entriesY;
@@ -530,16 +534,23 @@ namespace menu2 {
 		if (button.isMouseOver()) {
 			g.setColour(utils.colours[Utils::HoverButton]);
 			g.fillRoundedRectangle(bounds, nelG::Thicc);
+			g.setColour(utils.colours[Utils::Interactable]);
+			if (menu != nullptr) {
+				g.setColour(utils.colours[Utils::Abort]);
+				g.drawRoundedRectangle(bounds, nelG::Thicc, nelG::Thicc);
+				g.drawFittedText("X", bounds.toNearestInt(), juce::Justification::centred, 1, 0);
+				return;
+			}
 		}
-
-		if (menu != nullptr) {
-			g.setColour(utils.colours[Utils::Abort]);
-			g.drawRoundedRectangle(bounds, nelG::Thicc, nelG::Thicc);
-			g.drawFittedText("X", bounds.toNearestInt(), juce::Justification::centred, 1, 0);
-			return;
-		}
-
-		g.setColour(utils.colours[Utils::Normal]);
+		else
+			if (menu == nullptr)
+				g.setColour(utils.colours[Utils::Normal]);
+			else {
+				g.setColour(utils.colours[Utils::Abort]);
+				g.drawRoundedRectangle(bounds, nelG::Thicc, nelG::Thicc);
+				g.drawFittedText("X", bounds.toNearestInt(), juce::Justification::centred, 1, 0);
+				return;
+			}
 		g.drawRoundedRectangle(bounds, nelG::Thicc, nelG::Thicc);
 		const auto boundsHalf = bounds.reduced(std::min(bounds.getWidth(), bounds.getHeight()) * .25f);
 		g.drawEllipse(boundsHalf.reduced(nelG::Thicc * .5f), nelG::Thicc);

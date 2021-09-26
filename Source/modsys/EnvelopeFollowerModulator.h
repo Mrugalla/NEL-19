@@ -31,7 +31,7 @@ namespace modSys2 {
 			env.resize(numChannels, 0.f);
 		}
 		// PROCESS
-		void processBlock(const juce::AudioBuffer<float>& audioBuffer, juce::AudioBuffer<float>& _block, juce::AudioPlayHead::CurrentPositionInfo&) noexcept override {
+		void processBlock(const juce::AudioBuffer<float>& audioBuffer, juce::AudioBuffer<float>& _block, juce::AudioPlayHead::CurrentPositionInfo&, const juce::MidiBuffer&) noexcept override {
 			auto block = _block.getArrayOfWritePointers();
 			auto numChannels = audioBuffer.getNumChannels();
 			numChannels = numChannels < 3 ? numChannels : 2;

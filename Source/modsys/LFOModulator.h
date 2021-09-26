@@ -35,13 +35,14 @@ namespace modSys2 {
 			phase.resize(numChannels);
 			fsInv = 1.f / this->Fs;
 			externalLatency = latency;
+			for (auto& p : phase) p = 0.f;
 		}
 		void addStuff(std::vector<void*>& stuff, int stuffID) override {
 			if (stuffID == 0) // replaces the wavetables pointer
 				waveTables = static_cast<WaveTables*>(stuff[0]);
 		}
 		// PROCESS
-		void processBlock(const juce::AudioBuffer<float>& audioBuffer, juce::AudioBuffer<float>& _block, juce::AudioPlayHead::CurrentPositionInfo& playHead) noexcept override {
+		void processBlock(const juce::AudioBuffer<float>& audioBuffer, juce::AudioBuffer<float>& _block, juce::AudioPlayHead::CurrentPositionInfo& playHead, const juce::MidiBuffer&) noexcept override {
 			auto block = _block.getArrayOfWritePointers();
 			const auto numChannels = audioBuffer.getNumChannels();
 			const auto numSamples = audioBuffer.getNumSamples();

@@ -2,11 +2,12 @@
 #include "Utils.h"
 #include "Parameter.h"
 #include "Modulator.h"
+#include <random>
 
 namespace modSys2 {
 	/*
-* a randomized modulator (1d perlin noise)
-*/
+	* a randomized modulator (1d perlin noise)
+	*/
 	class PerlinModulator :
 		public Modulator
 	{
@@ -19,8 +20,8 @@ namespace modSys2 {
 			multiRange(ranges),
 			freeID(multiRange.getID("free")),
 			syncID(multiRange.getID("sync")),
-			seed(),
-			seedSize(1 << maxNumOctaves),
+			noiseV(),
+			noiseVSize(1 << maxNumOctaves),
 			maxOctaves(maxNumOctaves),
 			phase(0), fsInv(0), gainAccum(1),
 			octaves(-1)
@@ -30,18 +31,26 @@ namespace modSys2 {
 			this->params.push_back(widthParam);
 			this->informParametersAboutAttachment();
 
-			seed.resize(seedSize + spline::Size, 0.f);
-			juce::Random rand;
-			for (auto s = 0; s < seedSize; ++s)
-				seed[s] = rand.nextFloat();
-			for (auto s = seedSize; s < seed.size(); ++s)
-				seed[s] = seed[s - seedSize];
+			noiseV.resize(noiseVSize + spline::Size, 0.f);
+			
+			unsigned int seed = 420 * 69 / 666 * 42;
+			std::random_device rd;
+			std::mt19937 mt(rd());
+			std::uniform_real_distribution<float> dist(0.f, 1.f);
+			
+			for (auto s = 0; s < noiseVSize; ++s, ++seed) {
+				mt.seed(seed);
+				noiseV[s] = dist(mt);
+			}
+			for (auto s = noiseVSize; s < noiseV.size(); ++s)
+				noiseV[s] = noiseV[s - noiseVSize];
 		}
 		void prepareToPlay(const int numChannels, const double sampleRate, const size_t latency) override {
 			Modulator::prepareToPlay(numChannels, sampleRate, latency);
 			fsInv = 1.f / static_cast<float>(Fs);
+			phase = 0.f;
 		}
-		void processBlock(const juce::AudioBuffer<float>& audioBuffer, juce::AudioBuffer<float>& _block, juce::AudioPlayHead::CurrentPositionInfo& playHead) noexcept override {
+		void processBlock(const juce::AudioBuffer<float>& audioBuffer, juce::AudioBuffer<float>& _block, juce::AudioPlayHead::CurrentPositionInfo& playHead, const juce::MidiBuffer&) noexcept override {
 			auto block = _block.getArrayOfWritePointers();
 			auto numChannels = audioBuffer.getNumChannels();
 			numChannels = numChannels > 3 ? numChannels : 2;
@@ -62,8 +71,8 @@ namespace modSys2 {
 	protected:
 		const param::MultiRange& multiRange;
 		const juce::Identifier& freeID, syncID;
-		std::vector<float> seed;
-		const int seedSize, maxOctaves;
+		std::vector<float> noiseV;
+		const int noiseVSize, maxOctaves;
 		float phase, fsInv, gainAccum;
 		int octaves;
 
@@ -79,35 +88,39 @@ namespace modSys2 {
 			gainAccum = 1.f / gainAccum;
 		}
 
-		inline void synthesizePhase(float* block, const float inc, const int numSamples) noexcept {
+		void synthesizePhase(float* block, const float inc, const int numSamples) noexcept {
 			for (auto s = 0; s < numSamples; ++s) {
 				phase += inc;
-				if (phase >= seedSize)
-					phase -= seedSize;
+				if (phase >= noiseVSize)
+					phase -= noiseVSize;
 				block[s] = phase;
 			}
 		}
-		inline void synthesizeRandSignal(float** block, const int numChannels, const int numSamples) noexcept {
+		void synthesizeRandSignal(float** block, const int numChannels, const int numSamples) noexcept {
 			const auto maxChannel = numChannels - 1;
 			for (auto ch = 0; ch < numChannels; ++ch) {
-				auto offset = ch * seedSize * .5f;
+				auto offset = ch * noiseVSize * .5f;
 				for (auto s = 0; s < numSamples; ++s) {
 					auto noise = 0.f;
 					for (int o = 0; o < octaves; ++o) {
 						const auto scl = static_cast<float>(1 << o);
 						auto x = block[maxChannel][s] * scl + offset;
-						while (x >= seedSize)
-							x -= seedSize;
+						while (x >= noiseVSize)
+							x -= noiseVSize;
 						const auto gain = 1.f / scl;
-						noise += spline::process(seed.data(), x) * gain;
+						noise += spline::process(noiseV.data(), x) * gain;
 					}
 					noise *= gainAccum;
 					block[ch][s] = noise;
 				}
 			}
 		}
-		inline void processWidth(float** block, const int numChannels, const int numSamples) noexcept {
-			const auto width = this->params[Width]->get();
+		void processWidth(float** block, const int numChannels, const int numSamples) noexcept {
+			static constexpr float bias = .8f;
+			static constexpr float b = 1.f / (1.f - bias);
+
+			const auto widthParam = this->params[Width]->get();
+			const auto width = std::pow(widthParam, b);
 			for (auto ch = 1; ch < numChannels; ++ch)
 				for (auto s = 0; s < numSamples; ++s)
 					block[ch][s] = block[0][s] + width * (block[ch][s] - block[0][s]);
@@ -117,7 +130,5 @@ namespace modSys2 {
 
 
 /*
-
-width of perlin noise mod goes way too hard on values below 5%
 
 */

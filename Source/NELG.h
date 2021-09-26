@@ -3,15 +3,17 @@
 #define DebugLayout false && JUCE_DEBUG
 
 namespace nelG {
+    // MATH UTILS
     static constexpr float Pi = 3.14159265359f;
     static constexpr float Tau = 6.28318530718f;
     static constexpr float PiHalf = Pi * .5f;
     static constexpr float PiQuart = Pi * .25f;
-
+    // PAINT UTILS
     static constexpr float Thicc = 2.5f, Thicc2 = Thicc * 2.f;
+    // DEFAULT BOUNDS
     static constexpr int Width = 512 + 256;
     static constexpr int Height = 256 + 128 + 16;
-
+    // DEFAULT COLOURS
     static constexpr unsigned int ColBlack = 0xff171623;
     static constexpr unsigned int ColDarkGrey = 0xff595652;
     static constexpr unsigned int ColBeige = 0xff9c8980;
@@ -87,45 +89,51 @@ namespace nelG {
             for (auto& y : rY) y += bounds.getY();
         }
         // PROCESS
-        void place(juce::Component& comp, int x, int y, int width = 1, int height = 1, bool isQuad = false) {
+        void place(juce::Component& comp, int x, int y, int width = 1, int height = 1, float padding = 0.f, bool isQuad = false) {
             const auto cBounds = this->operator()(x, y, width, height);
-            if(!isQuad) comp.setBounds(cBounds.toNearestInt());
-            else comp.setBounds(maxQuadIn(cBounds).toNearestInt());
+            if(!isQuad)
+                if(padding != 0.f)
+                    comp.setBounds(cBounds.reduced(padding).toNearestInt());
+                else
+                    comp.setBounds(cBounds.toNearestInt());
+            else
+                if (padding != 0.f)
+                    comp.setBounds(maxQuadIn(cBounds).reduced(padding).toNearestInt());
+                else
+                    comp.setBounds(maxQuadIn(cBounds).toNearestInt());
         }
-        void place(juce::Component* comp, int x, int y, int width = 1, int height = 1, bool isQuad = false) {
+        void place(juce::Component* comp, int x, int y, int width = 1, int height = 1, float padding = 0.f, bool isQuad = false) {
             if (comp == nullptr) return;
-            const auto cBounds = this->operator()(x, y, width, height);
-            if (!isQuad) comp->setBounds(cBounds.toNearestInt());
-            else comp->setBounds(maxQuadIn(cBounds).toNearestInt());
+            place(*comp, x, y, width, height, padding, isQuad);
         }
-        juce::Rectangle<float> operator()() {
+        juce::Rectangle<float> operator()() const noexcept {
             return {
                 rX[0],
                 rY[0],
-                rX[rX.size() - 1],
-                rY[rY.size() - 1]
+                rX[rX.size() - 1] - rX[0],
+                rY[rY.size() - 1] - rY[0]
             };
         }
-        juce::Rectangle<float> operator()(int x, int y, int width = 1, int height = 1, bool isQuad = false) const {
+        juce::Rectangle<float> operator()(int x, int y, int width = 1, int height = 1, bool isQuad = false) const noexcept {
             juce::Rectangle<float> nBounds(rX[x], rY[y], rX[x + width] - rX[x], rY[y + height] - rY[y]);
             if (!isQuad) return nBounds;
             else return maxQuadIn(nBounds);
         }
-        juce::Rectangle<float> bottomBar() const {
+        juce::Rectangle<float> bottomBar() const noexcept {
             return {
                 rX[0],
                 rY[rY.size() - 2],
                 rX[rX.size() - 1] - rX[0],
                 rY[rY.size() - 1] - rY[rY.size() - 2] };
         }
-        juce::Rectangle<float> topBar() const {
+        juce::Rectangle<float> topBar() const noexcept {
             return {
                 rX[0],
                 rY[0],
                 rX[rX.size() - 1] - rX[0],
                 rY[1] - rY[0] };
         }
-        juce::Rectangle<float> exceptBottomBar() const {
+        juce::Rectangle<float> exceptBottomBar() const noexcept {
             return {
                 rX[0],
                 rY[0],
@@ -194,6 +202,19 @@ namespace nelG {
         }
 #endif
     };
+
+    static void fillAndOutline(juce::Graphics& g, juce::Rectangle<float> bounds, juce::Colour bg, juce::Colour lines = juce::Colours::transparentBlack) {
+        g.setColour(bg);
+        g.fillRoundedRectangle(bounds, Thicc);
+        g.setColour(lines);
+        g.drawRoundedRectangle(bounds, Thicc, Thicc);
+    }
+    static inline void fillAndOutline(juce::Graphics& g, const juce::Component& comp, juce::Colour bg, juce::Colour lines = juce::Colours::transparentBlack) {
+        fillAndOutline(g, comp.getBounds().toFloat(), bg, lines);
+    }
+    static inline void fillAndOutline(juce::Graphics& g, const Layout& layout, juce::Colour bg, juce::Colour lines) {
+        fillAndOutline(g, layout(), bg, lines);
+    }
 
     static juce::Image load(const void* d, int s) {
         auto img = juce::ImageCache::getFromMemory(d, s);

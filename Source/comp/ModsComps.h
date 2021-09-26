@@ -249,11 +249,6 @@ protected:
     nelG::Layout layout;
     pComp::Knob rateP, octavesP, widthP;
 
-    void paint(juce::Graphics& g) override {
-        //layout.paintGrid(g);
-        g.fillAll(utils.colours[Utils::Background]);
-        //outtake::drawRandGrid(g, getLocalBounds(), 32, 16, juce::Colour(nelG::ColDarkGrey), .1f);
-    }
     void resized() override {
         layout.setBounds(getBoundsInParent().toFloat());
         layout.place(rateP, 1, 1, 1, 1);
@@ -291,6 +286,8 @@ struct ModulatorLFOComp :
         this->randButton.addRandomizable(&tempoSyncP);
         this->randButton.addRandomizable(&polarityP);
         this->randButton.addRandomizable(&phaseP);
+
+        polarityP.onPaint = pComp::onPaintPolarity();
     }
     void setVisible(bool e) override {
         Comp::setVisible(e);
@@ -316,10 +313,6 @@ protected:
     pComp::WaveformChooser waveformP;
     pComp::Switch tempoSyncP, polarityP;
 
-    void paint(juce::Graphics& g) override {
-        //layout.paintGrid(g);
-        g.fillAll(utils.colours[Utils::Background]);
-    }
     void resized() override {
         layout.setBounds(getBoundsInParent().toFloat());
         layout.place(tempoSyncP, 1, 2, 1, 1, true);
@@ -382,10 +375,6 @@ protected:
     nelG::Layout layout;
     pComp::Knob atkP, rlsP, gainP, biasP, widthP;
 
-    void paint(juce::Graphics& g) override {
-        //layout.paintGrid(g);
-        g.fillAll(utils.colours[Utils::Background]);
-    }
     void resized() override {
         layout.setBounds(getBoundsInParent().toFloat());
         layout.place(gainP, 1, 1, 1, 1);
@@ -446,17 +435,13 @@ protected:
     pComp::Knob rateP, biasP, widthP, smoothP;
     pComp::Switch syncP;
 
-    void paint(juce::Graphics& g) override {
-        //layout.paintGrid(g);
-        g.fillAll(utils.colours[Utils::Background]);
-    }
     void resized() override {
         layout.setBounds(getBoundsInParent().toFloat());
         layout.place(rateP, 1, 1, 1, 1);
+        layout.place(syncP, 1, 2, 1, 1);
         layout.place(biasP, 2, 1, 1, 1);
-        layout.place(widthP, 3, 1, 1, 1);
-        layout.place(smoothP, 4, 1, 1, 1);
-        layout.place(syncP, 1, 2, 1, 1, true);
+        layout.place(smoothP, 3, 1, 1, 1);
+        layout.place(widthP, 4, 1, 1, 1);
         ModulatorComp::resized();
     }
 
@@ -469,7 +454,7 @@ protected:
 * each modulator has
 *   preset menu
 *
-* modulators can be lfo or env
+* modulators can be type lfo or type env
 *   triggers: midi, automation, transient detection
 *   but envelope follower triggered by envelope detection? hm, maybe not
 */

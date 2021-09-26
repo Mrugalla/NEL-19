@@ -26,10 +26,12 @@ Nel19AudioProcessor::Nel19AudioProcessor()
 
     vibDelay(),
     vibrato(vibDelay[0], matrix->getParameter(param::getID(param::ID::DryWetMix))->data(), getChannelCountOfBus(false, 0)),
-    vibDelayVisualizerValue(0.f),
+    vibDelayVisualizerValue(),
     mutex()
 #endif
 {
+    vibDelayVisualizerValue.resize(getChannelCountOfBus(false, 0), 0.f);
+
     appProperties.setStorageParameters(makeOptions());
 
     bool isMono = getChannelCountOfBus(false, 0) == 1;
@@ -291,17 +293,17 @@ void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     if (!processBlockReady(buffer)) return;
     midSideProcessor.setEnabled(matrix->getParameterValue(mtrxParams[StereoConfig]));
     midSideProcessor.processBlockEncode(buffer);
-    const auto mtrx = processBlockModSys(buffer);
+    const auto mtrx = processBlockModSys(buffer, midi);
     processBlockVibDelay(buffer, mtrx);
     midSideProcessor.processBlockDecode(buffer);
 }
-void Nel19AudioProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) {
+void Nel19AudioProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) {
     if (!processBlockReady(buffer)) return;
-    const auto mtrx = processBlockModSys(buffer);
+    const auto mtrx = processBlockModSys(buffer, midi);
     auto vd0 = vibDelay[0].getArrayOfWritePointers();
     for(auto ch = 0; ch < buffer.getNumChannels(); ++ch)
         juce::FloatVectorOperations::fill(vd0[ch], 0.f, buffer.getNumSamples());
-    vibDelayVisualizerValue.store(0.f);
+    vibDelayVisualizerValue[0].set(0.f); vibDelayVisualizerValue[1].set(0.f);
     vibrato.processBlock(*this, buffer);
 }
 void Nel19AudioProcessor::processBlockEmpty() {
@@ -311,7 +313,7 @@ void Nel19AudioProcessor::processBlockEmpty() {
         vb.clear(0, numSamples);
     auto mtrx = matrix.updateAndLoadCurrentPtr();
     mtrx->processBlockEmpty();
-    vibDelayVisualizerValue.store(0.f);
+    vibDelayVisualizerValue[0].set(0.f); vibDelayVisualizerValue[1].set(0.f);
 }
 bool Nel19AudioProcessor::hasEditor() const { return true; }
 juce::AudioProcessorEditor* Nel19AudioProcessor::createEditor() {
@@ -389,14 +391,15 @@ bool Nel19AudioProcessor::processBlockReady(juce::AudioBuffer<float>& buffer)  {
         vb.clear(0, buffer.getNumSamples());
     return true;
 }
-const std::shared_ptr<modSys2::Matrix> Nel19AudioProcessor::processBlockModSys(juce::AudioBuffer<float>& buffer) {
+const std::shared_ptr<modSys2::Matrix> Nel19AudioProcessor::processBlockModSys(juce::AudioBuffer<float>& buffer, const juce::MidiBuffer& midi) {
     auto mtrx = matrix.updateAndLoadCurrentPtr();
-    mtrx->processBlock(buffer, getPlayHead());
+    mtrx->processBlock(buffer, getPlayHead(), midi);
     return mtrx;
 }
 void Nel19AudioProcessor::processBlockVibDelay(juce::AudioBuffer<float>& buffer, const std::shared_ptr<modSys2::Matrix>& mtrx)  {
     auto vd0 = vibDelay[0].getArrayOfWritePointers();
     const auto vd1 = vibDelay[1].getArrayOfReadPointers();
+    const auto back = buffer.getNumSamples() - 1;
     for (auto ch = 0; ch < buffer.getNumChannels(); ++ch) {
         for (auto s = 0; s < buffer.getNumSamples(); ++s) {
             const auto mixV = mtrx->getParameterValue(mtrxParams[PID::ModsMix], s);
@@ -409,9 +412,9 @@ void Nel19AudioProcessor::processBlockVibDelay(juce::AudioBuffer<float>& buffer,
                 val * depthV
             );
         }
+        const auto lastVal = vd0[ch][back];
+        vibDelayVisualizerValue[ch].set(lastVal);
     }
-    const auto lastVal = vd0[0][buffer.getNumSamples() - 1];
-    vibDelayVisualizerValue.store(lastVal);
     vibrato.processBlock(*this, buffer);
 }
 /////////////////////////////////////////////////////////

@@ -1,4 +1,5 @@
 #pragma once
+#include "PixelArt.h"
 
 class VisualizerComp :
     public Comp,
@@ -75,7 +76,7 @@ protected:
     SideScroller sideScroller;
 
     void timerCallback() override {
-        const auto val = processor.vibDelayVisualizerValue.load();
+        const auto val = processor.vibDelayVisualizerValue[0].get();
         sideScroller.scroll(val);
         repaint();
     }

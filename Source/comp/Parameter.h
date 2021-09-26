@@ -1,6 +1,15 @@
 #pragma once
 
 namespace pComp {
+    static std::function<void(juce::Graphics&, const juce::Rectangle<float>&, const Utils&, bool)> onPaintPolarity() {
+        return [](juce::Graphics& g, const juce::Rectangle<float>& bounds, const Utils& utils, bool enabled) {
+            g.setColour(enabled ? utils.colours[Utils::ColourID::Interactable] : utils.colours[Utils::ColourID::Interactable].withMultipliedAlpha(.2f));
+            const auto b = nelG::maxQuadIn(bounds.reduced(nelG::Thicc));
+            g.drawEllipse(b, nelG::Thicc);
+            g.drawLine(juce::Line<float>(b.getBottomLeft(), b.getTopRight()), nelG::Thicc);
+        };
+    }
+
     struct Parameter :
         public Comp,
         public modSys2::Identifiable
@@ -28,6 +37,12 @@ namespace pComp {
         bool modulatable, active;
     protected:
         void updatePopUp(Utils& utils) { utils.updatePopUp(rap.getCurrentValueAsText()); }
+        void mouseDown(const juce::MouseEvent& evt) override {
+            utils.updatePopUpPoint(evt.getScreenPosition());
+        }
+        void mouseUp(const juce::MouseEvent&) override {
+            utils.updatePopUpPoint();
+        }
     };
 
     class Knob :
@@ -48,6 +63,7 @@ namespace pComp {
             bool select(bool e) noexcept {
                 if (selected != e) {
                     selected = e;
+                    repaint();
                     return true;
                 }
                 return false;
@@ -272,6 +288,7 @@ namespace pComp {
             attach.beginGesture();
             if (attachedModID.isValid())
                 processor.matrix->selectModulatorOf(attachedModID);
+            Parameter::mouseDown(evt);
         }
         void mouseDrag(const juce::MouseEvent& evt) override {
             const auto height = static_cast<float>(getHeight());
@@ -303,6 +320,7 @@ namespace pComp {
                 attach.setValueAsPartOfGesture(denormValue);
             }
             attach.endGesture();
+            Parameter::mouseUp(evt);
         }
         void mouseWheelMove(const juce::MouseEvent& evt, const juce::MouseWheelDetails& wheel) override {
             if (evt.mods.isAnyMouseButtonDown()) return;
@@ -367,26 +385,28 @@ namespace pComp {
         public Parameter
     {
         Switch(Nel19AudioProcessor& p, Utils& u, juce::String&& tooltp, juce::String&& _name, param::ID pID) :
-            Parameter(p, u, std::move(tooltp), std::move(_name), pID, [this](float) { repaint(); }, false)
+            Parameter(p, u, std::move(tooltp), std::move(_name), pID, [this](float) { repaint(); }, false),
+            onPaint(nullptr)
         {
             attach.sendInitialUpdate();
         }
+        std::function<void(juce::Graphics&, const juce::Rectangle<float>&, const Utils&, bool)> onPaint;
     protected:
         void paint(juce::Graphics& g) override {
             const auto value = rap.getValue();
-            bool interacting = isMouseButtonDown();
             auto bounds = getLocalBounds().toFloat().reduced(nelG::Thicc);
 
             g.fillAll(utils.colours[Utils::Background]);
-            if (interacting) {
-                bounds = bounds.reduced(nelG::Thicc);
-                g.setColour(juce::Colour(0x77ffffff));
+            if (isMouseOver()) {
+                g.setColour(utils.colours[Utils::ColourID::HoverButton]);
+                if (isMouseButtonDown()) {
+                    bounds.reduce(nelG::Thicc, nelG::Thicc);
+                    g.fillRoundedRectangle(bounds, nelG::Thicc);
+                }
                 g.fillRoundedRectangle(bounds, nelG::Thicc);
             }
-            else if (isMouseOver()) { // hovering
-                g.setColour(juce::Colour(0x44ffffff));
-                g.fillRoundedRectangle(bounds, nelG::Thicc);
-            }
+            if (onPaint != nullptr)
+                return onPaint(g, bounds, utils, rap.getValue() > .5f);
             g.setColour(utils.colours[Utils::Interactable]);
             g.drawText(rap.getCurrentValueAsText(), bounds, juce::Justification::centred, false);
         }

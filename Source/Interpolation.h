@@ -94,10 +94,6 @@ namespace interpolation {
 
 /*
 
-lagrange needs fix too
-
-find out why this sinc interpolator makes noise in the synfun project's 3rd loop
-	(-80db but still audible)
-	more apparent on bigger resampling speed (oversampling needed?)
+lagrange sounds crappy in the highend. why
 
 */

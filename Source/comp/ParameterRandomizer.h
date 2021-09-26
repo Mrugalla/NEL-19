@@ -1,6 +1,4 @@
 #pragma once
-
-#pragma once
 #include <JuceHeader.h>
 
 struct RandomizerButton :
@@ -73,7 +71,7 @@ protected:
 
     juce::String makeTooltip() {
         juce::Random rand;
-        static constexpr float count = 142.f;
+        static constexpr float count = 150.f;
         const auto v = static_cast<int>(std::rint(rand.nextFloat() * count));
         switch (v) {
         case 0: return "Do it!";
@@ -219,6 +217,14 @@ protected:
         case 140: return "Meow :3";
         case 141: return "N.. Nyan? uwu";
         case 142: return "Let's Go!";
+        case 143: return "Never Gonna Let You Down! Never Gonna Give You Up!";
+        case 144: return "Push It!";
+        case 145: return "Do You Feel The NRG??";
+        case 146: return "We could escape the great filter if we only vibed stronger..";
+        case 147: return "Check The Clock. It's time for randomization.";
+        case 148: return "The first version of this plugin was released in 2019.";
+        case 149: return "This plugin was named by my son, Lionel.";
+        case 150: return "If this plugin breaks, it's because your beat is so fire!";
         default: "Are you sure?";
         }
         return "You are not supposed to read this message!";

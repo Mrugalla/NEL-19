@@ -16,7 +16,7 @@ namespace modSys2 {
 			this->params.push_back(makroParam);
 			this->informParametersAboutAttachment();
 		}
-		void processBlock(const juce::AudioBuffer<float>& audioBuffer, juce::AudioBuffer<float>& block, juce::AudioPlayHead::CurrentPositionInfo&) noexcept override {
+		void processBlock(const juce::AudioBuffer<float>& audioBuffer, juce::AudioBuffer<float>& block, juce::AudioPlayHead::CurrentPositionInfo&, const juce::MidiBuffer& midi) noexcept override {
 			const auto paramData = this->params[0]->data().getReadPointer(0);
 			auto blockData = block.getArrayOfWritePointers();
 			for (auto ch = 0; ch < block.getNumChannels(); ++ch)

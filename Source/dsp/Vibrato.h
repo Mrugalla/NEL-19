@@ -171,7 +171,6 @@ namespace vibrato {
 #if LookAheadEnabled
 			p.setLatencySamples(rBufferSize / 2);
 #endif
-			DBG(ringBufferSize());
 		}
 		// PARAMETERS
 		void resizeDelaySafe(juce::AudioProcessor& p, const float ms) {

@@ -80,7 +80,7 @@ namespace modSys2 {
 			fsInv = 1.f / Fs;
 			externalLatency = static_cast<double>(latency);
 		}
-		void processBlock(const juce::AudioBuffer<float>& audioBuffer, juce::AudioBuffer<float>& _block, juce::AudioPlayHead::CurrentPositionInfo& playHead) noexcept override {
+		void processBlock(const juce::AudioBuffer<float>& audioBuffer, juce::AudioBuffer<float>& _block, juce::AudioPlayHead::CurrentPositionInfo& playHead, const juce::MidiBuffer&) noexcept override {
 			auto block = _block.getArrayOfWritePointers();
 			auto numChannels = audioBuffer.getNumChannels();
 			numChannels = numChannels < 3 ? numChannels : 2;

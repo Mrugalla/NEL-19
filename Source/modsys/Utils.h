@@ -21,13 +21,13 @@ namespace modSys2 {
 		cpi.editOriginTime = 0;
 		cpi.frameRate = juce::AudioPlayHead::FrameRateType::fps25;
 		cpi.isLooping = false;
-		cpi.isPlaying = true;
+		cpi.isPlaying = false;
 		cpi.isRecording = false;
 		cpi.ppqLoopEnd = 1;
 		cpi.ppqLoopStart = 0;
-		cpi.ppqPosition = 420;
+		cpi.ppqPosition = -1;
 		cpi.ppqPositionOfLastBarStart = 69;
-		cpi.timeInSamples = 0;
+		cpi.timeInSamples = -1;
 		cpi.timeInSeconds = 0;
 		cpi.timeSigDenominator = 1;
 		cpi.timeSigNumerator = 1;

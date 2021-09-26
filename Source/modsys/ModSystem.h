@@ -8,9 +8,18 @@
 #include "LFOModulator.h"
 #include "RandomModulator.h"
 #include "PerlinModulator.h"
+#include "MIDIModulator.h"
 #include "Matrix.h"
 	
 /* to do:
+
+rewrite modsys to not use buffers in parameter
+	advantage: most parameters don't need smoothing
+		like switches, choices and some float ones
+	issues to overcome:
+		modulators attached to parameters write to parameter buffer
+			instead mod dest has buffer?
+
 
 implement spline editor modulator
 implement formularparser modulator
@@ -24,9 +33,6 @@ implement midi modulator
 
 temposync / free phase mod
 	add phase offset parameter (rand)
-
-perlin noise temposync
-	make noise buffer fully procedural (deterministic)
 
 dryWetMix needs sqrt(x) and sqrt(1 - x) all the time
 currently in vibrato for each channel and sample (bad!)
@@ -49,7 +55,7 @@ lfoModulator
 	add pump curve wavetable
 
 randModulator
-	try rewrite with spline interpolator instead lowpass
+	rewrite with spline interpolator instead lowpass
 
 if intellisense is messed up, do:
 https://stackoverflow.com/questions/18289936/refreshing-the-auto-complete-intellisense-database-in-visual-studio

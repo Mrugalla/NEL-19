@@ -1,7 +1,7 @@
 #pragma once
 #include "NELG.h"
 #include <JuceHeader.h>
-#include "Component.h"
+#include "comp/Component.h"
 #include "PluginProcessor.h"
 #include <array>
 
@@ -13,7 +13,7 @@ struct Nel19AudioProcessorEditor :
 private:
     Nel19AudioProcessor& audioProcessor;
     Utils utils;
-    nelG::Layout layout, layoutMacros, layoutDepthMix, layoutBottomBar, layoutParams, layoutTopBar;
+    nelG::Layout layout, layoutMacros, layoutMainParams, layoutBottomBar, layoutMiscs , layoutTopBar;
 
     BuildDateComp buildDate;
     TooltipComp tooltips;
@@ -24,7 +24,8 @@ private:
     pComp::ModDragger macroDragger0, macroDragger1, macroDragger2, macroDragger3;
     PopUpComp popUp;
     std::array<std::array<std::unique_ptr<ModulatorComp>, 4>, 2> modulatorComps;
-    VisualizerComp visualizer;
+
+    pxl::ImgComp shuttle;
 
     std::unique_ptr<menu2::Menu> menu;
     menu2::Button menuButton;
@@ -32,7 +33,6 @@ private:
     void resized() override;
     void paint(juce::Graphics&) override;
     void mouseEnter(const juce::MouseEvent& evt) override;
-    void mouseMove(const juce::MouseEvent& evt) override;
     void timerCallback() override;
 
     void resetModulatorComp(int, int);

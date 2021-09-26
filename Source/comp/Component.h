@@ -65,7 +65,7 @@ struct Utils {
     Utils(Nel19AudioProcessor& p) :
         cursors(),
         tooltipID("tooltip"), popUpID("popUp"),
-        tooltip(nullptr), popUp(""),
+        tooltip(nullptr), popUp(""), popUpPoint(0, 0),
         font(getCustomFont()),
         colours(p),
         tooltipEnabled(true), popUpEnabled(true), popUpUpdated(false)
@@ -145,10 +145,12 @@ struct Utils {
             popUpUpdated = true;
         }
     }
+    void updatePopUpPoint(const juce::Point<int> p = { 0,0 }) { popUpPoint = p; }
     std::vector<juce::MouseCursor> cursors;
     juce::Identifier tooltipID, popUpID;
     juce::String* tooltip;
     juce::String popUp;
+    juce::Point<int> popUpPoint;
     juce::Font font;
     ColourSheme colours;
     bool tooltipEnabled, popUpEnabled, popUpUpdated;
@@ -190,6 +192,29 @@ protected:
     void mouseEnter(const juce::MouseEvent&) override { utils.updateTooltip(&tooltip); }
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Comp)
+};
+
+struct Label :
+    public Comp
+{
+    Label(Nel19AudioProcessor& p, Utils& u, const juce::String& tooltp, juce::String&& _name) :
+        Comp(p, u, tooltp),
+        bgCol(Utils::ColourID::Background),
+        txtCol(Utils::ColourID::Normal)
+    {
+        setName(_name);
+        setBufferedToImage(true);
+    }
+
+    Utils::ColourID bgCol, txtCol;
+protected:
+    void paint(juce::Graphics& g) override {
+        nelG::fillAndOutline(g, getLocalBounds().toFloat().reduced(nelG::Thicc), utils.colours[bgCol], utils.colours[txtCol]);
+        g.setFont(utils.font);
+        g.drawFittedText(getName(), getLocalBounds(), juce::Justification::centred, 1);
+    }
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Label)
 };
 
 struct TooltipComp :
@@ -278,13 +303,22 @@ protected:
         ++idx;
         if (idx > duration)
             return setVisible(false);
-        const auto parent = getParentComponent();
-        const auto newPos = juce::Desktop::getInstance().getMainMouseSource().getScreenPosition().toInt()
-            - parent->getScreenPosition();
-        const juce::Rectangle<int> newBounds(newPos.x, newPos.y, getWidth(), getHeight());
-        const auto constrainedBounds = newBounds.constrainedWithin(parent->getBounds());
-        setBounds(constrainedBounds);
-        repaint();
+        if (utils.popUpPoint == juce::Point<int>(0,0)) {
+            const auto parent = getParentComponent();
+            const auto newPos = juce::Desktop::getInstance().getMainMouseSource().getScreenPosition().toInt()
+                - parent->getScreenPosition();
+            const juce::Rectangle<int> newBounds(newPos.x, newPos.y, getWidth(), getHeight());
+            const auto constrainedBounds = newBounds.constrainedWithin(parent->getBounds());
+            setBounds(constrainedBounds);
+            repaint();
+        }
+        else {
+            const auto parent = getParentComponent();
+            const auto newPos = utils.popUpPoint - parent->getScreenPosition();
+            const juce::Rectangle<int> newBounds(newPos.x, newPos.y, getWidth(), getHeight());
+            setBounds(newBounds);
+            repaint();
+        }
     }
     void paint(juce::Graphics& g) override {
         if (!utils.popUpEnabled) return;
@@ -308,6 +342,8 @@ protected:
 
 #include "Menu.h"
 
+#include "PixelArt.h"
+
 /*
 
 make seperate headers for each thing
@@ -316,6 +352,6 @@ utils
     more sophisticated fonts handling system for when i'll have more fonts
 
 poup Comp
-    stays at currently touched mod (because that's where the eyes look at)
+    make it repaint only if needed
 
 */

@@ -221,7 +221,7 @@ namespace modSys2 {
 			mod->removeDestination(dID);
 		}
 		// PROCESS
-		void processBlock(const juce::AudioBuffer<float>& audioBuffer, juce::AudioPlayHead* playHead) noexcept {
+		void processBlock(const juce::AudioBuffer<float>& audioBuffer, juce::AudioPlayHead* playHead, const juce::MidiBuffer& midi) noexcept {
 			const auto numChannels = audioBuffer.getNumChannels();
 			const auto numSamples = audioBuffer.getNumSamples();
 			const auto modBlockData = block.getArrayOfWritePointers();
@@ -231,7 +231,7 @@ namespace modSys2 {
 					p->processBlock(numSamples);
 			for (auto m : modulators)
 				if (m->isActive()) {
-					m->processBlock(audioBuffer, block, curPosInfo);
+					m->processBlock(audioBuffer, block, curPosInfo, midi);
 					m->storeOutValue(modBlockData, numSamples);
 					m->processDestinations(block, numSamples);
 				}

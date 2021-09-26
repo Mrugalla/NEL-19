@@ -98,7 +98,8 @@ namespace modSys2 {
 		void setAttenuvertor(juce::Identifier&& pID, const float value) {
 			getDestination(std::move(pID))->setValue(value);
 		}
-		virtual void processBlock(const juce::AudioBuffer<float>& audioBuffer, juce::AudioBuffer<float>& block, juce::AudioPlayHead::CurrentPositionInfo& playHead) noexcept = 0;
+		virtual void processBlock(const juce::AudioBuffer<float>& audioBuffer, juce::AudioBuffer<float>& block,
+			juce::AudioPlayHead::CurrentPositionInfo& playHead, const juce::MidiBuffer& midi) noexcept = 0;
 		void processDestinations(const juce::AudioBuffer<float>& modBlock, const int numSamples) noexcept {
 			for (auto destination : destinations)
 				destination->processBlock(modBlock, numSamples);

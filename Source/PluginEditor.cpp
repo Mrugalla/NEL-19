@@ -6,35 +6,35 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     audioProcessor(p),
     utils(p),
     layout(
-        { 30, 150, 30, 30, 120 },
+        { 25, 150, 50, 150 },
         { 50, 50, 150, 150, 50, 30 }
     ),
     layoutMacros(
         { 1 },
         { 25, 12, 25, 12, 25, 12, 25, 12 }
     ),
-    layoutDepthMix(
+    layoutMainParams(
         { 1 },
-        { 70, 50 }
+        { 80, 80, 80, 30 }
     ),
     layoutBottomBar(
         { 250, 90 },
         { 1 }
     ),
-    layoutParams(
-        { 50, 50, 50 },
-        { 20, 80, 20 }
+    layoutMiscs(
+        { 1 },
+        { 50, 200 }
     ),
     layoutTopBar(
-        { 30, 150, 100, 100 },
+        { 30, 250, 70 },
         { 1 }
     ),
     buildDate(p, utils),
     tooltips(p, utils),
-    macro0(p, utils, param::ID::Macro0, "modulate parameters with a macro.", "Macro 0", param::getID(param::ID::Macro0), false),
-    macro1(p, utils, param::ID::Macro1, "modulate parameters with a macro.", "Macro 1", param::getID(param::ID::Macro1), false),
-    macro2(p, utils, param::ID::Macro2, "modulate parameters with a macro.", "Macro 2", param::getID(param::ID::Macro2), false),
-    macro3(p, utils, param::ID::Macro3, "modulate parameters with a macro.", "Macro 3", param::getID(param::ID::Macro3), false),
+    macro0(p, utils, param::ID::Macro0, "modulate parameters with a macro.", "Macro 0", param::getID(param::ID::Macro0), false, false),
+    macro1(p, utils, param::ID::Macro1, "modulate parameters with a macro.", "Macro 1", param::getID(param::ID::Macro1), false, false),
+    macro2(p, utils, param::ID::Macro2, "modulate parameters with a macro.", "Macro 2", param::getID(param::ID::Macro2), false, false),
+    macro3(p, utils, param::ID::Macro3, "modulate parameters with a macro.", "Macro 3", param::getID(param::ID::Macro3), false, false),
     modulatorsMix(p, utils, param::ID::ModulatorsMix, "mix the modulators.", "Mods Mix"),
     depth(p, utils, param::ID::Depth, "set the depth of the vibrato.", "Depth"),
     dryWetMix(p, utils, param::ID::DryWetMix, "mix the dry signal with the vibrated one.", "Dry/Wet-Mix"),
@@ -46,45 +46,10 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     macroDragger3(p, utils, "drag this to modulate a parameter.", param::getID(param::ID::Macro3), modulatables),
     popUp(p, utils),
     modulatorComps(),
-    visualizer(p, utils),
+    shuttle(p, utils, "Lionel's space shuttle vibrates the universe to your music :>", BinaryData::shuttle_png, BinaryData::shuttle_pngSize),
     menu(nullptr),
-    menuButton(p, utils, "All the extra stuff.", [this]() { menu2::openMenu(menu, audioProcessor, utils, *this, layout(1, 1, 4, 4).toNearestInt() , menuButton); }, [this](juce::Graphics& g, const menu2::Button& b) { menu2::paintMenuButton(g, menuButton, utils, menu.get()); })
+    menuButton(p, utils, "All the extra stuff.", [this]() { menu2::openMenu(menu, audioProcessor, utils, *this, layout(1, 1, 3, 4).toNearestInt() , menuButton); }, [this](juce::Graphics& g, const menu2::Button& b) { menu2::paintMenuButton(g, menuButton, utils, menu.get()); })
 {
-    layout.addNamedLocation("top bar", 0, 0, 5, 1, false, false, false);
-    layout.addNamedLocation("macros", 0, 1, 1, 4, false, false, false);
-    layout.addNamedLocation("modulator 0", 1, 1, 1, 2, false, false, false);
-    layout.addNamedLocation("m0 select", 2, 1, 1, 1, false, false, false);
-    layout.addNamedLocation("modulator 1", 1, 3, 1, 2, false, false, false);
-    layout.addNamedLocation("m1 select", 2, 4, 1, 1, false, false, false);
-    layout.addNamedLocation("paramcs", 3, 1, 2, 4, false, false, false);
-    layout.addNamedLocation("depth&ModMix", 2, 2, 2, 2, false, false, false);
-    layout.addNamedLocation("bottom bar", 0, 5, 5, 1, false, false, false);
-
-    layoutMacros.addNamedLocation("macro 0", 0, 0, 1, 1, true, true, false);
-    layoutMacros.addNamedLocation("macro 1", 0, 2, 1, 1, true, true, false);
-    layoutMacros.addNamedLocation("macro 2", 0, 4, 1, 1, true, true, false);
-    layoutMacros.addNamedLocation("macro 3", 0, 6, 1, 1, true, true, false);
-    layoutMacros.addNamedLocation("m0 drag", 0, 1, 1, 1, false, false, false);
-    layoutMacros.addNamedLocation("m1 drag", 0, 3, 1, 1, false, false, false);
-    layoutMacros.addNamedLocation("m2 drag", 0, 5, 1, 1, false, false, false);
-    layoutMacros.addNamedLocation("m3 drag", 0, 7, 1, 1, false, false, false);
-
-    layoutDepthMix.addNamedLocation("depth", 1, 1, 1, 1, true, true, false);
-    layoutDepthMix.addNamedLocation("mods mix", 0, 0, 3, 3, true, true, false);
-
-    layoutBottomBar.addNamedLocation("tooltip", 0, 0, 1, 1);
-    layoutBottomBar.addNamedLocation("build num", 1, 0, 1, 1);
-
-    layoutParams.addNamedLocation("visualizer", 0, 0, 3, 1, false, false);
-    layoutParams.addNamedLocation("dry/wet mix", 0, 1, 2, 1, true, true, false);
-    layoutParams.addNamedLocation("voices", 0, 2, 1, 1, true, false);
-    layoutParams.addNamedLocation("stereo config", 1, 2, 1, 1, true, false, false);
-    layoutParams.addNamedLocation("depth max", 2, 2, 1, 1, true, false);
-
-    layoutTopBar.addNamedLocation("menu", 0, 0, 1, 1, true, false);
-    layoutTopBar.addNamedLocation("presets", 1, 0, 1, 1, false, false);
-    layoutTopBar.addNamedLocation("title", 2, 0, 1, 1, false, false);
-
     auto numChannels = audioProcessor.getChannelCountOfBus(false, 0);
 
     addAndMakeVisible(buildDate);
@@ -93,7 +58,8 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     addAndMakeVisible(macro1);
     addAndMakeVisible(macro2);
     addAndMakeVisible(macro3);
-    addAndMakeVisible(visualizer);
+    addAndMakeVisible(shuttle);
+
     addAndMakeVisible(modulatorsMix);
     addAndMakeVisible(depth);
     addAndMakeVisible(dryWetMix);
@@ -105,12 +71,14 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     for (auto mcs = 0; mcs < modulatorComps.size(); ++mcs) {
         // behaviour for changing the selected modulator[mcs]
         auto onModReplace = [this, sel = mcs](int idx) {
+            for (auto& mc : modulatorComps[sel])
+                mc->setVisible(false);
             auto matrixCopy = audioProcessor.matrix.getCopyOfUpdatedPtr();
             for (const auto& id : audioProcessor.modsIDs[sel])
                 matrixCopy->setModulatorActive(id, false);
             matrixCopy->setModulatorActive(audioProcessor.modsIDs[sel][idx], true);
             audioProcessor.matrix.replaceUpdatedPtrWith(matrixCopy);
-            resetModulatorComp(sel, idx);
+            modulatorComps[sel][idx]->setVisible(true);
         };
 
         // create and add modulator components + their modulatables
@@ -166,59 +134,57 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     setOpaque(true);
     setMouseCursor(utils.cursors[utils.Cursor::Norm]);
 
+    setBufferedToImage(true);
     setResizable(true, true);
     startTimerHz(16);
     setSize(nelG::Width, nelG::Height);
 }
 void Nel19AudioProcessorEditor::resized() {
-    layout.setBounds(getLocalBounds().toFloat().reduced(8.f));
-    layoutMacros.setBounds(layout(0, 1, 1, 4));
-    layoutDepthMix.setBounds(layout(2, 2, 2, 2));
+    layout.setBounds(getLocalBounds().toFloat().reduced(nelG::Thicc));
     layoutBottomBar.setBounds(layout.bottomBar());
-    layoutParams.setBounds(layout(4, 1, 1, 4));
     layoutTopBar.setBounds(layout.topBar());
+    layoutMacros.setBounds(layout(0, 1, 1, 4).reduced(nelG::Thicc));
+    layoutMainParams.setBounds(layout(2, 1, 1, 4).reduced(nelG::Thicc));
+    layoutMiscs.setBounds(layout(3, 1, 1, 4).reduced(nelG::Thicc));
 
-    layoutTopBar.place(menuButton, 0, 0, 1, 1, true);
+    layoutTopBar.place(menuButton,  0, 0, 1, 1, nelG::Thicc, true);
+
     layout.place(menu.get(), 1, 1, 4, 4);
     
-    layoutBottomBar.place(buildDate, 1, 0, 1, 1, false);
-    layoutBottomBar.place(tooltips, 0, 0, 1, 1, false);
-    layoutMacros.place(macro0, 0, 0, 1, 1);
-    layoutMacros.place(macro1, 0, 2, 1, 1);
-    layoutMacros.place(macro2, 0, 4, 1, 1);
-    layoutMacros.place(macro3, 0, 6, 1, 1);
-    macroDragger0.setQBounds(layoutMacros(0, 1, 1, 1, true).toNearestInt());
-    macroDragger1.setQBounds(layoutMacros(0, 3, 1, 1, true).toNearestInt());
-    macroDragger2.setQBounds(layoutMacros(0, 5, 1, 1, true).toNearestInt());
-    macroDragger3.setQBounds(layoutMacros(0, 7, 1, 1, true).toNearestInt());
-
-    layoutParams.place(midSideSwitch, 1, 2, 1, 1, false);
+    layoutBottomBar.place(buildDate, 1, 0, 1, 1, nelG::Thicc, false);
+    layoutBottomBar.place(tooltips, 0, 0, 1, 1, nelG::Thicc, false);
+    layoutMacros.place(macro0, 0, 0, 1, 1, nelG::Thicc);
+    layoutMacros.place(macro1, 0, 2, 1, 1, nelG::Thicc);
+    layoutMacros.place(macro2, 0, 4, 1, 1, nelG::Thicc);
+    layoutMacros.place(macro3, 0, 6, 1, 1, nelG::Thicc);
+    macroDragger0.setQBounds(layoutMacros(0, 1, 1, 1, true).reduced(nelG::Thicc).toNearestInt());
+    macroDragger1.setQBounds(layoutMacros(0, 3, 1, 1, true).reduced(nelG::Thicc).toNearestInt());
+    macroDragger2.setQBounds(layoutMacros(0, 5, 1, 1, true).reduced(nelG::Thicc).toNearestInt());
+    macroDragger3.setQBounds(layoutMacros(0, 7, 1, 1, true).reduced(nelG::Thicc).toNearestInt());
 
     for (auto mcs = 0; mcs < 2; ++mcs)
         for (auto mm = 0; mm < modulatorComps[mcs].size(); ++mm)
-            layout.place(*modulatorComps[mcs][mm], 1, 1 + mcs * 2, 1, 2); 
+            layout.place(*modulatorComps[mcs][mm], 1, 1 + mcs * 2, 1, 2, nelG::Thicc, false); 
 
-    layoutDepthMix.place(depth,         0, 0, 1, 1);
-    layoutDepthMix.place(modulatorsMix, 0, 1, 1, 1);
+    layoutMainParams.place(depth,         0, 0, 1, 1, nelG::Thicc);
+    layoutMainParams.place(modulatorsMix, 0, 1, 1, 1, nelG::Thicc);
+    layoutMainParams.place(dryWetMix,     0, 2, 1, 1, nelG::Thicc);
+    layoutMainParams.place(midSideSwitch, 0, 3, 1, 1, nelG::Thicc, true);
 
-    layoutParams.place(dryWetMix,  0, 1, 2, 1);
-    layoutParams.place(visualizer, 0, 0, 3, 1);
+    shuttle.setBounds(layoutMiscs().reduced(nelG::Thicc).toNearestInt());
 
     popUp.setBounds({0, 0, 100, 30});
 }
-void Nel19AudioProcessorEditor::paint(juce::Graphics& g) { g.fillAll(utils.colours[Utils::Background]); }
-void Nel19AudioProcessorEditor::mouseEnter(const juce::MouseEvent&) { utils.updateTooltip(nullptr); }
-void Nel19AudioProcessorEditor::mouseMove(const juce::MouseEvent& evt) {
-    /*
-    layout.mouseMove(evt.position);
-    layoutMacros.mouseMove(evt.position);
-    layoutDepthMix.mouseMove(evt.position);
-    layoutBottomBar.mouseMove(evt.position);
-    layoutParams.mouseMove(evt.position);
-    layoutTopBar.mouseMove(evt.position);
-    repaint();
-    */
+void Nel19AudioProcessorEditor::paint(juce::Graphics& g) {
+    g.fillAll(juce::Colours::black);
+    //g.fillAll(utils.colours[Utils::Background]);
+    nelG::fillAndOutline(g, layoutMacros, utils.colours[Utils::ColourID::Background], utils.colours[Utils::ColourID::Normal]);
+    for (auto& modComp : modulatorComps)
+        nelG::fillAndOutline(g, *modComp[0].get(), utils.colours[Utils::ColourID::Background], utils.colours[Utils::ColourID::Normal]);
+    nelG::fillAndOutline(g, layoutMainParams, utils.colours[Utils::ColourID::Background], utils.colours[Utils::ColourID::Normal]);
+    nelG::fillAndOutline(g, layoutMiscs, utils.colours[Utils::ColourID::Background], utils.colours[Utils::ColourID::Normal]);
 }
+void Nel19AudioProcessorEditor::mouseEnter(const juce::MouseEvent&) { utils.updateTooltip(nullptr); }
 void Nel19AudioProcessorEditor::timerCallback() {
     const auto matrix = audioProcessor.matrix.getUpdatedPtr();
     macroDragger0.timerCallback(matrix); macroDragger1.timerCallback(matrix);
@@ -232,3 +198,11 @@ void Nel19AudioProcessorEditor::resetModulatorComp(int modIdx, int modTypeIdx) {
         mc->setVisible(false);
     modulatorComps[modIdx][modTypeIdx]->setVisible(true);
 }
+
+/*
+
+onModReplace can trigger some thread issue. why
+    seems to create -nan in processor vibBuffer
+    changed way it setVisible the modulatorComps (works now?)
+
+*/

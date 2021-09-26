@@ -7,16 +7,6 @@
               pluginRTASCategory="32" pluginAAXCategory="32" pluginCharacteristicsValue="pluginWantsMidiIn"
               pluginCode="Nel9" pluginManufacturerCode="Mrug" companyName="Mrugalla">
   <MAINGROUP id="V2oOlh" name="NEL">
-    <GROUP id="{EB637F68-8B54-CF39-23F4-99282698FA6E}" name="Img">
-      <FILE id="UlEIyH" name="bluecat.png" compile="0" resource="1" file="Source/Img/bluecat.png"/>
-      <FILE id="qMlrvH" name="cursorCross.png" compile="0" resource="1" file="Source/Img/cursorCross.png"/>
-      <FILE id="ok6eqm" name="cursor.png" compile="0" resource="1" file="Source/Img/cursor.png"/>
-      <FILE id="ciQHKW" name="juce.png" compile="0" resource="1" file="Source/Img/juce.png"/>
-      <FILE id="Y03fii" name="shuttle.png" compile="0" resource="1" file="Source/Img/shuttle.png"/>
-      <FILE id="xFrvgl" name="tap.png" compile="0" resource="1" file="Source/Img/tap.png"/>
-      <FILE id="e3uEiq" name="vst3_logo_small.png" compile="0" resource="1"
-            file="Source/Img/vst3_logo_small.png"/>
-    </GROUP>
     <GROUP id="{FF8BE835-9B90-31CB-45F4-D4B15FDEFD04}" name="Source">
       <GROUP id="{37A90D57-856D-DDA5-A367-4EC832EDC7CF}" name="xml">
         <FILE id="ld5eYo" name="menu.xml" compile="0" resource="1" file="Source/xml/menu.xml"/>
@@ -34,6 +24,7 @@
         <FILE id="Bi64TZ" name="MacroModulator.h" compile="0" resource="0"
               file="Source/modsys/MacroModulator.h"/>
         <FILE id="VZYZ7Z" name="Matrix.h" compile="0" resource="0" file="Source/modsys/Matrix.h"/>
+        <FILE id="TOXU69" name="MIDIModulator.h" compile="0" resource="0" file="Source/modsys/MIDIModulator.h"/>
         <FILE id="cxCTK5" name="ModSystem.h" compile="0" resource="0" file="Source/modsys/ModSystem.h"/>
         <FILE id="WfEtwS" name="Modulator.h" compile="0" resource="0" file="Source/modsys/Modulator.h"/>
         <FILE id="L4WToN" name="Parameter.h" compile="0" resource="0" file="Source/modsys/Parameter.h"/>
@@ -43,28 +34,43 @@
               file="Source/modsys/RandomModulator.h"/>
         <FILE id="tHrdt8" name="Utils.h" compile="0" resource="0" file="Source/modsys/Utils.h"/>
       </GROUP>
+      <GROUP id="{DF5CA124-D2C0-471E-8D17-297CEBC9FA0F}" name="releasePool">
+        <FILE id="ZsHHV2" name="ReleasePool.cpp" compile="1" resource="0" file="Source/releasePool/ReleasePool.cpp"/>
+        <FILE id="wMeHhK" name="ReleasePool.h" compile="0" resource="0" file="Source/releasePool/ReleasePool.h"/>
+      </GROUP>
+      <GROUP id="{E7C26409-5FA8-4FFC-B81A-4D1B04E433DC}" name="comp">
+        <FILE id="ybltcf" name="Component.h" compile="0" resource="0" file="Source/comp/Component.h"/>
+        <FILE id="wRDs2r" name="Menu.h" compile="0" resource="0" file="Source/comp/Menu.h"/>
+        <FILE id="LYSgbX" name="ModsComps.h" compile="0" resource="0" file="Source/comp/ModsComps.h"/>
+        <FILE id="Po4xEG" name="Parameter.h" compile="0" resource="0" file="Source/comp/Parameter.h"/>
+        <FILE id="VrcIYP" name="ParameterRandomizer.h" compile="0" resource="0"
+              file="Source/comp/ParameterRandomizer.h"/>
+        <FILE id="ZlThXB" name="PixelArt.h" compile="0" resource="0" file="Source/comp/PixelArt.h"/>
+        <FILE id="vWq25b" name="Visualizer.h" compile="0" resource="0" file="Source/comp/Visualizer.h"/>
+      </GROUP>
+      <GROUP id="{EB637F68-8B54-CF39-23F4-99282698FA6E}" name="Img">
+        <FILE id="UlEIyH" name="bluecat.png" compile="0" resource="1" file="Source/Img/bluecat.png"/>
+        <FILE id="qMlrvH" name="cursorCross.png" compile="0" resource="1" file="Source/Img/cursorCross.png"/>
+        <FILE id="ok6eqm" name="cursor.png" compile="0" resource="1" file="Source/Img/cursor.png"/>
+        <FILE id="ciQHKW" name="juce.png" compile="0" resource="1" file="Source/Img/juce.png"/>
+        <FILE id="Y03fii" name="shuttle.png" compile="0" resource="1" file="Source/Img/shuttle.png"/>
+        <FILE id="xFrvgl" name="tap.png" compile="0" resource="1" file="Source/Img/tap.png"/>
+        <FILE id="e3uEiq" name="vst3_logo_small.png" compile="0" resource="1"
+              file="Source/Img/vst3_logo_small.png"/>
+      </GROUP>
       <FILE id="jJ2XEr" name="Approx.h" compile="0" resource="0" file="Source/Approx.h"/>
-      <FILE id="McjeaG" name="ParameterRandomizer.h" compile="0" resource="0"
-            file="Source/ParameterRandomizer.h"/>
-      <FILE id="J7XIfH" name="Menu.h" compile="0" resource="0" file="Source/Menu.h"/>
       <FILE id="xZdKBx" name="Outtakes.h" compile="0" resource="0" file="Source/Outtakes.h"/>
-      <FILE id="Mf0SnE" name="ModsComps.h" compile="0" resource="0" file="Source/ModsComps.h"/>
-      <FILE id="B5d2nX" name="Parameter.h" compile="0" resource="0" file="Source/Parameter.h"/>
       <FILE id="RWsf1L" name="Interpolation.h" compile="0" resource="0" file="Source/Interpolation.h"/>
-      <FILE id="ko9msz" name="Visualizer.h" compile="0" resource="0" file="Source/Visualizer.h"/>
       <FILE id="xxe5Fr" name="NELG.h" compile="0" resource="0" file="Source/NELG.h"/>
       <FILE id="PdaT6g" name="Param.h" compile="0" resource="0" file="Source/Param.h"/>
-      <FILE id="DNwWaN" name="Component.h" compile="0" resource="0" file="Source/Component.h"/>
-      <FILE id="Lu4iN5" name="ReleasePool.cpp" compile="1" resource="0" file="Source/ReleasePool.cpp"/>
-      <FILE id="kaSrP6" name="ReleasePool.h" compile="0" resource="0" file="Source/ReleasePool.h"/>
       <FILE id="KltU2P" name="nel19.ttf" compile="0" resource="1" file="Source/Font/nel19.ttf"/>
-      <FILE id="oVPJjY" name="PluginProcessor.cpp" compile="1" resource="0"
-            file="Source/PluginProcessor.cpp"/>
-      <FILE id="HF6YKx" name="PluginProcessor.h" compile="0" resource="0"
-            file="Source/PluginProcessor.h"/>
-      <FILE id="xSckNP" name="PluginEditor.cpp" compile="1" resource="0"
+      <FILE id="bs2nAY" name="PluginEditor.cpp" compile="1" resource="0"
             file="Source/PluginEditor.cpp"/>
-      <FILE id="wgXSll" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>
+      <FILE id="XbM1I1" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>
+      <FILE id="BHW8Wi" name="PluginProcessor.cpp" compile="1" resource="0"
+            file="Source/PluginProcessor.cpp"/>
+      <FILE id="Cw0VJG" name="PluginProcessor.h" compile="0" resource="0"
+            file="Source/PluginProcessor.h"/>
     </GROUP>
   </MAINGROUP>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"/>

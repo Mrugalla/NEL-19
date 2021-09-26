@@ -6,7 +6,7 @@
 #include "dsp/MidSideEncoder.h"
 #include "dsp/Vibrato.h"
 #include <JuceHeader.h>
-#include "ReleasePool.h"
+#include "releasePool/ReleasePool.h"
 #include "modsys/ModSystem.h"
 
 #include <limits>
@@ -54,13 +54,13 @@ struct Nel19AudioProcessor :
 
     std::array<juce::AudioBuffer<float>, 2> vibDelay;
     vibrato::Processor vibrato;
-    std::atomic<float> vibDelayVisualizerValue;
+    std::vector<juce::Atomic<float>> vibDelayVisualizerValue;
 
 private:
     const juce::CriticalSection mutex;
 
     bool processBlockReady(juce::AudioBuffer<float>&);
-    const std::shared_ptr<modSys2::Matrix> processBlockModSys(juce::AudioBuffer<float>&);
+    const std::shared_ptr<modSys2::Matrix> processBlockModSys(juce::AudioBuffer<float>&, const juce::MidiBuffer&);
     void processBlockVibDelay(juce::AudioBuffer<float>&, const std::shared_ptr<modSys2::Matrix>&);
     void processBlockEmpty();
 
