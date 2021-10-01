@@ -49,7 +49,7 @@ namespace menu2 {
 			g.setColour(utils.colours[Utils::ColourID::Interactable]);
 		}
 		else
-			if(!selected)
+			if (!selected)
 				g.setColour(utils.colours[Utils::ColourID::Normal]);
 			else
 				g.setColour(utils.colours[Utils::ColourID::Modulation]);
@@ -161,7 +161,7 @@ namespace menu2 {
 			for (auto i = 0; i < options.size(); ++i) {
 				auto onClick = [os = onSwitch, &btns = buttons, j = i]() {
 					os(j);
-					for(auto& btn: btns)
+					for (auto& btn : btns)
 						btn->repaint();
 				};
 				auto onPaint = [this, isEnabled = onIsEnabled, j = i](juce::Graphics& g, const Button& b) {
@@ -170,7 +170,7 @@ namespace menu2 {
 
 				buttons.push_back(std::make_unique<Button>(
 					p, u, tooltp, onClick, onPaint
-				));
+					));
 				buttons[i]->setName(options[i].toString());
 				addAndMakeVisible(buttons[i].get());
 			}
@@ -227,7 +227,7 @@ namespace menu2 {
 
 		void mouseUp(const juce::MouseEvent& evt) override {
 			if (evt.mouseWasDraggedSinceMouseDown()) return;
-			startTimer(1000.f / 1.5f);
+			startTimer(static_cast<int>(1000.f / 1.5f));
 			grabKeyboardFocus();
 		}
 
@@ -445,7 +445,7 @@ namespace menu2 {
 			}
 			entries.push_back(std::make_unique<SwitchButton>(
 				processor, utils, tooltp.toString(), buttonName, onSwitch, options, onIsEnabled
-			));
+				));
 			addAndMakeVisible(*entries.back().get());
 		}
 		void addSwitchButton(const std::array<juce::Identifier, NumIDs>& id, juce::ValueTree child, const int i) {
@@ -484,6 +484,22 @@ namespace menu2 {
 				};
 				addSwitchButton(id, child, i, onSwitch, buttonName, onIsEnabled);
 			}
+			else if (buttonName == "oversampling") {
+				const auto onSwitch = [this](int e) {
+					//processor.oversampling.setEnabled(e);
+					juce::String oversamplingID("oversamplingOrder");
+					processor.apvts.state.setProperty(oversamplingID, e, nullptr);
+					auto user = processor.appProperties.getUserSettings();
+					user->setValue(oversamplingID, e);
+				};
+				const auto onIsEnabled = [this](int i) {
+					auto user = processor.appProperties.getUserSettings();
+					juce::String oversamplingID("oversamplingOrder");
+					return user->getIntValue(oversamplingID) == i;
+					//return static_cast<int>(processor.oversampling.getEnabled()) == i;
+				};
+				addSwitchButton(id, child, i, onSwitch, buttonName, onIsEnabled);
+			}
 		}
 		void addTextBox(const std::array<juce::Identifier, NumIDs>& id, juce::ValueTree child, const int i) {
 			const auto buttonName = child.getProperty(id[ID]).toString();
@@ -509,7 +525,7 @@ namespace menu2 {
 				const auto tooltp = child.getProperty(id[TOOLTIP]);
 				entries.push_back(std::make_unique<TextBox>(
 					processor, utils, tooltp.toString(), buttonName, onUpdate, onDefaultStr, " ms"
-				));
+					));
 				addAndMakeVisible(entries.back().get());
 			}
 		}

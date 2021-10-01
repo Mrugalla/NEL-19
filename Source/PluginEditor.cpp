@@ -46,7 +46,7 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     macroDragger3(p, utils, "drag this to modulate a parameter.", param::getID(param::ID::Macro3), modulatables),
     popUp(p, utils),
     modulatorComps(),
-    shuttle(p, utils, "Lionel's space shuttle vibrates the universe to your music :>", BinaryData::shuttle_png, BinaryData::shuttle_pngSize),
+    shuttle(p, utils, "Lionel's space shuttle vibrates the universe to your music :>", BinaryData::shuttle_png, BinaryData::shuttle_pngSize, pxl::colourize(utils, Utils::ColourID::Background, Utils::ColourID::Modulation)),
     menu(nullptr),
     menuButton(p, utils, "All the extra stuff.", [this]() { menu2::openMenu(menu, audioProcessor, utils, *this, layout(1, 1, 3, 4).toNearestInt() , menuButton); }, [this](juce::Graphics& g, const menu2::Button& b) { menu2::paintMenuButton(g, menuButton, utils, menu.get()); })
 {
@@ -58,16 +58,15 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     addAndMakeVisible(macro1);
     addAndMakeVisible(macro2);
     addAndMakeVisible(macro3);
-    addAndMakeVisible(shuttle);
+    addAndMakeVisible(shuttle); shuttle.setAlpha(.3f);
 
     addAndMakeVisible(modulatorsMix);
     addAndMakeVisible(depth);
     addAndMakeVisible(dryWetMix);
-    if(numChannels == 2) addAndMakeVisible(midSideSwitch);
+    if (numChannels == 2) addAndMakeVisible(midSideSwitch);
 
     // modulation components init stuff:
     auto matrix = audioProcessor.matrix.getCopyOfUpdatedPtr();
-    enum { EnvFol, LFO, Rand, Perlin, NumMods };
     for (auto mcs = 0; mcs < modulatorComps.size(); ++mcs) {
         // behaviour for changing the selected modulator[mcs]
         auto onModReplace = [this, sel = mcs](int idx) {
@@ -84,16 +83,22 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
         // create and add modulator components + their modulatables
         modulatorComps[mcs][EnvFol] = std::make_unique<ModulatorEnvelopeFollowerComp>(
             p, utils, audioProcessor.modsIDs[mcs][EnvFol], modulatables, mcs, onModReplace
-        );
+            );
         modulatorComps[mcs][LFO] = std::make_unique<ModulatorLFOComp>(
             p, utils, audioProcessor.modsIDs[mcs][LFO], modulatables, mcs, onModReplace
-        );
+            );
         modulatorComps[mcs][Rand] = std::make_unique<ModulatorRandComp>(
             p, utils, audioProcessor.modsIDs[mcs][Rand], modulatables, mcs, onModReplace
-        );
+            );
         modulatorComps[mcs][Perlin] = std::make_unique<ModulatorPerlinComp>(
             p, utils, audioProcessor.modsIDs[mcs][Perlin], modulatables, mcs, onModReplace
-        );
+            );
+        modulatorComps[mcs][Pitchbend] = std::make_unique<ModulatorPitchbendComp>(
+            p, utils, audioProcessor.modsIDs[mcs][Pitchbend], modulatables, mcs, onModReplace
+            );
+        modulatorComps[mcs][Note] = std::make_unique<ModulatorNoteComp>(
+            p, utils, audioProcessor.modsIDs[mcs][Note], modulatables, mcs, onModReplace
+            );
 
         for (auto ms = 0; ms < NumMods; ++ms) {
             addChildComponent(modulatorComps[mcs][ms].get());
@@ -122,6 +127,8 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     paintModOptions.push_back(ModulatorComp::paintModOption(utils, "LFO"));
     paintModOptions.push_back(ModulatorComp::paintModOption(utils, "Classic\nRand"));
     paintModOptions.push_back(ModulatorComp::paintModOption(utils, "Perlin\nNoise"));
+    paintModOptions.push_back(ModulatorComp::paintModOption(utils, "Pitchbend"));
+    paintModOptions.push_back(ModulatorComp::paintModOption(utils, "Note"));
     for (auto mcs = 0; mcs < modulatorComps.size(); ++mcs)
         for (auto ms = 0; ms < NumMods; ++ms)
             modulatorComps[mcs][ms]->init(paintModOptions);

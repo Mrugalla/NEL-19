@@ -173,6 +173,23 @@ namespace modSys2 {
 			modulators.push_back(std::make_shared<PerlinModulator>(idString, rateP, octavesP, widthP, ranges, maxOctaves));
 			return modulators[modulators.size() - 1];
 		}
+		std::shared_ptr<Modulator> addNoteModulator(const juce::Identifier& octPID, const juce::Identifier& semiPID,
+			const juce::Identifier& finePID, const juce::Identifier& phaseDistPID, const juce::Identifier& retunePID,
+			int idx) {
+			const auto octP = getParameter(octPID);
+			const auto semiP = getParameter(semiPID);
+			const auto fineP = getParameter(finePID);
+			const auto phaseDistP = getParameter(phaseDistPID);
+			const auto retuneP = getParameter(retunePID);
+			const juce::String idString("Note" + static_cast<juce::String>(idx));
+			modulators.push_back(std::make_shared<MIDINoteModulator>(idString, octP, semiP, fineP, phaseDistP, retuneP));
+			return modulators.back();
+		}
+		std::shared_ptr<Modulator> addMIDIPitchbendModulator(float& signal, int idx) {
+			const juce::String idString("Pitchbend" + static_cast<juce::String>(idx));
+			modulators.push_back(std::make_shared<MIDIPitchbendModulator>(idString, signal));
+			return modulators.back();
+		}
 		void setModulatorActive(const juce::Identifier& mID, bool active) {
 			auto mod = getModulator(mID);
 			if (mod == nullptr) return;

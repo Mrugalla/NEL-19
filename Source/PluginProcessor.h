@@ -43,6 +43,11 @@ struct Nel19AudioProcessor :
 
     juce::ApplicationProperties appProperties;
     param::MultiRange modRateRanges;
+
+    // midi modulator stuff
+    std::array<std::atomic<bool>, 2> midiLearn;
+    std::array<float, 2> midiSignal;
+
     juce::AudioProcessorValueTreeState apvts;
     ThreadSafePtr<modSys2::Matrix> matrix;
     std::vector<int> mtrxParams;

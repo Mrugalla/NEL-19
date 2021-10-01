@@ -7,6 +7,10 @@
       <option id="lagrange"/>
       <option id="sinc"/>
     </switch>
+    <switch id="oversampling" tooltip="turn on oversampling to get lower sidelobes.">
+      <option id="1x"/>
+      <option id="2x"/>
+    </switch>
   </menu>
   <menu id="graphics" tooltip="individualize the appearance of the plugin here.">
     <menu id="colours" tooltip="individualize the colour sheme of the plugin here.">

@@ -108,7 +108,7 @@ class ModulatorComp :
     public Comp,
     public modSys2::Identifiable
 {
-    enum Mods{ EnvFol, LFO, Rand, Perlin, NumMods };
+    enum Mods { EnvFol, LFO, Rand, Perlin, Pitchbend, Note, NumMods };
 
     struct Label :
         public Comp
@@ -186,9 +186,9 @@ protected:
             const auto x = 0.f;
             const auto y = rbY;
             const auto h = rbWidth;
-            label.setBounds(juce::Rectangle<float>(x,y,w,h).toNearestInt());
+            label.setBounds(juce::Rectangle<float>(x, y, w, h).toNearestInt());
         }
-        
+
     }
 private:
     std::function<void(juce::Graphics& g, Comp* comp)> paintReplaceModButton() {
@@ -448,8 +448,140 @@ protected:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ModulatorRandComp)
 };
 
+class ModulatorPitchbendComp :
+    public ModulatorComp
+{
+    struct MIDIDisplay :
+        public Comp,
+        public juce::Timer
+    {
+        MIDIDisplay(Nel19AudioProcessor& p, Utils& u, int _modIdx) :
+            Comp(p, u, ""),
+            signal(.5f),
+            modIdx(_modIdx)
+        {
+            setBufferedToImage(true);
+            startTimerHz(12);
+        }
+    protected:
+        float signal;
+        int modIdx;
+
+        void timerCallback() override {
+            const auto s = processor.midiSignal[modIdx];
+            if (signal != s) {
+                signal = s;
+                repaint();
+            }
+        }
+        void paint(juce::Graphics& g) override {
+            const auto bounds = getLocalBounds().toFloat().reduced(nelG::Thicc);
+            g.setColour(utils.colours[Utils::ColourID::Darken]);
+            g.fillRoundedRectangle(bounds, nelG::Thicc);
+            {
+                const auto x = static_cast<int>(bounds.getX() + signal * bounds.getWidth());
+                g.setColour(utils.colours[Utils::ColourID::Modulation]);
+                g.drawVerticalLine(x, bounds.getY(), bounds.getBottom());
+            }
+        }
+    };
+public:
+    ModulatorPitchbendComp(Nel19AudioProcessor& p, Utils& u, const juce::Identifier& mID, std::vector<pComp::Parameter*>& mods, int modulatorsIdx,
+        std::function<void(int)> onModReplace) :
+        ModulatorComp(p, u, mID, mods, modulatorsIdx, onModReplace, "Pitchbend"),
+        layout(
+            { 30, 210, 30 },
+            { 70, 90, 30 }
+        ),
+        display(processor, utils, modsIdx)
+    {
+    }
+    void setVisible(bool e) override {
+        display.setVisible(e);
+        Comp::setVisible(e);
+    }
+    void initModulatables() override {
+        auto top = getTopLevelComponent();
+        top->addChildComponent(display);
+    }
+protected:
+    nelG::Layout layout;
+    MIDIDisplay display;
+
+    void resized() override {
+        layout.setBounds(getBoundsInParent().toFloat());
+        layout.place(display, 1, 1, 1, 1);
+        ModulatorComp::resized();
+    }
+};
+
+struct ModulatorNoteComp :
+    public ModulatorComp
+{
+    ModulatorNoteComp(Nel19AudioProcessor& p, Utils& u, const juce::Identifier& mID, std::vector<pComp::Parameter*>& mods, int modulatorsIdx,
+        std::function<void(int)> onModReplace) :
+        ModulatorComp(p, u, mID, mods, modulatorsIdx, onModReplace, "Note"),
+        layout(
+            { 30, 56, 56, 56, 56, 56, 30 },
+            { 70, 90, 30 }
+        ),
+        octP(processor, utils, modsIdx == 0 ? param::ID::NoteOct0 : param::ID::NoteOct1, "Shift the midi input in octaves.", "Oct"),
+        semiP(processor, utils, modsIdx == 0 ? param::ID::NoteSemi0 : param::ID::NoteSemi1, "Shift the midi input in semitones.", "Semi"),
+        fineP(processor, utils, modsIdx == 0 ? param::ID::NoteFine0 : param::ID::NoteFine1, "Shift the midi input in finetones.", "Fine"),
+        phaseDistP(processor, utils, modsIdx == 0 ? param::ID::NotePhaseDist0 : param::ID::NotePhaseDist1, "Warp the internal synth's waveform", "Phase Dist"),
+        retuneP(processor, utils, modsIdx == 0 ? param::ID::NoteRetune0 : param::ID::NoteRetune1, "The retune speed of the internal mono-synth.", "Retune Speed")
+    {
+        this->modulatables.push_back(&octP);
+        this->modulatables.push_back(&semiP);
+        this->modulatables.push_back(&fineP);
+        this->modulatables.push_back(&phaseDistP);
+        this->modulatables.push_back(&retuneP);
+        this->randButton.addRandomizable(&octP);
+        this->randButton.addRandomizable(&semiP);
+        this->randButton.addRandomizable(&fineP);
+        this->randButton.addRandomizable(&phaseDistP);
+        this->randButton.addRandomizable(&retuneP);
+    }
+    void setVisible(bool e) override {
+        octP.setVisible(e);
+        semiP.setVisible(e);
+        fineP.setVisible(e);
+        phaseDistP.setVisible(e);
+        retuneP.setVisible(e);
+        Comp::setVisible(e);
+    }
+    void initModulatables() override {
+        auto top = getTopLevelComponent();
+        top->addChildComponent(octP);
+        top->addChildComponent(semiP);
+        top->addChildComponent(fineP);
+        top->addChildComponent(phaseDistP);
+        top->addChildComponent(retuneP);
+    }
+protected:
+    nelG::Layout layout;
+    pComp::Knob octP, semiP, fineP, phaseDistP, retuneP;
+
+    void resized() override {
+        layout.setBounds(getBoundsInParent().toFloat());
+        layout.place(octP, 1, 1, 1, 1);
+        layout.place(semiP, 2, 1, 1, 1);
+        layout.place(fineP, 3, 1, 1, 1);
+        layout.place(phaseDistP, 4, 1, 1, 1);
+        layout.place(retuneP, 5, 1, 1, 1);
+        ModulatorComp::resized();
+    }
+};
+
 /*
-* 
+*
+* midi mod:
+*   midilearn
+*   labels: which midi type selected
+*       which cc selected if cc
+*   serialization of type
+*   range parameter, midi visualizer
+*
 * to do
 * each modulator has
 *   preset menu

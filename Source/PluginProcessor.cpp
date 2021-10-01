@@ -16,6 +16,8 @@ Nel19AudioProcessor::Nel19AudioProcessor()
                        ),
     appProperties(),
     modRateRanges(),
+    midiLearn(),
+    midiSignal(),
     apvts(*this, nullptr, "parameters", param::createParameters(apvts, modRateRanges)),
     matrix(apvts),
     mtrxParams(),
@@ -30,6 +32,9 @@ Nel19AudioProcessor::Nel19AudioProcessor()
     mutex()
 #endif
 {
+    for (auto& ml : midiLearn) ml.store(false);
+    for (auto& m : midiSignal) m = .5f;
+
     vibDelayVisualizerValue.resize(getChannelCountOfBus(false, 0), 0.f);
 
     appProperties.setStorageParameters(makeOptions());
@@ -92,6 +97,7 @@ Nel19AudioProcessor::Nel19AudioProcessor()
     matrix->setWavetables(wavetables, samplesPerCycle);
 
     // add all other modulators and their parameters
+    // add all other modulators and their parameters
     modsIDs[0].push_back(matrix->addEnvelopeFollowerModulator(
         param::getID(param::ID::EnvFolGain0),
         param::getID(param::ID::EnvFolAtk0),
@@ -127,6 +133,18 @@ Nel19AudioProcessor::Nel19AudioProcessor()
         param::PerlinMaxOctaves,
         0
     )->id);
+    modsIDs[0].push_back(matrix->addMIDIPitchbendModulator(
+        midiSignal[0], 0
+    )->id);
+    modsIDs[0].push_back(matrix->addNoteModulator(
+        param::getID(param::ID::NoteOct0),
+        param::getID(param::ID::NoteSemi0),
+        param::getID(param::ID::NoteFine0),
+        param::getID(param::ID::NotePhaseDist0),
+        param::getID(param::ID::NoteRetune0),
+        0
+    )->id);
+
     modsIDs[1].push_back(matrix->addEnvelopeFollowerModulator(
         param::getID(param::ID::EnvFolGain1),
         param::getID(param::ID::EnvFolAtk1),
@@ -160,6 +178,17 @@ Nel19AudioProcessor::Nel19AudioProcessor()
         param::getID(param::ID::PerlinWidth1),
         modRateRanges,
         param::PerlinMaxOctaves,
+        1
+    )->id);
+    modsIDs[1].push_back(matrix->addMIDIPitchbendModulator(
+        midiSignal[1], 1
+    )->id);
+    modsIDs[1].push_back(matrix->addNoteModulator(
+        param::getID(param::ID::NoteOct1),
+        param::getID(param::ID::NoteSemi1),
+        param::getID(param::ID::NoteFine1),
+        param::getID(param::ID::NotePhaseDist1),
+        param::getID(param::ID::NoteRetune1),
         1
     )->id);
 

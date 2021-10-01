@@ -11,11 +11,13 @@ namespace param {
 		LFOSync0, LFORate0, LFOWidth0, LFOWaveTable0, LFOPolarity0, LFOPhase0,
 		RandSync0, RandRate0, RandBias0, RandWidth0, RandSmooth0,
 		PerlinRate0, PerlinOctaves0, PerlinWidth0,
+		NoteOct0, NoteSemi0, NoteFine0, NotePhaseDist0, NoteRetune0,
 
 		EnvFolGain1, EnvFolAtk1, EnvFolRls1, EnvFolBias1, EnvFolWidth1, // modulator 1 params
 		LFOSync1, LFORate1, LFOWidth1, LFOWaveTable1, LFOPolarity1, LFOPhase1,
 		RandSync1, RandRate1, RandBias1, RandWidth1, RandSmooth1,
 		PerlinRate1, PerlinOctaves1, PerlinWidth1,
+		NoteOct1, NoteSemi1, NoteFine1, NotePhaseDist1, NoteRetune1,
 
 		Depth, ModulatorsMix, DryWetMix, Voices, StereoConfig, // non modulator params (crossfb?)
 		EnumSize
@@ -28,7 +30,7 @@ namespace param {
 		case ID::Macro1: return "Macro 1";
 		case ID::Macro2: return "Macro 2";
 		case ID::Macro3: return "Macro 3";
-		
+
 		case ID::EnvFolGain0: return "EnvFolGain 0";
 		case ID::EnvFolAtk0: return "EnvFolAtk 0";
 		case ID::EnvFolRls0: return "EnvFolRls 0";
@@ -48,6 +50,11 @@ namespace param {
 		case ID::PerlinRate0: return "PerlinRate 0";
 		case ID::PerlinOctaves0: return "PerlinOctaves 0";
 		case ID::PerlinWidth0: return "PerlinWidth 0";
+		case ID::NoteOct0: return "NoteOct 0";
+		case ID::NoteSemi0: return "NoteSemi 0";
+		case ID::NoteFine0: return "NoteFine 0";
+		case ID::NotePhaseDist0: return "NotePhaseDist 0";
+		case ID::NoteRetune0: return "NoteRetune 0";
 
 		case ID::EnvFolGain1: return "EnvFolGain 1";
 		case ID::EnvFolAtk1: return "EnvFolAtk 1";
@@ -68,6 +75,11 @@ namespace param {
 		case ID::PerlinRate1: return "PerlinRate 1";
 		case ID::PerlinOctaves1: return "PerlinOctaves 1";
 		case ID::PerlinWidth1: return "PerlinWidth 1";
+		case ID::NoteOct1: return "NoteOct 1";
+		case ID::NoteSemi1: return "NoteSemi 1";
+		case ID::NoteFine1: return "NoteFine 1";
+		case ID::NotePhaseDist1: return "NotePhaseDist 1";
+		case ID::NoteRetune1: return "NoteRetune 1";
 
 		case ID::Depth: return "Depth"; // put depth max somewhere else because buffer realloc
 		case ID::ModulatorsMix: return "Mix Mods";
@@ -343,6 +355,8 @@ namespace param {
 		static constexpr float EnvFolAtkRlsBias = .75f;
 		const auto envFolAtkRlsRange = getBiasedRange(1.f, maxEnvFolAtk, EnvFolAtkRlsBias);
 
+		const auto noteRetuneSpeedRange = getBiasedRange(0.f, 1000.f, .82f);
+
 		// general constants of the lfo rand perlin's freq parameter creation
 		static constexpr float lfoRandPerlinMinFreq = .1f;
 		static constexpr float lfoRandPerlinMaxFreq = 24.f;
@@ -382,6 +396,12 @@ namespace param {
 		parameters.push_back(createParameter(ID::PerlinOctaves0, 1.f, octStr, 1.f, PerlinMaxOctaves, 1.f));
 		parameters.push_back(createParameter(ID::PerlinWidth0, 0.f, percentStr));
 
+		parameters.push_back(createParameter(ID::NoteOct0, 0.f, nullptr, -2.f, 2.f, 1.f));
+		parameters.push_back(createParameter(ID::NoteSemi0, 0.f, nullptr, -12.f, 12.f, 1.f));
+		parameters.push_back(createParameter(ID::NoteFine0, 0.f, nullptr, -1.f, 1.f));
+		parameters.push_back(createParameter(ID::NotePhaseDist0, 0.f, nullptr, 0.f, 1.f));
+		parameters.push_back(createParameter(ID::NoteRetune0, 0.f, nullptr, noteRetuneSpeedRange));
+
 		// mod's parameters 1:
 
 		parameters.push_back(createParameter(ID::EnvFolGain1, 0.f, dbStr, 0.f, 24.f));
@@ -410,6 +430,12 @@ namespace param {
 		parameters.push_back(createParameter(ID::PerlinRate1, .5f, rateStr));
 		parameters.push_back(createParameter(ID::PerlinOctaves1, 1.f, octStr, 1.f, PerlinMaxOctaves, 1.f));
 		parameters.push_back(createParameter(ID::PerlinWidth1, 0.f, percentStr));
+
+		parameters.push_back(createParameter(ID::NoteOct1, 0.f, nullptr, -2.f, 2.f, 1.f));
+		parameters.push_back(createParameter(ID::NoteSemi1, 0.f, nullptr, -12.f, 12.f, 1.f));
+		parameters.push_back(createParameter(ID::NoteFine1, 0.f, nullptr, -1.f, 1.f));
+		parameters.push_back(createParameter(ID::NotePhaseDist1, 0.f, nullptr, 0.f, 1.f));
+		parameters.push_back(createParameter(ID::NoteRetune1, 0.f, nullptr, noteRetuneSpeedRange));
 
 		// non modulators' parameters:
 		parameters.push_back(createParameter(ID::Depth, 1.f, percentStr));
