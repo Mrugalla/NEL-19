@@ -3,6 +3,9 @@
 namespace modSys2 {
 	static constexpr float pi = 3.14159265359f;
 	static constexpr float tau = 6.28318530718f;
+	static float noteInHz(const float note) noexcept {
+		return std::pow(2.f, (note - 69.f) * .08333333333f) * 440.f;
+	}
 	static float msInSamples(float ms, float Fs) noexcept { return ms * Fs * .001f; }
 	static float hzInSamples(float hz, float Fs) noexcept { return Fs / hz; }
 	static float hzInSlewRate(float hz, float Fs) noexcept { return 1.f / hzInSamples(hz, Fs); }
