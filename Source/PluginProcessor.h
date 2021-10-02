@@ -5,6 +5,7 @@
 #include "Interpolation.h"
 #include "dsp/MidSideEncoder.h"
 #include "dsp/Vibrato.h"
+#include "dsp/Oversampling.h"
 #include <JuceHeader.h>
 #include "releasePool/ReleasePool.h"
 #include "modsys/ModSystem.h"

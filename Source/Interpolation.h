@@ -96,4 +96,8 @@ namespace interpolation {
 
 lagrange sounds crappy in the highend. why
 
+sinc might still be wrong
+	(peter said shall have no issues on sine)
+	might be float vs double issue
+
 */
