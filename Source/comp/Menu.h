@@ -307,8 +307,6 @@ namespace menu2 {
 			txt = txtDefault;
 			pos = txt.length();
 		}
-
-		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TextBox)
 	};
 
 	/* recursive menu for holding any trees of sub menus and components */
@@ -486,7 +484,7 @@ namespace menu2 {
 			}
 			else if (buttonName == "oversampling") {
 				const auto onSwitch = [this](int e) {
-					//processor.oversampling.setEnabled(e);
+					while(!processor.oversampling.setEnabled(e != 0)){}
 					juce::String oversamplingID("oversamplingOrder");
 					processor.apvts.state.setProperty(oversamplingID, e, nullptr);
 					auto user = processor.appProperties.getUserSettings();

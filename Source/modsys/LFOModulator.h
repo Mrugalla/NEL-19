@@ -19,7 +19,8 @@ namespace modSys2 {
 			syncID(multiRange.getID("sync")),
 			phase(),
 			waveTables(wts),
-			fsInv(0.f)
+			fsInv(0.f),
+			externalLatency(0)
 		{
 			this->params.push_back(syncParam);
 			this->params.push_back(rateParam);
@@ -106,16 +107,12 @@ namespace modSys2 {
 			const auto width = this->params[Width]->denormalized() * .5f;
 			if (width != 0) {
 				for (auto ch = 1; ch < numChannels; ++ch)
-					for (auto s = 0; s < numSamples; ++s)
+					for (auto s = 0; s < numSamples; ++s) {
 						block[ch][s] = block[0][s] + width;
-				if (width < 0.f)
-					for (auto ch = 1; ch < numChannels; ++ch)
-						for (auto s = 0; s < numSamples; ++s)
-							while (block[ch][s] < 0.f) ++block[ch][s];
-				else
-					for (auto ch = 1; ch < numChannels; ++ch)
-						for (auto s = 0; s < numSamples; ++s)
-							while (block[ch][s] >= 1.f) --block[ch][s];
+						if (block[ch][s] >= 1.f)
+							block[ch][s] -= 1.f;
+					}
+				
 			}
 			else
 				for (auto ch = 1; ch < numChannels; ++ch)

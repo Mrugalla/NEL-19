@@ -134,8 +134,10 @@ namespace vibrato {
 		}
 	};
 
-	struct Processor {
-		Processor(juce::AudioBuffer<float>& vibBuf, juce::AudioBuffer<float>& dryWetMixP, const int channelCount) :
+	struct Processor
+	{
+		Processor(juce::AudioProcessor* p, juce::AudioBuffer<float>& vibBuf, juce::AudioBuffer<float>& dryWetMixP, const int channelCount) :
+			audioProcessor(p),
 			dryDelay(),
 			writeHead(),
 			delay(),
@@ -149,6 +151,7 @@ namespace vibrato {
 				delay.emplace_back(vibBuf, ch);
 		}
 		Processor(Processor& other) :
+			audioProcessor(other.audioProcessor),
 			dryBuffer(other.dryBuffer),
 			dryDelay(other.dryDelay),
 			writeHead(other.writeHead),
@@ -162,28 +165,27 @@ namespace vibrato {
 			writeHead.resize(blockSize, 0);
 			dryBuffer.setSize(numChannels(), blockSize, false, false, false);
 		}
-		void resizeDelay(juce::AudioProcessor& p, const size_t size) {
+		void resizeDelay(const size_t size) {
 			rBufferSize = size;
 			for (auto& d : delay)
 				d.setDelaySize(rBufferSize);
 			for (auto& d : dryDelay)
-				d.setDelaySize(rBufferSize);
-#if LookAheadEnabled
-			p.setLatencySamples(rBufferSize / 2);
-#endif
+				d.setDelaySize(getLatency());
 		}
 		// PARAMETERS
 		void resizeDelaySafe(juce::AudioProcessor& p, const float ms) {
 			rBufferSize = static_cast<size_t>(ms * static_cast<float>(p.getSampleRate()) / 1000.f);
+			for (auto& d : dryDelay)
+				d.setDelaySize(getLatency());
+			//audioProcessor->setLatencySamples(getLatency());
 		}
 		void setInterpolationType(InterpolationType t) noexcept {
 			for (auto& d : delay) d.setInterpolationType(t);
 		}
 		// PROCESS
-		void processBlock(juce::AudioProcessor& p, juce::AudioBuffer<float>& audioBuffer) noexcept {
+		void processBlock(juce::AudioBuffer<float>& audioBuffer) {
 			if (rBufferSize != ringBufferSize())
-				return resizeDelay(p, rBufferSize);
-
+				return resizeDelay(rBufferSize);
 			auto samples = audioBuffer.getArrayOfWritePointers();
 			auto dry = dryBuffer.getArrayOfWritePointers();
 			const auto numSamples = audioBuffer.getNumSamples();
@@ -204,7 +206,15 @@ namespace vibrato {
 			return static_cast<float>(dlyTime);
 		}
 		const InterpolationType getInterpolationType() const noexcept { return delay[0].getInterpolationType(); }
+		const int getLatency() const noexcept {
+#if LookAheadEnabled
+			return ringBufferSize() / 2;
+#elif
+			return 0;
+#endif
+		}
 	private:
+		juce::AudioProcessor* audioProcessor;
 		juce::AudioBuffer<float> dryBuffer;
 		std::vector<FFDelay> dryDelay;
 		std::vector<size_t> writeHead;

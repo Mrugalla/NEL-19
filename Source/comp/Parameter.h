@@ -36,7 +36,7 @@ namespace pComp {
         juce::ParameterAttachment attach;
         bool modulatable, active;
     protected:
-        void updatePopUp(Utils& utils) { utils.updatePopUp(rap.getCurrentValueAsText()); }
+        void updatePopUp(Utils& u) { u.updatePopUp(rap.getCurrentValueAsText()); }
         void mouseDown(const juce::MouseEvent& evt) override {
             utils.updatePopUpPoint(evt.getScreenPosition());
         }

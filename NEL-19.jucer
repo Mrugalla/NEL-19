@@ -11,10 +11,15 @@
       <GROUP id="{37A90D57-856D-DDA5-A367-4EC832EDC7CF}" name="xml">
         <FILE id="ld5eYo" name="menu.xml" compile="0" resource="1" file="Source/xml/menu.xml"/>
       </GROUP>
+      <GROUP id="{FE66FC35-0867-A645-7FF8-6E8DD7C732A0}" name="oversampling">
+        <FILE id="Bq0cwR" name="ConvolutionFilter.h" compile="0" resource="0"
+              file="Source/oversampling/ConvolutionFilter.h"/>
+        <FILE id="npdYae" name="Filter.h" compile="0" resource="0" file="Source/oversampling/Filter.h"/>
+        <FILE id="uBL8je" name="Oversampling.h" compile="0" resource="0" file="Source/oversampling/Oversampling.h"/>
+      </GROUP>
       <GROUP id="{64C413BA-3699-8A57-746B-A094BA76D880}" name="dsp">
         <FILE id="bv92ia" name="MidSideEncoder.h" compile="0" resource="0"
               file="Source/dsp/MidSideEncoder.h"/>
-        <FILE id="s5I2qM" name="Oversampling.h" compile="0" resource="0" file="Source/dsp/Oversampling.h"/>
         <FILE id="NhBr3Z" name="Vibrato.h" compile="0" resource="0" file="Source/dsp/Vibrato.h"/>
       </GROUP>
       <GROUP id="{506F3931-B583-C784-A391-2F9193648856}" name="modsys">

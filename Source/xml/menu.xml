@@ -9,7 +9,7 @@
     </switch>
     <switch id="oversampling" tooltip="turn on oversampling to get lower sidelobes.">
       <option id="1x"/>
-      <option id="2x"/>
+      <option id="4x"/>
     </switch>
   </menu>
   <menu id="graphics" tooltip="individualize the appearance of the plugin here.">

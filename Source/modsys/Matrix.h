@@ -1,11 +1,13 @@
 #pragma once
 #include "Utils.h"
+#include "oversampling/Oversampling.h"
 
 namespace modSys2 {
 	/*
 * the thing that handles everything in the end
 */
-	struct Matrix {
+	struct Matrix
+	{
 		Matrix(juce::AudioProcessorValueTreeState& apvts) :
 			parameters(),
 			modulators(),
@@ -51,12 +53,12 @@ namespace modSys2 {
 		}
 		void prepareToPlay(const int numChannels, int blockSize, const double sampleRate, const size_t latency = 0) {
 			if (blockSize < 1) blockSize = 1;
-			for (auto& p : parameters)
+			for (auto p : parameters)
 				p->prepareToPlay(blockSize, sampleRate);
-			for (auto& m : modulators)
+			for (auto m : modulators)
 				m->prepareToPlay(numChannels, sampleRate, latency);
 			const auto channelCount = numChannels * numChannels;
-			block.setSize(channelCount, blockSize, false, false, false);
+			block.setSize(channelCount, blockSize, false, true, false);
 		}
 		void setSmoothingLengthInSamples(const juce::Identifier& pID, float length) noexcept {
 			auto param = getParameter(pID);

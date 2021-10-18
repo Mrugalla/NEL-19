@@ -5,7 +5,7 @@
 #include "Interpolation.h"
 #include "dsp/MidSideEncoder.h"
 #include "dsp/Vibrato.h"
-#include "dsp/Oversampling.h"
+#include "oversampling/Oversampling.h"
 #include <JuceHeader.h>
 #include "releasePool/ReleasePool.h"
 #include "modsys/ModSystem.h"
@@ -50,6 +50,9 @@ struct Nel19AudioProcessor :
     std::array<float, 2> midiSignal;
 
     juce::AudioProcessorValueTreeState apvts;
+
+    oversampling::Processor oversampling;
+
     ThreadSafePtr<modSys2::Matrix> matrix;
     std::vector<int> mtrxParams;
 
@@ -57,7 +60,6 @@ struct Nel19AudioProcessor :
     juce::Identifier modulatorsID;
 
     midSide::Processor midSideProcessor;
-
     std::array<juce::AudioBuffer<float>, 2> vibDelay;
     vibrato::Processor vibrato;
     std::vector<juce::Atomic<float>> vibDelayVisualizerValue;
@@ -74,6 +76,10 @@ private:
 };
 
 /*
+
+oversampling crunshes cpu on dbg. 4% on rls.
+    replace import juceheader with smaller modules everywhere
+    actually not oversample modsys if possible
 
 debugger:
 
