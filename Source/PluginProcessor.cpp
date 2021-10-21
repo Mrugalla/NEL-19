@@ -310,6 +310,8 @@ void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize) {
     m->setSmoothingLengthInSamples(param::getID(param::ID::LFOPhase1), medium);
     
     matrix.replaceUpdatedPtrWith(m);
+
+    setLatencySamples(latency);
 }
 void Nel19AudioProcessor::releaseResources() {}
 bool Nel19AudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const {

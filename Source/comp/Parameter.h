@@ -124,13 +124,15 @@ namespace pComp {
                 if (!selected) return;
                 if (!tryRemove) {
                     tryRemove = true;
-                    return param.repaint();
+                    param.repaint();
+                    return repaint();
                 }
                 auto mtrx = processor.matrix.getCopyOfUpdatedPtr();
                 mtrx->removeDestination(selectedMod->id, dest->id);
                 processor.matrix.replaceUpdatedPtrWith(mtrx);
                 tryRemove = selected = false;
                 param.repaint();
+                repaint();
             }
             void mouseExit(const juce::MouseEvent& evt) override {
                 tryRemove = false;
