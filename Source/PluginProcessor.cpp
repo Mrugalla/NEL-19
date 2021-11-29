@@ -26,8 +26,8 @@ Nel19AudioProcessor::Nel19AudioProcessor()
     modulatorsID("ModulatorsIdx"),
 
     midSideProcessor(getTotalNumInputChannels()),
-    vibDelay(),
-    vibrato(this, vibDelay[0], matrix->getParameter(param::getID(param::ID::DryWetMix))->data(), getTotalNumInputChannels()),
+    vibDelay(), vibDelayUp(),
+    vibrato(this, vibDelayUp, matrix->getParameter(param::getID(param::ID::DryWetMix))->data(), getTotalNumInputChannels()),
     vibDelayVisualizerValue(),
     mutex()
 #endif
@@ -258,6 +258,9 @@ void Nel19AudioProcessor::changeProgramName (int, const juce::String&){}
 void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize) {
     const auto channelCount = getTotalNumInputChannels();
     
+    const auto sampleRateDown = sampleRate;
+    const auto maxBufferSizeDown = maxBufferSize;
+
     oversampling.prepareToPlay(sampleRate, maxBufferSize);
     sampleRate = oversampling.getSampleRateUpsampled();
     maxBufferSize = oversampling.getBlockSizeUp();
@@ -269,9 +272,11 @@ void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize) {
     const auto quick = sec / 64.f;
     const auto instant = 0.f;
 
+    for (auto& vd : vibDelay)
+        vd.setSize(channelCount, maxBufferSizeDown);
+    vibDelayUp.setSize(channelCount, maxBufferSize);
+
     vibrato.prepareToPlay(maxBufferSize);
-    for(auto& vd: vibDelay)
-        vd.setSize(channelCount, maxBufferSize);
     
     auto user = appProperties.getUserSettings();
 
@@ -292,8 +297,8 @@ void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize) {
     auto m = matrix.getCopyOfUpdatedPtr();
     m->prepareToPlay(
         channelCount,
-        maxBufferSize,
-        sampleRate,
+        maxBufferSizeDown,
+        sampleRateDown,
         latency
     );
 
@@ -329,16 +334,33 @@ void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     if (!processBlockReady(buffer)) return;
     midSideProcessor.setEnabled(matrix->getParameterValue(mtrxParams[StereoConfig]));
     midSideProcessor.processBlockEncode(buffer);
+    for (auto& vb : vibDelay)
+        vb.clear(0, buffer.getNumSamples());
+    const auto mtrx = processBlockModSys(buffer, midi);
+    processBlockVibDelay(buffer, mtrx);
     {
         auto bufferUp = oversampling.upsample(buffer);
         if (bufferUp == nullptr) return;
 
-        for (auto& vb : vibDelay)
-            vb.clear(0, bufferUp->getNumSamples());
+        if (oversampling.isEnabled()) {
+            for (auto ch = 0; ch < buffer.getNumChannels(); ++ch) {
+                const auto vb = vibDelay[0].getReadPointer(ch);
+                auto vbUp = vibDelayUp.getWritePointer(ch);
+                for (auto s = 0; s < buffer.getNumSamples(); ++s) {
+                    const auto idx = oversampling::MaxOrder * s;
+                    for (auto o = 0; o < oversampling::MaxOrder; ++o)
+                        vbUp[idx + o] = vb[s];
+                }
+            }
+        }
+        else
+            for (auto ch = 0; ch < buffer.getNumChannels(); ++ch) {
+                const auto vb = vibDelay[0].getReadPointer(ch);
+                auto vbUp = vibDelayUp.getWritePointer(ch);
+                juce::FloatVectorOperations::copy(vbUp, vb, buffer.getNumSamples());
+            }
 
-        const auto mtrx = processBlockModSys(*bufferUp, midi);
-        processBlockVibDelay(*bufferUp, mtrx);
-
+        vibrato.processBlock(*bufferUp);
         oversampling.downsample(buffer);
     }
     midSideProcessor.processBlockDecode(buffer);
@@ -445,7 +467,6 @@ void Nel19AudioProcessor::processBlockVibDelay(juce::AudioBuffer<float>& buffer,
         const auto lastVal = vd0[ch][back];
         vibDelayVisualizerValue[ch].set(lastVal);
     }
-    vibrato.processBlock(buffer);
 }
 /////////////////////////////////////////////////////////
 

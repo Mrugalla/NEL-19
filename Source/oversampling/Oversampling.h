@@ -20,10 +20,10 @@ namespace oversampling {
 
 			buffer(),
 
-			filterUp2(  numChannels, 88200.f,  20000.f, 2049.f,  true),
+			filterUp2(  numChannels, 88200.f,  19000.f, 3049.f,  true),
 			filterUp4(  numChannels, 176400.f, 22050.f, 44100.f, true),
 			filterDown4(numChannels, 176400.f, 22050.f, 44100.f),
-			filterDown2(numChannels, 88200.f,  20000.f, 2049.f),
+			filterDown2(numChannels, 88200.f,  19000.f, 3049.f),
 
 			FsUp(0.),
 			blockSizeUp(0),

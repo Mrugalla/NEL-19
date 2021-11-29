@@ -61,6 +61,7 @@ struct Nel19AudioProcessor :
 
     midSide::Processor midSideProcessor;
     std::array<juce::AudioBuffer<float>, 2> vibDelay;
+    juce::AudioBuffer<float> vibDelayUp;
     vibrato::Processor vibrato;
     std::vector<juce::Atomic<float>> vibDelayVisualizerValue;
 
