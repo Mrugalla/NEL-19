@@ -1,6 +1,8 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #define RemoveValueTree false
+#define OversamplingEnabled true
+#define DebugModsBuffer false
 
 Nel19AudioProcessor::Nel19AudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -13,207 +15,110 @@ Nel19AudioProcessor::Nel19AudioProcessor()
                      #endif
                        ),
     appProperties(),
-    modRateRanges(),
-    midiLearn(),
-    midiSignal(),
-    apvts(*this, nullptr, "parameters", param::createParameters(apvts, modRateRanges)),
+    numChannels(getMainBusNumOutputChannels() == 1 ? 1 : 2),
 
-    oversampling(getTotalNumInputChannels(), this),
+    dryWet(numChannels),
 
-    matrix(apvts),
-    mtrxParams(),
-    modsIDs(),
-    modulatorsID("ModulatorsIdx"),
+    modSys(*this, [this]() { loadPatch(); }),
 
-    midSideProcessor(getTotalNumInputChannels()),
-    vibDelay(), vibDelayUp(),
-    vibrato(this, vibDelayUp, matrix->getParameter(param::getID(param::ID::DryWetMix))->data(), getTotalNumInputChannels()),
-    vibDelayVisualizerValue(),
-    mutex()
+    midSideProcessor(numChannels),
+    oversampling(this),
+
+    modulators
+    {
+        vibrato::Modulator(numChannels, modSys.getBeatsData()),
+        vibrato::Modulator(numChannels, modSys.getBeatsData())
+    },
+    modsBuffer(),
+    modType(),
+
+    vibrat(modsBuffer, numChannels),
+    visualizerValues(),
+
+    mutex(),
+    depthSmooth(), modsMixSmooth(),
+    depthBuf(), modsMixBuf()
 #endif
 {
-    for (auto& ml : midiLearn) ml.store(false);
-    for (auto& m : midiSignal) m = .5f;
-
-    vibDelayVisualizerValue.resize(getTotalNumInputChannels(), 0.f);
-
     appProperties.setStorageParameters(makeOptions());
+    auto user = appProperties.getUserSettings();
 
-    bool isMono = getTotalNumInputChannels() == 1;
+    { // MAKE PRESETS
+        auto file = user->getFile();
+        file = file.getParentDirectory();
+        file = file.getChildFile("Presets");
+        if (!file.exists())
+            file.createDirectory();
+        {
+            const auto make = [&f = file](juce::String name, const char* data, const int size)
+            {
+                const auto txt = juce::String::fromUTF8(data, size);
+                auto nFile = f.getChildFile(name + ".nel");
+                if (nFile.existsAsFile())
+                    nFile.deleteFile();
+                nFile.create();
+                nFile.appendText(txt, false, false);
+            };
 
-    // activate all used non-modulator parameters
-    matrix->activateParameter(param::getID(param::ID::Depth), true);
-    matrix->activateParameter(param::getID(param::ID::ModulatorsMix), true);
-    matrix->activateParameter(param::getID(param::ID::DryWetMix), true);
-    matrix->activateParameter(param::getID(param::ID::Voices), true);
-    if(!isMono)
-        matrix->activateParameter(param::getID(param::ID::StereoConfig), true);
-    
-    // add and activate all macro mods and params
-    auto macro = matrix->addMacroModulator(param::getID(param::ID::Macro0));
-    macro->setActive(true);
-    macro = matrix->addMacroModulator(param::getID(param::ID::Macro1));
-    macro->setActive(true);
-    macro = matrix->addMacroModulator(param::getID(param::ID::Macro2));
-    macro->setActive(true);
-    macro = matrix->addMacroModulator(param::getID(param::ID::Macro3));
-    macro->setActive(true);
-
-    // prepare wavetables for lfos
-    const auto numTables = static_cast<size_t>(apvts.getParameter(param::getID(param::ID::LFOWaveTable0))->getNormalisableRange().end + 1.f);
-    constexpr int samplesPerCycle = 1 << 11;
-    std::vector<std::function<float(float)>> wavetables;
-    wavetables.resize(numTables);
-    enum wtIdx { Sin, Tri, Sqr, Saw };
-    wavetables[Sin] = [t = modSys2::tau](float x) { return .5f * std::sin(x * t) + .5f; };
-    wavetables[Tri] = [p = modSys2::pi](float x) {
-        return x < .25f ? 2.f * x + .5f :
-            x < .75f ? -2.f * (x - .75f) :
-            2.f * (x - .75f);
-    };
-    wavetables[Sqr] = [p = modSys2::pi](float x) {
-        const auto K = x < .5f ? 0.f : 1.f;
-        const auto W = .5f - .5f * std::cos(4.f * p * x);
-        auto sum = 0.f;
-        const auto N = 12.f;
-        for (auto n = 1.f; n < N; ++n)
-            sum += std::fmod(n, 2.f) * std::sin(2.f * x * n * p) / n;
-        sum *= 1.69f / p;
-        const auto S = .5f - sum;
-        return (1.f - W) * S + W * K;
-    };
-    wavetables[Saw] = [p = modSys2::pi](float x) {
-        const auto tau = p * 2.f;
-        const auto N = 7.f;
-        auto sum = 0.f;
-        for (auto n = 1.f; n <= N; ++n)
-            sum += std::sin(tau * x * n) / n;
-        sum *= .95f / p;
-        sum += .5f;
-        sum = 1.f - sum;
-        const auto window = .5f + .5f * std::cos(tau * x);
-        return x + window * (sum - x);
-    };
-    matrix->setWavetables(wavetables, samplesPerCycle);
-
-    // add all other modulators and their parameters
-    // add all other modulators and their parameters
-    modsIDs[0].push_back(matrix->addEnvelopeFollowerModulator(
-        param::getID(param::ID::EnvFolGain0),
-        param::getID(param::ID::EnvFolAtk0),
-        param::getID(param::ID::EnvFolRls0),
-        param::getID(param::ID::EnvFolBias0),
-        param::getID(param::ID::EnvFolWidth0),
-        0
-    )->id);
-    modsIDs[0].push_back(matrix->addLFOModulator(
-        param::getID(param::ID::LFOSync0),
-        param::getID(param::ID::LFORate0),
-        param::getID(param::ID::LFOWidth0),
-        param::getID(param::ID::LFOWaveTable0),
-        param::getID(param::ID::LFOPolarity0),
-        param::getID(param::ID::LFOPhase0),
-        modRateRanges,
-        0
-    )->id);
-    modsIDs[0].push_back(matrix->addRandomModulator(
-        param::getID(param::ID::RandSync0),
-        param::getID(param::ID::RandRate0),
-        param::getID(param::ID::RandBias0),
-        param::getID(param::ID::RandWidth0),
-        param::getID(param::ID::RandSmooth0),
-        modRateRanges,
-        0
-    )->id);
-    modsIDs[0].push_back(matrix->addPerlinModulator(
-        param::getID(param::ID::PerlinRate0),
-        param::getID(param::ID::PerlinOctaves0),
-        param::getID(param::ID::PerlinWidth0),
-        modRateRanges,
-        param::PerlinMaxOctaves,
-        0
-    )->id);
-    modsIDs[0].push_back(matrix->addMIDIPitchbendModulator(
-        midiSignal[0], 0
-    )->id);
-    modsIDs[0].push_back(matrix->addNoteModulator(
-        param::getID(param::ID::NoteOct0),
-        param::getID(param::ID::NoteSemi0),
-        param::getID(param::ID::NoteFine0),
-        param::getID(param::ID::NotePhaseDist0),
-        param::getID(param::ID::NoteRetune0),
-        0
-    )->id);
-
-    modsIDs[1].push_back(matrix->addEnvelopeFollowerModulator(
-        param::getID(param::ID::EnvFolGain1),
-        param::getID(param::ID::EnvFolAtk1),
-        param::getID(param::ID::EnvFolRls1),
-        param::getID(param::ID::EnvFolBias1),
-        param::getID(param::ID::EnvFolWidth1),
-        1
-    )->id);
-    modsIDs[1].push_back(matrix->addLFOModulator(
-        param::getID(param::ID::LFOSync1),
-        param::getID(param::ID::LFORate1),
-        param::getID(param::ID::LFOWidth1),
-        param::getID(param::ID::LFOWaveTable1),
-        param::getID(param::ID::LFOPolarity1),
-        param::getID(param::ID::LFOPhase1),
-        modRateRanges,
-        1
-    )->id);
-    modsIDs[1].push_back(matrix->addRandomModulator(
-        param::getID(param::ID::RandSync1),
-        param::getID(param::ID::RandRate1),
-        param::getID(param::ID::RandBias1),
-        param::getID(param::ID::RandWidth1),
-        param::getID(param::ID::RandSmooth1),
-        modRateRanges,
-        1
-    )->id);
-    modsIDs[1].push_back(matrix->addPerlinModulator(
-        param::getID(param::ID::PerlinRate1),
-        param::getID(param::ID::PerlinOctaves1),
-        param::getID(param::ID::PerlinWidth1),
-        modRateRanges,
-        param::PerlinMaxOctaves,
-        1
-    )->id);
-    modsIDs[1].push_back(matrix->addMIDIPitchbendModulator(
-        midiSignal[1], 1
-    )->id);
-    modsIDs[1].push_back(matrix->addNoteModulator(
-        param::getID(param::ID::NoteOct1),
-        param::getID(param::ID::NoteSemi1),
-        param::getID(param::ID::NoteFine1),
-        param::getID(param::ID::NotePhaseDist1),
-        param::getID(param::ID::NoteRetune1),
-        1
-    )->id);
-
-    for (auto i = 0; i < modsIDs.size(); ++i)
-        for (auto j = 0; j < modsIDs[i].size(); ++j) {
-            auto md = matrix->getModulator(modsIDs[i][j]);
-            juce::String mdID = "vd" + juce::String(i) + "_" + juce::String(j);
-            if(modsIDs[i][j].toString().contains("EnvFol"))
-                md->addDestination(mdID, vibDelay[i], 1.f, false);
-            else
-                md->addDestination(mdID, vibDelay[i], 1.f, true);
+            make("AudioRate Arp (midi)", BinaryData::AudioRate_Arp_midi_nel, BinaryData::AudioRate_Arp_midi_nelSize);
+            make("Broken Tape", BinaryData::Broken_Tape_nel, BinaryData::Broken_Tape_nelSize);
+            make("Dream Arp EnvFol", BinaryData::Dream_Arp_EnvFol_nel, BinaryData::Dream_Arp_EnvFol_nelSize);
+            make("Flanger", BinaryData::Flanger_nel, BinaryData::Flanger_nelSize);
+            make("Init", BinaryData::Init_nel, BinaryData::Init_nelSize);
+            make("Psychosis", BinaryData::Psychosis_nel, BinaryData::Psychosis_nelSize);
+            make("Resample", BinaryData::Resample_nel, BinaryData::Resample_nelSize);
+            make("Shoegaze", BinaryData::Shoegaze_nel, BinaryData::Shoegaze_nelSize);
+            make("Sines", BinaryData::Sines_nel, BinaryData::Sines_nelSize);
+            make("Thicc", BinaryData::Thicc_nel, BinaryData::Thicc_nelSize);
         }
+    }
+    
 
-    // activate default modulators and their parameters
-    matrix->setModulatorActive(modsIDs[0][Mods::Perlin], true);
-    matrix->setModulatorActive(modsIDs[1][Mods::LFO], true);
+    visualizerValues.resize(numChannels, 0.f);
 
-    // get parameter indexes for later accessing their values
-    mtrxParams.resize(PID::EnumSize);
-    mtrxParams[PID::Depth] = matrix->getParameterIndex(param::getID(param::ID::Depth));
-    mtrxParams[PID::ModsMix] = matrix->getParameterIndex(param::getID(param::ID::ModulatorsMix));
-    mtrxParams[PID::StereoConfig] = matrix->getParameterIndex(param::getID(param::ID::StereoConfig));
+    modType[0] = vibrato::ModType::Perlin;
+    modType[1] = vibrato::ModType::LFO;
+
+    {
+        const auto id = oversampling::getOversamplingOrderID();
+        const auto enabled = user->getIntValue(id, 0) == 0 ? false : true;
+        oversampling.setEnabled(enabled);
+    }
+    {
+        const auto defVal = vibrato::toString(vibrato::InterpolationType::Spline);
+        const auto id = vibrato::toString(vibrato::ObjType::InterpolationType);
+        const auto idType = user->getValue(id, defVal);
+        const auto type = vibrato::toType(idType);
+        vibrat.setInterpolationType(type);
+    }
+    {
+        const auto id = drywet::getLookaheadID();
+        const auto e = user->getBoolValue(id, true);
+        dryWet.setLookaheadEnabled(e);
+    }
+    {
+        std::array<vibrato::ModType, NumActiveMods> defVals
+        {
+            vibrato::ModType::Perlin,
+            vibrato::ModType::LFO
+        };
+        const auto objType = vibrato::ObjType::ModType;
+        for (auto m = 0; m < NumActiveMods; ++m)
+        {
+            const auto objStr = vibrato::with(objType, m);
+            const juce::Identifier id(objStr);
+            const auto mID = user->getValue(id, vibrato::toString(defVals[m]));
+            const auto type = vibrato::getModType(mID);
+            modType[m] = type;
+        }
+    }
+
+    // juce::PluginHostType::isCubase();
+    // if daw is one with playhead draw free/sync button in lfo modulator
 }
 
-juce::PropertiesFile::Options Nel19AudioProcessor::makeOptions() {
+juce::PropertiesFile::Options Nel19AudioProcessor::makeOptions()
+{
     juce::PropertiesFile::Options options;
     options.applicationName = JucePlugin_Name;
     options.filenameSuffix = ".settings";
@@ -227,27 +132,33 @@ juce::PropertiesFile::Options Nel19AudioProcessor::makeOptions() {
     return options;
 }
 
-const juce::String Nel19AudioProcessor::getName() const { return JucePlugin_Name; }
-bool Nel19AudioProcessor::acceptsMidi() const{
-   #if JucePlugin_WantsMidiInput
-    return true;
-   #else
-    return false;
-   #endif
+const juce::String Nel19AudioProcessor::getName() const
+{
+    return JucePlugin_Name;
 }
-bool Nel19AudioProcessor::producesMidi() const {
-   #if JucePlugin_ProducesMidiOutput
+bool Nel19AudioProcessor::acceptsMidi() const
+{
+#if JucePlugin_WantsMidiInput
     return true;
-   #else
+#else
     return false;
-   #endif
+#endif
 }
-bool Nel19AudioProcessor::isMidiEffect() const {
-   #if JucePlugin_IsMidiEffect
+bool Nel19AudioProcessor::producesMidi() const
+{
+#if JucePlugin_ProducesMidiOutput
     return true;
-   #else
+#else
     return false;
-   #endif
+#endif
+}
+bool Nel19AudioProcessor::isMidiEffect() const
+{
+#if JucePlugin_IsMidiEffect
+    return true;
+#else
+    return false;
+#endif
 }
 double Nel19AudioProcessor::getTailLengthSeconds() const { return 0.; }
 int Nel19AudioProcessor::getNumPrograms() { return 1; }
@@ -255,71 +166,66 @@ int Nel19AudioProcessor::getCurrentProgram() { return 0; }
 void Nel19AudioProcessor::setCurrentProgram (int) {}
 const juce::String Nel19AudioProcessor::getProgramName (int) { return {}; }
 void Nel19AudioProcessor::changeProgramName (int, const juce::String&){}
-void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize) {
-    const auto channelCount = getTotalNumInputChannels();
-    
-    const auto sampleRateDown = sampleRate;
-    const auto maxBufferSizeDown = maxBufferSize;
+void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize)
+{
+    auto sampleRateF = static_cast<float>(sampleRate);
 
-    oversampling.prepareToPlay(sampleRate, maxBufferSize);
-    sampleRate = oversampling.getSampleRateUpsampled();
-    maxBufferSize = oversampling.getBlockSizeUp();
-    auto latency = oversampling.getLatency();
-
-    const auto sec = static_cast<float>(sampleRate);
-    const auto slow = sec / 4.f;
-    const auto medium = sec / 16.f;
-    const auto quick = sec / 64.f;
-    const auto instant = 0.f;
-
-    for (auto& vd : vibDelay)
-        vd.setSize(channelCount, maxBufferSizeDown);
-    vibDelayUp.setSize(channelCount, maxBufferSize);
-
-    vibrato.prepareToPlay(maxBufferSize);
-    
     auto user = appProperties.getUserSettings();
 
-    juce::String vibDelaySizeID("vibDelaySize");
-    auto vibDelaySize = static_cast<float>(apvts.state.getProperty(vibDelaySizeID, "-1"));
-    if(vibDelaySize <= 0.f)
-        vibDelaySize = static_cast<float>(user->getDoubleValue(vibDelaySizeID, 4.));
-    const size_t vds = static_cast<size_t>(vibDelaySize * sec / 1000.f);
-    vibrato.resizeDelay(vds);
-    latency += vibrato.getLatency();
+    float dSize;
+    {
+        static constexpr double defaultDlySize = 13.;
+        const juce::String id(vibrato::toString(vibrato::ObjType::DelaySize));
+        dSize = static_cast<float>(modSys.state.getProperty(id, -1.f));
+        if (dSize <= 0.f)
+            dSize = static_cast<float>(user->getDoubleValue(id, defaultDlySize));
+    }
+    const auto vibSizeSamplesHalf = static_cast<int>(std::rint(sampleRateF * dSize * .001f * .5f));
     
-    juce::String vibInterpolationID("vibInterpolation");
-    auto vibInterpolation = static_cast<int>(apvts.state.getProperty(vibInterpolationID, "-1"));
-    if (vibInterpolation < 0.f)
-        vibInterpolation = user->getIntValue(vibInterpolationID, vibrato::InterpolationType::Spline);
-    vibrato.setInterpolationType(static_cast<vibrato::InterpolationType>(vibInterpolation));
+    dryWet.prepare(sampleRateF, maxBufferSize, vibSizeSamplesHalf);
 
-    auto m = matrix.getCopyOfUpdatedPtr();
-    m->prepareToPlay(
-        channelCount,
-        maxBufferSizeDown,
-        sampleRateDown,
-        latency
-    );
+    const auto lGate = dryWet.isLookaheadEnabled() ? 1 : 0;
+    auto latency = vibSizeSamplesHalf;
+#if OversamplingEnabled
+    oversampling.prepareToPlay(sampleRate, maxBufferSize);
 
-    m->setSmoothingLengthInSamples(param::getID(param::ID::Macro0), quick);
-    m->setSmoothingLengthInSamples(param::getID(param::ID::Macro1), quick);
-    m->setSmoothingLengthInSamples(param::getID(param::ID::Macro2), quick);
-    m->setSmoothingLengthInSamples(param::getID(param::ID::Macro3), quick);
-    m->setSmoothingLengthInSamples(param::getID(param::ID::Depth), medium);
-    m->setSmoothingLengthInSamples(param::getID(param::ID::ModulatorsMix), medium);
-    m->setSmoothingLengthInSamples(param::getID(param::ID::DryWetMix), quick);
-    m->setSmoothingLengthInSamples(param::getID(param::ID::Voices), instant);
-    m->setSmoothingLengthInSamples(param::getID(param::ID::StereoConfig), instant);
-    m->setSmoothingLengthInSamples(param::getID(param::ID::LFOPhase0), medium);
-    m->setSmoothingLengthInSamples(param::getID(param::ID::LFOPhase1), medium);
+    sampleRate = oversampling.getSampleRateUpsampled();
+    maxBufferSize = oversampling.getBlockSizeUp();
+    latency += oversampling.getLatency();
+    const auto latencyUp = latency * oversampling.getUpsamplingFactor();
+
+    sampleRateF = static_cast<float>(sampleRate);
+#endif
+    modSys6::Smooth::makeFromDecayInMs(depthSmooth, 24.f, sampleRateF);
+    modSys6::Smooth::makeFromDecayInMs(modsMixSmooth, 24.f, sampleRateF);
+    depthBuf.resize(maxBufferSize);
+    modsMixBuf.resize(maxBufferSize);
+
+    for (auto ch = 0; ch < numChannels; ++ch)
+        modsBuffer[ch].resize(maxBufferSize, 0.f);
     
-    matrix.replaceUpdatedPtrWith(m);
+    for (auto m = 0; m < NumActiveMods; ++m)
+        modulators[m].prepare(sampleRateF, maxBufferSize, latencyUp * lGate);
+        
+    // UPDATE LFO WAVETABLE
+    const size_t vds = static_cast<size_t>(sampleRateF * dSize * .001f);
+    vibrat.resizeDelay(vds);
+    {
+        const auto id = vibrato::toString(vibrato::ObjType::InterpolationType);
+        const auto typeStr = modSys.state.getProperty(id, "").toString();
+        if (typeStr.isNotEmpty())
+        {
+            const auto type = vibrato::toType(typeStr);
+            vibrat.setInterpolationType(type);
+        }
+    }
+    vibrat.prepareToPlay(maxBufferSize);
 
-    setLatencySamples(latency);
+    setLatencySamples(latency * lGate);
 }
 void Nel19AudioProcessor::releaseResources() {}
-bool Nel19AudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const {
+bool Nel19AudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
+{
     return
         (layouts.getMainInputChannelSet() == juce::AudioChannelSet::disabled()
         && layouts.getMainOutputChannelSet() == juce::AudioChannelSet::disabled())
@@ -330,152 +236,332 @@ bool Nel19AudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) co
         || layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo());
 }
 
-void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) {
-    if (!processBlockReady(buffer)) return;
-    midSideProcessor.setEnabled(matrix->getParameterValue(mtrxParams[StereoConfig]));
-    midSideProcessor.processBlockEncode(buffer);
-    for (auto& vb : vibDelay)
-        vb.clear(0, buffer.getNumSamples());
-    const auto mtrx = processBlockModSys(buffer, midi);
-    processBlockVibDelay(buffer, mtrx);
+void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
+{
+    juce::ScopedNoDenormals noDenormals;
+    const auto numSamples = buffer.getNumSamples();
     {
-        auto bufferUp = oversampling.upsample(buffer);
-        if (bufferUp == nullptr) return;
+        const auto numChannelsIn = getTotalNumInputChannels();
+        for (auto ch = numChannelsIn; ch < getTotalNumOutputChannels(); ++ch)
+            buffer.clear(ch, 0, numSamples);
+    }
+    const auto numChannelsIn = getChannelCountOfBus(true, 0);
+    const auto numChannelsOut = getChannelCountOfBus(false, 0) == 1 ? 1 : 2;
 
-        if (oversampling.isEnabled()) {
-            for (auto ch = 0; ch < buffer.getNumChannels(); ++ch) {
-                const auto vb = vibDelay[0].getReadPointer(ch);
-                auto vbUp = vibDelayUp.getWritePointer(ch);
-                for (auto s = 0; s < buffer.getNumSamples(); ++s) {
-                    const auto idx = oversampling::MaxOrder * s;
-                    for (auto o = 0; o < oversampling::MaxOrder; ++o)
-                        vbUp[idx + o] = vb[s];
+    const auto samplesRead = buffer.getArrayOfReadPointers();
+    if (!modSys.processBlock(samplesRead, numSamples, getPlayHead()))
+        return;
+    
+    if (numSamples == 0)
+    {
+        for (auto& v : visualizerValues)
+            v = 0.f;
+        oversampling.processBlockEmpty();
+        return;
+    }
+    auto samples = buffer.getArrayOfWritePointers();
+
+    if (!dryWet.saveDry(samplesRead, modSys.getParam(modSys6::PID::DryWetMix)->getValueSum(), numChannelsIn, numChannelsOut, numSamples))
+        return prepareToPlay(getSampleRate(), getBlockSize());
+
+#if !DebugModsBuffer
+    midSideProcessor.setEnabled(modSys.getParam(modSys6::PID::StereoConfig)->getValueSum() > .5f);
+    if (midSideProcessor.enabled && numChannelsIn + numChannelsOut == 4)
+    {
+        midSideProcessor.processBlockEncode(samples, numSamples);
+        processBlockVibrato(buffer, midi, numChannelsIn, numChannelsOut);
+        midSideProcessor.processBlockDecode(samples, numSamples);
+    }
+    else
+#endif
+    processBlockVibrato(buffer, midi, numChannelsIn, numChannelsOut);
+
+    dryWet.processWet(samples, modSys.getParam(modSys6::PID::WetGain)->getValSumDenorm(), numChannelsIn, numChannelsOut, numSamples);
+}
+void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& b, const juce::MidiBuffer& midi, int numChannelsIn, int numChannelsOut)
+{
+    auto buffer = &b;
+#if OversamplingEnabled
+    buffer = oversampling.upsample(b, numChannelsIn, numChannelsOut);
+    {
+        const bool oversamplerUpdated = buffer == nullptr;
+        if (oversamplerUpdated) return;
+    }
+    const bool hasUpsampled = &b != buffer;
+#endif
+    const auto samplesRead = buffer->getArrayOfReadPointers();
+    const auto numSamples = buffer->getNumSamples();
+
+    auto curPlayHead = getPlayHead();
+
+    // PROCESS MODULATORS
+    for(auto m = 0; m < NumActiveMods; ++m)
+    {
+        auto& mod = modulators[m];
+        const auto type = modType[m];
+        mod.setType(type);
+        const auto offset = m * modSys6::NumParamsPerMod;
+
+        using namespace modSys6;
+        switch (type)
+        {
+        case vibrato::ModType::AudioRate:
+            mod.setParametersAudioRate(
+                modSys.getParam(withOffset(PID::AudioRate0Oct, offset))->getValSumDenorm(),
+                modSys.getParam(withOffset(PID::AudioRate0Semi, offset))->getValSumDenorm(),
+                modSys.getParam(withOffset(PID::AudioRate0Fine, offset))->getValSumDenorm(),
+                modSys.getParam(withOffset(PID::AudioRate0Width, offset))->getValSumDenorm(),
+                modSys.getParam(withOffset(PID::AudioRate0RetuneSpeed, offset))->getValSumDenorm(),
+                modSys.getParam(withOffset(PID::AudioRate0Atk, offset))->getValSumDenorm(),
+                modSys.getParam(withOffset(PID::AudioRate0Dcy, offset))->getValSumDenorm(),
+                modSys.getParam(withOffset(PID::AudioRate0Sus, offset))->getValSumDenorm(),
+                modSys.getParam(withOffset(PID::AudioRate0Rls, offset))->getValSumDenorm()
+            );
+            break;
+        case vibrato::ModType::Perlin:
+            mod.setParametersPerlin(
+                modSys.getParam(withOffset(PID::Perlin0FreqHz, offset))->getValSumDenorm(),
+                static_cast<int>(modSys.getParam(withOffset(PID::Perlin0Octaves, offset))->getValSumDenorm()),
+                modSys.getParam(withOffset(PID::Perlin0Width, offset))->getValSumDenorm()
+            );
+            break;
+        case vibrato::ModType::Dropout:
+            mod.setParametersDropout(
+                modSys.getParam(withOffset(PID::Dropout0Decay, offset))->getValSumDenorm(),
+                modSys.getParam(withOffset(PID::Dropout0Spin, offset))->getValSumDenorm(),
+                modSys.getParam(withOffset(PID::Dropout0Chance, offset))->getValSumDenorm(),
+                modSys.getParam(withOffset(PID::Dropout0Smooth, offset))->getValSumDenorm(),
+                modSys.getParam(withOffset(PID::Dropout0Width, offset))->getValueSum()
+            );
+            break;
+        case vibrato::ModType::EnvFol:
+            mod.setParametersEnvFol(
+                modSys.getParam(withOffset(PID::EnvFol0Attack, offset))->getValSumDenorm(),
+                modSys.getParam(withOffset(PID::EnvFol0Release, offset))->getValSumDenorm(),
+                modSys.getParam(withOffset(PID::EnvFol0Gain, offset))->getValSumDenorm(),
+                modSys.getParam(withOffset(PID::EnvFol0Width, offset))->getValueSum()
+            );
+            break;
+        case vibrato::ModType::Macro:
+            mod.setParametersMacro(
+                modSys.getParam(withOffset(PID::Macro0, offset))->getValSumDenorm()
+            );
+            break;
+        case vibrato::ModType::Pitchwheel:
+            mod.setParametersPitchbend(
+                modSys.getParam(withOffset(PID::Pitchbend0Smooth, offset))->getValSumDenorm()
+            );
+            break;
+        case vibrato::ModType::LFO:
+            mod.setParametersLFO(
+                modSys.getParam(withOffset(PID::LFO0FreeSync, offset))->getValueSum() > .5f,
+                modSys.getParam(withOffset(PID::LFO0RateFree, offset))->getValSumDenorm(),
+                modSys.getParam(withOffset(PID::LFO0RateSync, offset))->getValSumDenorm(),
+                modSys.getParam(withOffset(PID::LFO0Waveform, offset))->getValueSum(),
+                modSys.getParam(withOffset(PID::LFO0Phase, offset))->getValSumDenorm(),
+                modSys.getParam(withOffset(PID::LFO0Width, offset))->getValSumDenorm()
+            );
+            break;
+        }
+        mod.processBlock(samplesRead, midi, curPlayHead, numChannelsIn, numChannelsOut, numSamples);
+    }
+
+    // FILL MODBUFFER WITH MODULATORS
+    {
+        const auto modsMix = modSys.getParam(modSys6::PID::ModsMix)->getValueSum();
+        const auto depth = modSys.getParam(modSys6::PID::Depth)->getValueSum();
+        for (auto s = 0; s < numSamples; ++s)
+        {
+            depthBuf[s] = depthSmooth(depth);
+            modsMixBuf[s] = modsMixSmooth(modsMix);
+        }
+
+        for (auto ch = 0; ch < numChannelsOut; ++ch)
+        {
+            const auto m0 = modulators[0].buffer[ch].data();
+            const auto m1 = modulators[1].buffer[ch].data();
+            auto mAll = modsBuffer[ch].data();
+            for (auto s = 0; s < numSamples; ++s)
+                mAll[s] = (m0[s] + modsMixBuf[s] * (m1[s] - m0[s])) * depthBuf[s];
+            visualizerValues[ch] = mAll[numSamples - 1];
+        }
+    }
+
+#if DebugModsBuffer
+    const auto depth = modSys.getParam(modSys6::PID::Depth)->getValueSum();
+    for (auto ch = 0; ch < numChannelsOut; ++ch)
+    {
+        const auto mAll = modsBuffer[ch].data();
+        auto samples = buffer->getWritePointer(ch);
+        for (auto s = 0; s < numSamples; ++s)
+            samples[s] = mAll[s] * depth;
+        visualizerValues[ch] = mAll[numSamples - 1];
+    }
+#else
+    // PROCESS VIBRATO
+    if (!vibrat.processBlock(*buffer, this, numChannelsOut))
+        return;
+#endif
+    
+#if OversamplingEnabled
+    if(hasUpsampled)
+        oversampling.downsample(&b, numChannelsOut);
+#endif
+}
+void Nel19AudioProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+{
+    juce::ScopedNoDenormals noDenormals;
+    const auto numSamples = buffer.getNumSamples();
+    const auto numChannelsIn = getChannelCountOfBus(true, 0);
+    const auto numChannelsOut = getChannelCountOfBus(false, 0);
+    const auto samplesRead = buffer.getArrayOfReadPointers();
+    modSys.processBlock(samplesRead, numSamples, getPlayHead());
+    auto samples = buffer.getArrayOfWritePointers();
+    bool updateStuff = false;
+    if (oversampling.processBlockEmpty())
+        updateStuff = true;
+    if (!dryWet.processBypass(samples, numChannelsIn, numChannelsOut, numSamples))
+        updateStuff = true;
+    vibrat.processBlockBypassed(this, numChannelsOut);
+    if (updateStuff)
+        return prepareToPlay(getSampleRate(), getBlockSize());
+}
+bool Nel19AudioProcessor::hasEditor() const { return true; }
+juce::AudioProcessorEditor* Nel19AudioProcessor::createEditor()
+{
+    return new Nel19AudioProcessorEditor(*this);
+}
+
+void Nel19AudioProcessor::getStateInformation (juce::MemoryBlock& destData)
+{
+    juce::ScopedLock lock(mutex);
+    savePatch();
+#if RemoveValueTree
+    state.removeAllChildren(nullptr);
+    state.removeAllProperties(nullptr);
+#endif
+    std::unique_ptr<juce::XmlElement> xml(modSys.state.createXml());
+    copyXmlToBinary(*xml, destData);
+}
+void Nel19AudioProcessor::savePatch()
+{
+    modSys.savePatch();
+    {
+        const auto modTypeID = vibrato::toString(vibrato::ObjType::ModType);
+        const juce::Identifier id(modTypeID);
+        auto modTypeState = modSys.state.getChildWithName(id);
+        if (!modTypeState.isValid())
+        {
+            modTypeState = juce::ValueTree(id);
+            modSys.state.appendChild(modTypeState, nullptr);
+        }
+        for (auto m = 0; m < NumActiveMods; ++m)
+        {
+            const auto typeID = modTypeID + static_cast<juce::String>(m);
+            modTypeState.setProperty(typeID, vibrato::toString(modType[m]), nullptr);
+        }
+    }
+    for (auto m = 0; m < modulators.size(); ++m)
+        modulators[m].savePatch(modSys.state, m);
+    {
+        const juce::Identifier id(vibrato::toString(vibrato::ObjType::InterpolationType));
+        const auto type = vibrat.getInterpolationType();
+        const auto typeStr = vibrato::toString(type);
+        modSys.state.setProperty(id, typeStr, nullptr);
+    }
+    {
+        const juce::Identifier id(vibrato::toString(vibrato::ObjType::DelaySize));
+        const auto bufferSize = vibrat.getSizeInMs(oversampling.getSampleRateUpsampled());
+        modSys.state.setProperty(id, bufferSize, nullptr);
+    }
+    {
+        const juce::Identifier id(oversampling::getOversamplingOrderID());
+        const auto oEnabled = oversampling.isEnabled() ? 1 : 0;
+        modSys.state.setProperty(id, oEnabled, nullptr);
+    }
+    {
+        const juce::Identifier id(drywet::getLookaheadID());
+        const auto oEnabled = dryWet.isLookaheadEnabled() ? 1 : 0;
+        modSys.state.setProperty(id, oEnabled, nullptr);
+    }
+}
+void Nel19AudioProcessor::setStateInformation (const void* data, int sizeInBytes)
+{
+    juce::ScopedLock lock(mutex);
+    std::unique_ptr<juce::XmlElement> xmlState(getXmlFromBinary(data, sizeInBytes));
+    if (xmlState.get() != nullptr)
+        if (xmlState->hasTagName(modSys.state.getType()))
+            modSys.state = juce::ValueTree::fromXml(*xmlState);
+    loadPatch();
+#if RemoveValueTree
+    modSys.state.removeAllChildren(nullptr);
+    modSys.state.removeAllProperties(nullptr);
+#endif
+}
+void Nel19AudioProcessor::loadPatch()
+{
+    modSys.loadPatch();
+    {
+        const auto modTypeID = vibrato::toString(vibrato::ObjType::ModType);
+        const auto modTypeState = modSys.state.getChildWithName(modTypeID);
+        if (modTypeState.isValid())
+        {
+            for (auto m = 0; m < NumActiveMods; ++m)
+            {
+                const auto propID = modTypeID + static_cast<juce::String>(m);
+                const auto typeProp = modTypeState.getProperty(propID).toString();
+                for (auto i = 0; i < static_cast<int>(vibrato::ModType::NumMods); ++i)
+                {
+                    const auto type = static_cast<vibrato::ModType>(i);
+                    if (typeProp == vibrato::toString(type))
+                        modType[m] = type;
                 }
             }
         }
-        else
-            for (auto ch = 0; ch < buffer.getNumChannels(); ++ch) {
-                const auto vb = vibDelay[0].getReadPointer(ch);
-                auto vbUp = vibDelayUp.getWritePointer(ch);
-                juce::FloatVectorOperations::copy(vbUp, vb, buffer.getNumSamples());
-            }
-
-        vibrato.processBlock(*bufferUp);
-        oversampling.downsample(buffer);
     }
-    midSideProcessor.processBlockDecode(buffer);
-}
-void Nel19AudioProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) {
-    
-}
-void Nel19AudioProcessor::processBlockEmpty() {
-    
-}
-bool Nel19AudioProcessor::hasEditor() const { return true; }
-juce::AudioProcessorEditor* Nel19AudioProcessor::createEditor() {
-    return new Nel19AudioProcessorEditor (*this);
-}
-
-void Nel19AudioProcessor::getStateInformation (juce::MemoryBlock& destData) {
-    juce::ScopedLock lock(mutex);
-    matrix->getState(apvts);
-    auto state = apvts.state;
-    auto modulatorsChild = state.getChildWithName(modulatorsID);
-    if (!modulatorsChild.isValid()) {
-        modulatorsChild = juce::ValueTree(modulatorsID);
-        state.appendChild(modulatorsChild, nullptr);
-    }
-    for (const auto& modsID : modsIDs)
-        for (const auto& modID : modsID) {
-            auto mod = matrix->getModulator(modID);
-            int active = mod->isActive() ? 1 : 0;
-            //DBG(modID.toString() << ": " << active);
-            modulatorsChild.setProperty(modID, active, nullptr);
+    for (auto m = 0; m < modulators.size(); ++m)
+        modulators[m].loadPatch(modSys.state, m);
+    {
+        const juce::Identifier id(vibrato::toString(vibrato::ObjType::InterpolationType));
+        const auto typeStr = modSys.state.getProperty(id, "").toString();
+        if (typeStr.isNotEmpty())
+        {
+            const auto type = vibrato::toType(typeStr);
+            vibrat.setInterpolationType(type);
         }
-    //DBG(state.toXmlString());
-
-#if RemoveValueTree
-    apvts.state.removeAllChildren(nullptr);
-    apvts.state.removeAllProperties(nullptr);
-#endif
-    std::unique_ptr<juce::XmlElement> xml(state.createXml());
-    copyXmlToBinary(*xml, destData);
-}
-void Nel19AudioProcessor::setStateInformation (const void* data, int sizeInBytes) {
-    std::unique_ptr<juce::XmlElement> xmlState(getXmlFromBinary(data, sizeInBytes));
-    if (xmlState.get() != nullptr)
-        if (xmlState->hasTagName(apvts.state.getType()))
-            apvts.replaceState(juce::ValueTree::fromXml(*xmlState));
-
-    juce::ScopedLock lock(mutex);
-    auto m = matrix.getCopyOfUpdatedPtr();
-    auto state = apvts.state;
-    auto modulatorsChild = state.getChildWithName(modulatorsID);
-    if (!modulatorsChild.isValid()) {
-        modulatorsChild = juce::ValueTree(modulatorsID);
-        state.appendChild(modulatorsChild, nullptr);
     }
-    for (const auto& modsID : modsIDs)
-        for (const auto& modID : modsID) {
-            auto mActive = static_cast<int>(modulatorsChild.getProperty(modID, -1));
-            if(mActive != -1)
-                m->setModulatorActive(modID, mActive);
+    {
+        const juce::Identifier id(vibrato::toString(vibrato::ObjType::DelaySize));
+        const auto sizeStr = modSys.state.getProperty(id, "").toString();
+        if (sizeStr.isNotEmpty())
+        {
+            const auto bufferSize = sizeStr.getFloatValue();
+            modSys.state.setProperty(id, bufferSize, nullptr);
+            vibrat.triggerUpdate();
         }
-#if RemoveValueTree
-    apvts.state.removeAllChildren(nullptr);
-    apvts.state.removeAllProperties(nullptr);
-#endif
-    m->setState(apvts);
-    matrix.replaceUpdatedPtrWith(m);
+    }
+    {
+        const juce::Identifier id(oversampling::getOversamplingOrderID());
+        const auto oEnabledStr = modSys.state.getProperty(id, "").toString();
+        if (oEnabledStr.isNotEmpty())
+        {
+            const auto oEnabled = oEnabledStr.getIntValue() == 1 ? true : false;
+            oversampling.setEnabled(oEnabled);
+        }
+    }
+    {
+        const juce::Identifier id(drywet::getLookaheadID());
+        const auto oEnabledStr = modSys.state.getProperty(id, "").toString();
+        if (oEnabledStr.isNotEmpty())
+        {
+            const auto oEnabled = oEnabledStr.getIntValue() == 1 ? true : false;
+            dryWet.setLookaheadEnabled(oEnabled);
+        }
+    }
 }
+
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new Nel19AudioProcessor(); }
 
-/////////// PROCESS BLOCK EXTRA STEPS ///////////////////
-bool Nel19AudioProcessor::processBlockReady(juce::AudioBuffer<float>& buffer)  {
-    if (buffer.getNumSamples() == 0) {
-        processBlockEmpty();
-        return false;
-    }  
-    juce::ScopedNoDenormals noDenormals;
-    const auto totalNumInputChannels = getTotalNumInputChannels();
-    const auto totalNumOutputChannels = getTotalNumOutputChannels();
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear(i, 0, buffer.getNumSamples());
-    return true;
-}
-const std::shared_ptr<modSys2::Matrix> Nel19AudioProcessor::processBlockModSys(juce::AudioBuffer<float>& buffer, const juce::MidiBuffer& midi) {
-    auto mtrx = matrix.updateAndLoadCurrentPtr();
-    mtrx->processBlock(buffer, getPlayHead(), midi);
-    return mtrx;
-}
-void Nel19AudioProcessor::processBlockVibDelay(juce::AudioBuffer<float>& buffer, const std::shared_ptr<modSys2::Matrix>& mtrx)  {
-    auto vd0 = vibDelay[0].getArrayOfWritePointers();
-    const auto vd1 = vibDelay[1].getArrayOfReadPointers();
-    const auto back = buffer.getNumSamples() - 1;
-    for (auto ch = 0; ch < buffer.getNumChannels(); ++ch) {
-        for (auto s = 0; s < buffer.getNumSamples(); ++s) {
-            const auto mixV = mtrx->getParameterValue(mtrxParams[PID::ModsMix], s);
-            const auto depthV = mtrx->getParameterValue(mtrxParams[PID::Depth], s);
-
-            const auto val = vd0[ch][s] + mixV * (vd1[ch][s] - vd0[ch][s]);
-            vd0[ch][s] = juce::jlimit(
-                -1.f + std::numeric_limits<float>::epsilon(),
-                1.f - std::numeric_limits<float>::epsilon(),
-                val * depthV
-            );
-        }
-        const auto lastVal = vd0[ch][back];
-        vibDelayVisualizerValue[ch].set(lastVal);
-    }
-}
-/////////////////////////////////////////////////////////
-
-/*
-
-processBlockBypassed has some issue idk
-
-if plugin didn't get music for a while
-    parameters don't repaint correctly
-    improve processBlockEmpty method!
-
-*/
+#undef RemoveValueTree
+#undef OversamplingEnabled
+#undef DebugModsBuffer

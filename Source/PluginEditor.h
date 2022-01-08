@@ -1,46 +1,56 @@
 #pragma once
-#include "NELG.h"
 #include <JuceHeader.h>
-#include "comp/Component.h"
 #include "PluginProcessor.h"
-#include <array>
+#include "modsys/ModSysGUI.h"
+#include "dsp/ModsGUI.h"
+#include "NELG.h"
+#include "Menu.h"
 
-struct Nel19AudioProcessorEditor :
-    public juce::AudioProcessorEditor,
-    public juce::Timer
+class Nel19AudioProcessorEditor :
+    public juce::AudioProcessorEditor
 {
-    enum ModsType { EnvFol, LFO, Rand, Perlin, Pitchbend, Note, NumMods };
-
+    static constexpr int MinEditorBounds = 120;
+public:
     Nel19AudioProcessorEditor(Nel19AudioProcessor&);
 private:
     Nel19AudioProcessor& audioProcessor;
-    Utils utils;
+    
     nelG::Layout layout, layoutMacros, layoutMainParams, layoutBottomBar, layoutMiscs, layoutTopBar;
+    
+    modSys6::gui::Utils utils;
+    modSys6::gui::Events::Evt notify;
 
-    BuildDateComp buildDate;
-    TooltipComp tooltips;
-    pComp::Knob macro0, macro1, macro2, macro3;
-    pComp::Knob modulatorsMix, depth, dryWetMix;
-    pComp::Switch midSideSwitch;
-    std::vector<pComp::Parameter*> modulatables;
-    pComp::ModDragger macroDragger0, macroDragger1, macroDragger2, macroDragger3;
-    PopUpComp popUp;
-    std::array<std::array<std::unique_ptr<ModulatorComp>, ModsType::NumMods>, 2> modulatorComps;
+    modSys6::gui::Label nelLabel;
 
-    pxl::ImgComp shuttle;
+    modSys6::gui::Tooltip tooltips;
+    modSys6::gui::BuildDate buildDate;
 
+    std::vector<modSys6::gui::Paramtr*> modulatables;
+    
+    modSys6::gui::Paramtr macro0, macro1, macro2, macro3;
+    std::array<modSys6::gui::ModComp, 2> modComps;
+
+    modSys6::gui::Visualizer visualizer;
+
+    modSys6::gui::Paramtr modsDepth, modsMix, dryWetMix, gainWet, stereoConfig;
+
+    modSys6::gui::ModDragger macro0Dragger, macro1Dragger, macro2Dragger, macro3Dragger;
+
+    modSys6::gui::ParamtrRandomizer paramRandomizer;
+
+    modSys6::gui::PopUp popUp;
+    modSys6::gui::EnterValueComp enterValue;
+    
     std::unique_ptr<menu2::Menu> menu;
-    menu2::Button menuButton;
+    menu2::ButtonM menuButton;
+
+    modSys6::gui::PresetBrowser presetBrowser;
 
     void resized() override;
     void paint(juce::Graphics&) override;
-    void mouseEnter(const juce::MouseEvent& evt) override;
-    void timerCallback() override;
-
-    void resetModulatorComp(int, int);
-
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Nel19AudioProcessorEditor)
-        //JUCE_IS_REPAINT_DEBUGGING_ACTIVE
+    void mouseEnter(const juce::MouseEvent&) override;
+    void mouseDown(const juce::MouseEvent&) override;
+    void initBrowser();
 };
 /*
 

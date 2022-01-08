@@ -101,10 +101,11 @@ namespace param {
 		const auto range = max - min;
 		const auto rangeInv = 1.f / range;
 		return juce::NormalisableRange<float>(min, max,
-			[b = bias, bInv = biasInv, r = range](float start, float end, float normalised) {
+			[b = bias, bInv = biasInv, r = range](float start, float, float normalised)
+			{
 				return start + r * std::pow(normalised, bInv);
 			},
-			[b = bias, rInv = rangeInv](float start, float end, float denormalized) {
+			[b = bias, rInv = rangeInv](float start, float, float denormalized) {
 				return std::pow((denormalized - start) * rInv, b);
 			}
 			);

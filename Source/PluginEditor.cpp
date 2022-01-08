@@ -1,12 +1,24 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+modSys6::gui::Notify makeNotify(juce::Component* comp)
+{
+    return [c = comp](int t, const void*)
+    {
+        if (t == modSys6::gui::NotificationType::ColourChanged)
+        {
+            modSys6::gui::makeCursor(*c, modSys6::gui::CursorType::Default);
+            c->repaint();
+        }
+        return false;
+    };
+}
+
 Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     AudioProcessorEditor(&p),
     audioProcessor(p),
-    utils(p),
     layout(
-        { 25, 150, 50, 150 },
+        { 25, 150, 50 },
         { 50, 50, 150, 150, 50, 30 }
     ),
     layoutMacros(
@@ -14,8 +26,8 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
         { 25, 12, 25, 12, 25, 12, 25, 12 }
     ),
     layoutMainParams(
-        { 1 },
-        { 80, 80, 80, 30 }
+        { 50, 80 },
+        { 90, 90, 90, 40 }
     ),
     layoutBottomBar(
         { 250, 90 },
@@ -26,190 +38,237 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
         { 50, 200 }
     ),
     layoutTopBar(
-        { 30, 250, 70 },
+        { 30, 30, 30, 270, 70 },
         { 1 }
     ),
-    buildDate(p, utils),
-    tooltips(p, utils),
-    macro0(p, utils, param::ID::Macro0, "modulate parameters with a macro.", "Macro 0", param::getID(param::ID::Macro0), false, false),
-    macro1(p, utils, param::ID::Macro1, "modulate parameters with a macro.", "Macro 1", param::getID(param::ID::Macro1), false, false),
-    macro2(p, utils, param::ID::Macro2, "modulate parameters with a macro.", "Macro 2", param::getID(param::ID::Macro2), false, false),
-    macro3(p, utils, param::ID::Macro3, "modulate parameters with a macro.", "Macro 3", param::getID(param::ID::Macro3), false, false),
-    modulatorsMix(p, utils, param::ID::ModulatorsMix, "mix the modulators.", "Mods Mix"),
-    depth(p, utils, param::ID::Depth, "set the depth of the vibrato.", "Depth"),
-    dryWetMix(p, utils, param::ID::DryWetMix, "mix the dry signal with the vibrated one.", "Dry/Wet-Mix"),
-    midSideSwitch(p, utils, "switch between l/r & m/s processing.", "Stereo-Config", param::ID::StereoConfig),
-    modulatables({ &depth, &modulatorsMix, &dryWetMix }) ,
-    macroDragger0(p, utils, "drag this to modulate a parameter.", param::getID(param::ID::Macro0), modulatables),
-    macroDragger1(p, utils, "drag this to modulate a parameter.", param::getID(param::ID::Macro1), modulatables),
-    macroDragger2(p, utils, "drag this to modulate a parameter.", param::getID(param::ID::Macro2), modulatables),
-    macroDragger3(p, utils, "drag this to modulate a parameter.", param::getID(param::ID::Macro3), modulatables),
-    popUp(p, utils),
-    modulatorComps(),
-    shuttle(p, utils, "Lionel's space shuttle vibrates the universe to your music :>", BinaryData::shuttle_png, BinaryData::shuttle_pngSize, pxl::colourize(utils, Utils::ColourID::Background, Utils::ColourID::Modulation)),
-    menu(nullptr),
-    menuButton(p, utils, "All the extra stuff.", [this]() { menu2::openMenu(menu, audioProcessor, utils, *this, layout(1, 1, 3, 4).toNearestInt() , menuButton); }, [this](juce::Graphics& g, const menu2::Button& b) { menu2::paintMenuButton(g, menuButton, utils, menu.get()); })
-{
-    auto numChannels = audioProcessor.getChannelCountOfBus(false, 0);
+    utils(p.modSys, p.appProperties.getUserSettings()),
+    notify(utils.events, makeNotify(this)),
 
-    addAndMakeVisible(buildDate);
+    nelLabel(utils, "<< NEL >>", modSys6::gui::ColourID::Transp, modSys6::gui::ColourID::Transp, modSys6::gui::ColourID::Txt),
+
+    tooltips(utils),
+    buildDate(utils),
+    
+    modulatables(),
+
+    macro0(utils, "M0", "Modulate parameters with this macro.", modSys6::PID::MSMacro0, modulatables, modSys6::gui::ParameterType::Knob),
+    macro1(utils, "M1", "Modulate parameters with this macro.", modSys6::PID::MSMacro1, modulatables, modSys6::gui::ParameterType::Knob),
+    macro2(utils, "M2", "Modulate parameters with this macro.", modSys6::PID::MSMacro2, modulatables, modSys6::gui::ParameterType::Knob),
+    macro3(utils, "M3", "Modulate parameters with this macro.", modSys6::PID::MSMacro3, modulatables, modSys6::gui::ParameterType::Knob),
+
+    modComps
+    {
+        modSys6::gui::ModComp(utils, modulatables, audioProcessor.modulators[0].getTables(), 0),
+        modSys6::gui::ModComp(utils, modulatables, audioProcessor.modulators[1].getTables(), modSys6::NumParamsPerMod)
+    },
+
+    modsDepth(utils, "Depth", "Modulate the depth of the vibrato.", modSys6::PID::Depth, modulatables, modSys6::gui::ParameterType::Knob),
+    modsMix(utils, "Mods\nMix", "Interpolate between the vibrato's modulators.", modSys6::PID::ModsMix, modulatables, modSys6::gui::ParameterType::Knob),
+    dryWetMix(utils, "Mix", "Define the dry/wet ratio of the effect.", modSys6::PID::DryWetMix, modulatables, modSys6::gui::ParameterType::Knob),
+    gainWet(utils, "Gain", "The output gain of the wet signal.", modSys6::PID::WetGain, modulatables, modSys6::gui::ParameterType::Knob),
+    stereoConfig(utils, "StereoConfig", "Configurate if effect is applied to l/r or m/s", modSys6::PID::StereoConfig, modulatables, modSys6::gui::ParameterType::Switch),
+
+    macro0Dragger(utils, modSys6::ModType::Macro, 0, modulatables),
+    macro1Dragger(utils, modSys6::ModType::Macro, 1, modulatables),
+    macro2Dragger(utils, modSys6::ModType::Macro, 2, modulatables),
+    macro3Dragger(utils, modSys6::ModType::Macro, 3, modulatables),
+
+    visualizer(utils, "Visualizes the sum of the vibrato's modulators.", p.getChannelCountOfBus(false, 0), 1),
+
+    paramRandomizer(utils, modulatables),
+
+    popUp(utils),
+    enterValue(utils),
+
+    menu(nullptr),
+    menuButton(
+        utils,
+        "All the extra stuff.",
+        [this]() { menu2::openMenu(menu, audioProcessor, utils, *this, layout(1, 1, 2, 4).toNearestInt(), menuButton); },
+        [this](juce::Graphics& g, const menu2::ButtonM& b) { menu2::paintMenuButton(g, menuButton, utils, menu.get());
+    }),
+
+    presetBrowser(utils, *p.appProperties.getUserSettings())
+{
+    nelLabel.font = modSys6::gui::Shared::shared.font;
+
+    paramRandomizer.add(&stereoConfig);
+
+    visualizer.onPaint = modSys6::gui::makeVibratoVisualizerOnPaint2();
+    visualizer.onUpdate = [&p = this->audioProcessor](modSys6::gui::Buffer& b)
+    {
+        const auto& vals = p.visualizerValues;
+        bool needsUpdate = false;
+        for (auto ch = 0; ch < b.size(); ++ch)
+        {
+            if (b[ch][0] != vals[ch])
+            {
+                b[ch][0] = vals[ch];
+                needsUpdate = true;
+            }
+        }
+        return needsUpdate;
+    };
+
+    addAndMakeVisible(nelLabel);
+
     addAndMakeVisible(tooltips);
+    addAndMakeVisible(buildDate);
+
     addAndMakeVisible(macro0);
     addAndMakeVisible(macro1);
     addAndMakeVisible(macro2);
     addAndMakeVisible(macro3);
-    addAndMakeVisible(shuttle); shuttle.setAlpha(.3f);
 
-    addAndMakeVisible(modulatorsMix);
-    addAndMakeVisible(depth);
-    addAndMakeVisible(dryWetMix);
-    if (numChannels == 2) addAndMakeVisible(midSideSwitch);
+    for(auto& m: modComps)
+        addAndMakeVisible(m);
 
-    // modulation components init stuff:
-    auto matrix = audioProcessor.matrix.getCopyOfUpdatedPtr();
-    for (auto mcs = 0; mcs < modulatorComps.size(); ++mcs) {
-        // behaviour for changing the selected modulator[mcs]
-        auto onModReplace = [this, sel = mcs](int idx) {
-            for (auto& mc : modulatorComps[sel])
-                mc->setVisible(false);
-            auto matrixCopy = audioProcessor.matrix.getCopyOfUpdatedPtr();
-            for (const auto& id : audioProcessor.modsIDs[sel])
-                matrixCopy->setModulatorActive(id, false);
-            matrixCopy->setModulatorActive(audioProcessor.modsIDs[sel][idx], true);
-            audioProcessor.matrix.replaceUpdatedPtrWith(matrixCopy);
-            modulatorComps[sel][idx]->setVisible(true);
-        };
-
-        // create and add modulator components + their modulatables
-        modulatorComps[mcs][EnvFol] = std::make_unique<ModulatorEnvelopeFollowerComp>(
-            p, utils, audioProcessor.modsIDs[mcs][EnvFol], modulatables, mcs, onModReplace
-            );
-        modulatorComps[mcs][LFO] = std::make_unique<ModulatorLFOComp>(
-            p, utils, audioProcessor.modsIDs[mcs][LFO], modulatables, mcs, onModReplace
-            );
-        modulatorComps[mcs][Rand] = std::make_unique<ModulatorRandComp>(
-            p, utils, audioProcessor.modsIDs[mcs][Rand], modulatables, mcs, onModReplace
-            );
-        modulatorComps[mcs][Perlin] = std::make_unique<ModulatorPerlinComp>(
-            p, utils, audioProcessor.modsIDs[mcs][Perlin], modulatables, mcs, onModReplace
-            );
-        modulatorComps[mcs][Pitchbend] = std::make_unique<ModulatorPitchbendComp>(
-            p, utils, audioProcessor.modsIDs[mcs][Pitchbend], modulatables, mcs, onModReplace
-            );
-        modulatorComps[mcs][Note] = std::make_unique<ModulatorNoteComp>(
-            p, utils, audioProcessor.modsIDs[mcs][Note], modulatables, mcs, onModReplace
-            );
-
-        for (auto ms = 0; ms < NumMods; ++ms) {
-            addChildComponent(modulatorComps[mcs][ms].get());
-            modulatorComps[mcs][ms]->initModulatables();
-        }
-
-        // loading current modulatorselectors' states
-        for (auto m = 0; m < audioProcessor.modsIDs[mcs].size(); ++m) {
-            const auto& id = audioProcessor.modsIDs[mcs][m];
-            const auto mod = matrix->getModulator(id);
-            bool modValid = mod != nullptr && mod->isActive();
-            if (modValid) {
-                resetModulatorComp(mcs, m);
-                break;
-            }
-        }
-    }
-
-    addAndMakeVisible(macroDragger0);
-    addAndMakeVisible(macroDragger1);
-    addAndMakeVisible(macroDragger2);
-    addAndMakeVisible(macroDragger3);
-
-    std::vector<std::function<void(juce::Graphics&, Comp*, bool)>> paintModOptions;
-    paintModOptions.push_back(ModulatorComp::paintModOption(utils, "Envelope\nFollower"));
-    paintModOptions.push_back(ModulatorComp::paintModOption(utils, "LFO"));
-    paintModOptions.push_back(ModulatorComp::paintModOption(utils, "Classic\nRand"));
-    paintModOptions.push_back(ModulatorComp::paintModOption(utils, "Perlin\nNoise"));
-    paintModOptions.push_back(ModulatorComp::paintModOption(utils, "Pitchbend"));
-    paintModOptions.push_back(ModulatorComp::paintModOption(utils, "Note"));
-    for (auto mcs = 0; mcs < modulatorComps.size(); ++mcs)
-        for (auto ms = 0; ms < NumMods; ++ms)
-            modulatorComps[mcs][ms]->init(paintModOptions);
-
-    audioProcessor.matrix.replaceUpdatedPtrWith(matrix);
-
+    addAndMakeVisible(paramRandomizer);
     addAndMakeVisible(menuButton);
+
+    addAndMakeVisible(visualizer);
+
+    addAndMakeVisible(modsDepth);
+    addAndMakeVisible(modsMix);
+    addAndMakeVisible(dryWetMix);
+    addAndMakeVisible(gainWet);
+    addAndMakeVisible(stereoConfig);
+
+    addAndMakeVisible(macro0Dragger);
+    addAndMakeVisible(macro1Dragger);
+    addAndMakeVisible(macro2Dragger);
+    addAndMakeVisible(macro3Dragger);
+
     addAndMakeVisible(popUp);
+    addChildComponent(enterValue);
+
+    addAndMakeVisible(presetBrowser);
+    presetBrowser.init(this);
 
     setOpaque(true);
-    setMouseCursor(utils.cursors[utils.Cursor::Norm]);
+    modSys6::gui::makeCursor(*this, modSys6::gui::CursorType::Default);
+
+    for (auto m = 0; m < modComps.size(); ++m)
+    {
+        auto& modComp = modComps[m];
+        modComp.onModChange = [this, m](vibrato::ModType t)
+        {
+            audioProcessor.modType[m] = t;
+        };
+        modComp.setMod(p.modType[m]);
+        modComp.addButtonsToRandomizer(paramRandomizer);
+        modComp.getModType = [this, m]()
+        {
+            return audioProcessor.modType[m];
+        };
+    }
+
+    paramRandomizer.add([this](juce::Random& rand)
+    {
+        const auto numMods = static_cast<float>(vibrato::ModType::NumMods);
+        for (auto m = 0; m < modComps.size(); ++m)
+        {
+            const auto val = rand.nextFloat() * (numMods - .1f);
+            const auto type = static_cast<vibrato::ModType>(val);
+            modComps[m].setMod(type);
+        }
+        {
+            const auto val = rand.nextFloat() > .5f ? true : false;
+            audioProcessor.oversampling.setEnabled(val);
+        }
+        {
+            const auto range = modSys6::makeRange::biasXL(1.f, 10000.f, -.999f);
+            const auto val = range.convertFrom0to1(rand.nextFloat());
+            const juce::Identifier id(vibrato::toString(vibrato::ObjType::DelaySize));
+            audioProcessor.modSys.state.setProperty(id, val, nullptr);
+            audioProcessor.vibrat.triggerUpdate();
+        }
+        {
+            const auto numTypes = static_cast<float>(vibrato::InterpolationType::NumInterpolationTypes);
+            const auto val = rand.nextFloat() * (numTypes - .1f);
+            const auto type = static_cast<vibrato::InterpolationType>(val);
+            audioProcessor.vibrat.setInterpolationType(type);
+        }
+    });
+
+    presetBrowser.savePatch = [this]()
+    {
+        juce::MessageManagerLock lock;
+        audioProcessor.savePatch();
+        return audioProcessor.modSys.state;
+    };
 
     setBufferedToImage(true);
     setResizable(true, true);
-    startTimerHz(16);
     setSize(nelG::Width, nelG::Height);
 }
-void Nel19AudioProcessorEditor::resized() {
-    layout.setBounds(getLocalBounds().toFloat().reduced(nelG::Thicc));
+void Nel19AudioProcessorEditor::resized()
+{
+    if (getWidth() < MinEditorBounds)
+        return setBounds(0, 0, MinEditorBounds, getHeight());
+    else if (getHeight() < MinEditorBounds)
+        return setBounds(0, 0, getWidth(), MinEditorBounds);
+
+    const auto thicc = modSys6::gui::Shared::shared.thicc;
+
+    layout.setBounds(getLocalBounds().toFloat().reduced(thicc));
     layoutBottomBar.setBounds(layout.bottomBar());
     layoutTopBar.setBounds(layout.topBar());
-    layoutMacros.setBounds(layout(0, 1, 1, 4).reduced(nelG::Thicc));
-    layoutMainParams.setBounds(layout(2, 1, 1, 4).reduced(nelG::Thicc));
-    layoutMiscs.setBounds(layout(3, 1, 1, 4).reduced(nelG::Thicc));
+    layoutMacros.setBounds(layout(0, 1, 1, 4).reduced(thicc));
+    layoutMainParams.setBounds(layout(2, 1, 1, 4).reduced(thicc));
+    //layoutMiscs.setBounds(layout(3, 1, 1, 4).reduced(thicc));
 
-    layoutTopBar.place(menuButton,  0, 0, 1, 1, nelG::Thicc, true);
+    layoutBottomBar.place(tooltips, 0, 0, 1, 1, thicc, false);
+    layoutBottomBar.place(buildDate, 1, 0, 1, 1, thicc, false);
 
+    layoutMacros.place(macro0, 0, 0, 1, 1, thicc);
+    layoutMacros.place(macro1, 0, 2, 1, 1, thicc);
+    layoutMacros.place(macro2, 0, 4, 1, 1, thicc);
+    layoutMacros.place(macro3, 0, 6, 1, 1, thicc);
+    macro0Dragger.setQBounds(layoutMacros(0, 1, 1, 1, true).reduced(thicc));
+    macro1Dragger.setQBounds(layoutMacros(0, 3, 1, 1, true).reduced(thicc));
+    macro2Dragger.setQBounds(layoutMacros(0, 5, 1, 1, true).reduced(thicc));
+    macro3Dragger.setQBounds(layoutMacros(0, 7, 1, 1, true).reduced(thicc));
+
+    layoutTopBar.place(paramRandomizer, 1, 0, 1, 1, thicc, true);
+    layoutTopBar.place(menuButton,      0, 0, 1, 1, thicc, true);
+    layoutTopBar.place(presetBrowser.getOpenCloseButton(), 2, 0, 1, 1, thicc, true);
+    layoutTopBar.place(nelLabel,        3, 0, 1, 1, thicc, false);
+    layoutTopBar.place(visualizer,      4, 0, 1, 1, thicc, false);
+
+    popUp.setBounds({ 0, 0, 100, 50 });
+    enterValue.setBounds({ 0, 0, 100, 50 });
+
+    for(auto m = 0; m < modComps.size(); ++m)
+        layout.place(modComps[m], 1, 1 + m * 2, 1, 2, thicc, false);
+
+    layoutMainParams.place(modsDepth,    0, 0, 2, 1, thicc, true);
+    layoutMainParams.place(modsMix,      0, 1, 2, 1, thicc, true);
+    layoutMainParams.place(dryWetMix,    1, 2, 1, 1, thicc, true);
+    layoutMainParams.place(gainWet,      0, 2, 1, 1, thicc, true);
+    layoutMainParams.place(stereoConfig, 0, 3, 2, 1, thicc, true);
+
+    layout.place(presetBrowser, 1, 1, 2, 4, thicc, false);
+
+    /*
+    layoutTopBar.place(menuButton, 0, 0, 1, 1, nelG::Thicc, true);
     layout.place(menu.get(), 1, 1, 4, 4);
-    
-    layoutBottomBar.place(buildDate, 1, 0, 1, 1, nelG::Thicc, false);
-    layoutBottomBar.place(tooltips, 0, 0, 1, 1, nelG::Thicc, false);
-    layoutMacros.place(macro0, 0, 0, 1, 1, nelG::Thicc);
-    layoutMacros.place(macro1, 0, 2, 1, 1, nelG::Thicc);
-    layoutMacros.place(macro2, 0, 4, 1, 1, nelG::Thicc);
-    layoutMacros.place(macro3, 0, 6, 1, 1, nelG::Thicc);
-    macroDragger0.setQBounds(layoutMacros(0, 1, 1, 1, true).reduced(nelG::Thicc).toNearestInt());
-    macroDragger1.setQBounds(layoutMacros(0, 3, 1, 1, true).reduced(nelG::Thicc).toNearestInt());
-    macroDragger2.setQBounds(layoutMacros(0, 5, 1, 1, true).reduced(nelG::Thicc).toNearestInt());
-    macroDragger3.setQBounds(layoutMacros(0, 7, 1, 1, true).reduced(nelG::Thicc).toNearestInt());
-
-    for (auto mcs = 0; mcs < 2; ++mcs)
-        for (auto mm = 0; mm < modulatorComps[mcs].size(); ++mm)
-            layout.place(*modulatorComps[mcs][mm], 1, 1 + mcs * 2, 1, 2, nelG::Thicc, false); 
-
-    layoutMainParams.place(depth,         0, 0, 1, 1, nelG::Thicc);
-    layoutMainParams.place(modulatorsMix, 0, 1, 1, 1, nelG::Thicc);
-    layoutMainParams.place(dryWetMix,     0, 2, 1, 1, nelG::Thicc);
-    layoutMainParams.place(midSideSwitch, 0, 3, 1, 1, nelG::Thicc, true);
-
-    shuttle.setBounds(layoutMiscs().reduced(nelG::Thicc).toNearestInt());
-
-    popUp.setBounds({0, 0, 100, 30});
+    */
 }
-void Nel19AudioProcessorEditor::paint(juce::Graphics& g) {
-    g.fillAll(juce::Colours::black);
-    //g.fillAll(utils.colours[Utils::Background]);
-    nelG::fillAndOutline(g, layoutMacros, utils.colours[Utils::ColourID::Background], utils.colours[Utils::ColourID::Normal]);
-    for (auto& modComp : modulatorComps)
-        nelG::fillAndOutline(g, *modComp[0].get(), utils.colours[Utils::ColourID::Background], utils.colours[Utils::ColourID::Normal]);
-    nelG::fillAndOutline(g, layoutMainParams, utils.colours[Utils::ColourID::Background], utils.colours[Utils::ColourID::Normal]);
-    nelG::fillAndOutline(g, layoutMiscs, utils.colours[Utils::ColourID::Background], utils.colours[Utils::ColourID::Normal]);
+void Nel19AudioProcessorEditor::paint(juce::Graphics& g)
+{
+    g.fillAll(utils.colour(modSys6::gui::ColourID::Bg));
 }
-void Nel19AudioProcessorEditor::mouseEnter(const juce::MouseEvent&) { utils.updateTooltip(nullptr); }
-void Nel19AudioProcessorEditor::timerCallback() {
-    const auto matrix = audioProcessor.matrix.getUpdatedPtr();
-    macroDragger0.timerCallback(matrix); macroDragger1.timerCallback(matrix);
-    macroDragger2.timerCallback(matrix); macroDragger3.timerCallback(matrix);
-
-    for(auto modulatable : modulatables)
-        modulatable->updateModSys(matrix);
+void Nel19AudioProcessorEditor::mouseEnter(const juce::MouseEvent&)
+{
+    utils.setTooltip(nullptr);
 }
-void Nel19AudioProcessorEditor::resetModulatorComp(int modIdx, int modTypeIdx) {
-    for (auto& mc : modulatorComps[modIdx])
-        mc->setVisible(false);
-    modulatorComps[modIdx][modTypeIdx]->setVisible(true);
+void Nel19AudioProcessorEditor::mouseDown(const juce::MouseEvent&)
+{
+    utils.killEnterValue();
 }
 
 /*
 
-onModReplace can trigger some thread issue. why
-    seems to create -nan in processor vibBuffer
-    changed way it setVisible the modulatorComps (works now?)
 
 */

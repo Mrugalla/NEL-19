@@ -1,7 +1,8 @@
 #pragma once
 #include "Filter.h"
 
-namespace oversampling {
+namespace oversampling
+{
 	// http://www.dspguide.com/ch16/1.htm
 
 	struct ImpulseResponse
@@ -14,7 +15,7 @@ namespace oversampling {
 		}
 		ImpulseResponse(const std::vector<float>& _data) :
 			data(_data),
-			latency(data.size() / 2)
+			latency(static_cast<int>(data.size()) / 2)
 		{
 		}
 		float operator[](int i) const noexcept { return data[i]; }
@@ -36,7 +37,8 @@ namespace oversampling {
 	/*
 	* fc < Nyquist && bw < Nyquist && fc + bw < Nyquist
 	*/
-	static ImpulseResponse makeSincFilter2(float Fs, float fc, float bw, bool upsampling) {
+	static ImpulseResponse makeSincFilter2(float Fs, float fc, float bw, bool upsampling)
+	{
 		const auto nyquist = Fs * .5f;
 		if (fc > nyquist || bw > nyquist || fc + bw > nyquist) { // invalid arguments
 			std::vector<float> ir;
@@ -66,7 +68,10 @@ namespace oversampling {
 		std::vector<float> ir;
 		ir.reserve(N);
 		for (auto n = 0; n < N; ++n)
-			ir.emplace_back(h(n) * w(n));
+		{
+			auto nF = static_cast<float>(n);
+			ir.emplace_back(h(nF) * w(nF));
+		}	
 
 		const auto targetGain = upsampling ? 2.f : 1.f;
 		auto sum = 0.f; // normalize
@@ -88,8 +93,10 @@ namespace oversampling {
 			buffer.resize(ir.size(), 0.f);
 		}
 
-		void processBlock(float* audioBuffer, const ImpulseResponse& ir, const int numSamples) noexcept {
-			for (auto s = 0; s < numSamples; ++s) {
+		void processBlock(float* audioBuffer, const ImpulseResponse& ir, const int numSamples) noexcept
+		{
+			for (auto s = 0; s < numSamples; ++s)
+			{
 				++wIdx;
 				if (wIdx == ir.size())
 					wIdx = 0;
@@ -97,52 +104,59 @@ namespace oversampling {
 
 				auto y = 0.f;
 				auto rIdx = wIdx;
-				for (auto i = 0; i < ir.size(); ++i) {
+				for (auto i = 0; i < ir.size(); ++i)
+				{
 					y += buffer[rIdx] * ir[i];
 					--rIdx;
 					if (rIdx == -1)
-						rIdx = ir.size() - 1;
+						rIdx = static_cast<int>(ir.size()) - 1;
 				}
 				audioBuffer[s] = y;
 			}
 		}
-
-		void processBlockUp(float* audioBuffer, const ImpulseResponse& ir, const int numSamples) noexcept {
-			for (auto s = 0; s < numSamples; s += 2) {
+		void processBlockUp(float* audioBuffer, const ImpulseResponse& ir, const int numSamples) noexcept
+		{
+			for (auto s = 0; s < numSamples; s += 2)
+			{
 				audioBuffer[s] = processSampleUpEven(audioBuffer[s], ir);
 				audioBuffer[s + 1] = processSampleUpOdd(ir);
 			}
 		}
-
-		float processSampleUpEven(const float sample, const ImpulseResponse& ir) noexcept {
-				buffer[wIdx] = sample;
-				auto y = 0.f;
-				auto rIdx = wIdx;
-				for (auto i = 0; i < ir.size(); i += 2) {
-					y += buffer[rIdx] * ir[i];
-					rIdx -= 2;
-					if (rIdx < 0)
-						rIdx += ir.size();
-				}
-				++wIdx;
-				if (wIdx == ir.size())
-					wIdx = 0;
-				return y;
-		}
-		float processSampleUpOdd(const ImpulseResponse& ir) noexcept {
+		float processSampleUpEven(const float sample, const ImpulseResponse& ir) noexcept
+		{
+			const auto irSize = static_cast<int>(ir.size());
+			buffer[wIdx] = sample;
 			auto y = 0.f;
-			auto rIdx = wIdx - 1;
-			if (rIdx == -1)
-				rIdx = ir.size() - 1;
-			buffer[wIdx] = 0.f;
-			for (auto i = 1; i < ir.size(); i += 2) {
+			auto rIdx = wIdx;
+			for (auto i = 0; i < irSize; i += 2)
+			{
 				y += buffer[rIdx] * ir[i];
 				rIdx -= 2;
 				if (rIdx < 0)
-					rIdx += ir.size();
+					rIdx += irSize;
 			}
 			++wIdx;
-			if (wIdx == ir.size())
+			if (wIdx == irSize)
+				wIdx = 0;
+			return y;
+		}
+		float processSampleUpOdd(const ImpulseResponse& ir) noexcept
+		{
+			const auto irSize = static_cast<int>(ir.size());
+			auto y = 0.f;
+			auto rIdx = wIdx - 1;
+			if (rIdx == -1)
+				rIdx = irSize - 1;
+			buffer[wIdx] = 0.f;
+			for (auto i = 1; i < irSize; i += 2)
+			{
+				y += buffer[rIdx] * ir[i];
+				rIdx -= 2;
+				if (rIdx < 0)
+					rIdx += irSize;
+			}
+			++wIdx;
+			if (wIdx == irSize)
 				wIdx = 0;
 			return y;
 		}
@@ -151,33 +165,37 @@ namespace oversampling {
 		int wIdx;
 	};
 
-	struct ConvolutionFilter :
-		public Filter
+	struct ConvolutionFilter
 	{
 		ConvolutionFilter(int _numChannels = 0, float _Fs = 1.f, float _cutoff = .25f, float _bandwidth = .25f, bool upsampling = false) :
-			Filter(_numChannels),
 			filters(),
-			ir(_numChannels != 0 ? makeSincFilter2(_Fs, _cutoff, _bandwidth, upsampling) : ImpulseResponse())
+			ir(_numChannels != 0 ? makeSincFilter2(_Fs, _cutoff, _bandwidth, upsampling) : ImpulseResponse()),
+			numChannels(_numChannels)
 		{
 			filters.resize(_numChannels, { ir });
 		}
-		const int getLatency() const noexcept override { return ir.latency; }
-		void processBlockDown(float** audioBuffer, const int numSamples) override {
+		int getLatency() const noexcept { return ir.latency; }
+		void processBlockDown(float** audioBuffer, int numSamples) noexcept
+		{
 			for (auto ch = 0; ch < this->numChannels; ++ch)
 				filters[ch].processBlock(audioBuffer[ch], ir, numSamples);
 		}
-		void processBlockUp(float** audioBuffer, const int numSamples) override {
+		void processBlockUp(float** audioBuffer, int numSamples) noexcept
+		{
 			for (auto ch = 0; ch < this->numChannels; ++ch)
 				filters[ch].processBlockUp(audioBuffer[ch], ir, numSamples);
 		}
-		float processSampleUpEven(const float sample, const int ch) override {
+		float processSampleUpEven(const float sample, const int ch) noexcept
+		{
 			return filters[ch].processSampleUpEven(sample, ir);
 		}
-		float processSampleUpOdd(const int ch) override {
+		float processSampleUpOdd(const int ch) noexcept 
+		{
 			return filters[ch].processSampleUpOdd(ir);
 		}
 	protected:
 		std::vector<Convolution> filters;
 		ImpulseResponse ir;
+		int numChannels;
 	};
 }

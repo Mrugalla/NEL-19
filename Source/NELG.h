@@ -2,36 +2,29 @@
 #include <JuceHeader.h>
 #define DebugLayout false && JUCE_DEBUG
 
-namespace nelG {
+namespace nelG
+{
     // MATH UTILS
     static constexpr float Pi = 3.14159265359f;
     static constexpr float Tau = 6.28318530718f;
     static constexpr float PiHalf = Pi * .5f;
     static constexpr float PiQuart = Pi * .25f;
-    // PAINT UTILS
-    static constexpr float Thicc = 2.5f, Thicc2 = Thicc * 2.f;
     // DEFAULT BOUNDS
     static constexpr int Width = 512 + 256;
     static constexpr int Height = 256 + 128 + 16;
-    // DEFAULT COLOURS
-    static constexpr unsigned int ColBlack = 0xff171623;
-    static constexpr unsigned int ColDarkGrey = 0xff595652;
-    static constexpr unsigned int ColBeige = 0xff9c8980;
-    static constexpr unsigned int ColGrey = 0xff696a6a;
-    static constexpr unsigned int ColRed = 0xffac3232;
-    static constexpr unsigned int ColGreen = 0xff37946e;
-    static constexpr unsigned int ColYellow = 0xfffffa8f;
-    static constexpr unsigned int ColGreenNeon = 0xff99c550;
 
-    static juce::Rectangle<float> maxQuadIn(const juce::Rectangle<float>& b) noexcept {
+    inline juce::Rectangle<float> maxQuadIn(const juce::Rectangle<float>& b) noexcept
+    {
         const auto minDimen = std::min(b.getWidth(), b.getHeight());
         const auto x = b.getX() + .5f * (b.getWidth() - minDimen);
         const auto y = b.getY() + .5f * (b.getHeight() - minDimen);
         return { x, y, minDimen, minDimen };
     }
 
-    class Layout {
-        struct NamedLocation {
+    class Layout
+    {
+        struct NamedLocation
+        {
             NamedLocation(juce::String&& n, int xx, int yy, int widthh, int heightt, bool quad, bool ellip, bool visible) :
                 name(n),
                 x(xx),
@@ -89,7 +82,8 @@ namespace nelG {
             for (auto& y : rY) y += bounds.getY();
         }
         // PROCESS
-        void place(juce::Component& comp, int x, int y, int width = 1, int height = 1, float padding = 0.f, bool isQuad = false) {
+        void place(juce::Component& comp, int x, int y, int width = 1, int height = 1, float padding = 0.f, bool isQuad = false)
+        {
             const auto cBounds = this->operator()(x, y, width, height);
             if(!isQuad)
                 if(padding != 0.f)
@@ -114,10 +108,24 @@ namespace nelG {
                 rY[rY.size() - 1] - rY[0]
             };
         }
-        juce::Rectangle<float> operator()(int x, int y, int width = 1, int height = 1, bool isQuad = false) const noexcept {
+        //juce::Rectangle<float> operator()(int x, int y, int width = 1, int height = 1, bool isQuad = false) const noexcept {
+        //    juce::Rectangle<float> nBounds(rX[x], rY[y], rX[x + width] - rX[x], rY[y + height] - rY[y]);
+        //    if (!isQuad) return nBounds;
+        //    else return maxQuadIn(nBounds);
+        //}
+        juce::Rectangle<float> operator()(int x, int y, int width = 1, int height = 1, float padding = 0.f, bool isQuad = false) const noexcept
+        {
             juce::Rectangle<float> nBounds(rX[x], rY[y], rX[x + width] - rX[x], rY[y + height] - rY[y]);
-            if (!isQuad) return nBounds;
-            else return maxQuadIn(nBounds);
+            if (!isQuad)
+                if (padding == 0.f)
+                    return nBounds;
+                else
+                    return nBounds.reduced(padding);
+            else
+                if (padding == 0.f)
+                    return maxQuadIn(nBounds);
+                else
+                    return maxQuadIn(nBounds).reduced(padding);
         }
         juce::Rectangle<float> bottomBar() const noexcept {
             return {
@@ -204,15 +212,16 @@ namespace nelG {
     };
 
     static void fillAndOutline(juce::Graphics& g, juce::Rectangle<float> bounds, juce::Colour bg, juce::Colour lines = juce::Colours::transparentBlack) {
+        const auto thicc = modSys6::gui::Shared::shared.thicc;
         g.setColour(bg);
-        g.fillRoundedRectangle(bounds, Thicc);
+        g.fillRoundedRectangle(bounds, thicc);
         g.setColour(lines);
-        g.drawRoundedRectangle(bounds, Thicc, Thicc);
+        g.drawRoundedRectangle(bounds, thicc, thicc);
     }
     static inline void fillAndOutline(juce::Graphics& g, const juce::Component& comp, juce::Colour bg, juce::Colour lines = juce::Colours::transparentBlack) {
         fillAndOutline(g, comp.getBounds().toFloat(), bg, lines);
     }
-    static inline void fillAndOutline(juce::Graphics& g, const Layout& layout, juce::Colour bg, juce::Colour lines) {
+    static inline void fillAndOutline(juce::Graphics& g, const Layout& layout, juce::Colour bg, juce::Colour lines = juce::Colours::transparentBlack) {
         fillAndOutline(g, layout(), bg, lines);
     }
 

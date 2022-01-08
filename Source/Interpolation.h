@@ -50,7 +50,8 @@ namespace interpolation {
 		return lerp(buffer[i0], buffer[i1], x);
 	}
 
-	static float cubicHermiteSpline(const float* buffer, const float readHead, const int size) {
+	static float cubicHermiteSpline(const float* buffer, const float readHead, const int size) noexcept
+	{
 		const auto iFloor = std::floor(readHead);
 		auto i1 = static_cast<int>(iFloor);
 		auto i0 = i1 - 1;
@@ -73,7 +74,28 @@ namespace interpolation {
 
 		return ((c3 * t + c2) * t + c1) * t + c0;
 	}
+	static float cubicHermiteSpline(const float* buffer, const float readHead) noexcept
+	{
+		const auto iFloor = std::floor(readHead);
+		const auto i0 = static_cast<int>(iFloor);
+		const auto i1 = i0 + 1;
+		const auto i2 = i0 + 2;
+		const auto i3 = i0 + 3;
 
+		const auto t = readHead - iFloor;
+		const auto v0 = buffer[i0];
+		const auto v1 = buffer[i1];
+		const auto v2 = buffer[i2];
+		const auto v3 = buffer[i3];
+
+		const auto c0 = v1;
+		const auto c1 = .5f * (v2 - v0);
+		const auto c2 = v0 - 2.5f * v1 + 2.f * v2 - .5f * v3;
+		const auto c3 = 1.5f * (v1 - v2) + .5f * (v3 - v0);
+
+		return ((c3 * t + c2) * t + c1) * t + c0;
+	}
+	
 	static float lagrange(const float* buffer, const float readHead, const int size, const int N) {
 		const float iFloor = std::floor(readHead);
 		const int iFloorInt = static_cast<int>(iFloor);
@@ -94,10 +116,10 @@ namespace interpolation {
 
 /*
 
-lagrange sounds crappy in the highend. why
+lagrange sounds crappy in the highend in 44100hz. why?
 
 sinc might still be wrong
-	(peter said shall have no issues on sine)
+	(peter said shall have no issues on sinc)
 	might be float vs double issue
 
 */

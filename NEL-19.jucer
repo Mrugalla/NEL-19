@@ -5,65 +5,61 @@
               pluginName="NEL" pluginDesc="Creative Vibrato For Travellers"
               pluginManufacturer="Florian Mrugalla" pluginVST3Category="Modulation"
               pluginRTASCategory="32" pluginAAXCategory="32" pluginCharacteristicsValue="pluginWantsMidiIn"
-              pluginCode="Nel9" pluginManufacturerCode="Mrug" companyName="Mrugalla">
+              pluginCode="Nel9" pluginManufacturerCode="Mrug" companyName="Mrugalla"
+              cppLanguageStandard="20">
   <MAINGROUP id="V2oOlh" name="NEL">
     <GROUP id="{FF8BE835-9B90-31CB-45F4-D4B15FDEFD04}" name="Source">
+      <GROUP id="{8EC0EF39-024B-4AE6-4857-5AD651D74232}" name="modsys">
+        <FILE id="nECyrZ" name="ModSys.h" compile="0" resource="0" file="Source/modsys/ModSys.h"/>
+        <FILE id="IhYJlR" name="ModSysGUI.cpp" compile="1" resource="0" file="Source/modsys/ModSysGUI.cpp"/>
+        <FILE id="C8d7qo" name="ModSysGUI.h" compile="0" resource="0" file="Source/modsys/ModSysGUI.h"/>
+      </GROUP>
       <GROUP id="{37A90D57-856D-DDA5-A367-4EC832EDC7CF}" name="xml">
-        <FILE id="ld5eYo" name="menu.xml" compile="0" resource="1" file="Source/xml/menu.xml"/>
+        <GROUP id="{E731FF33-6A25-2972-1315-42CDC87CE522}" name="presets">
+          <FILE id="UgRv1h" name="AudioRate Arp (midi).nel" compile="0" resource="1"
+                file="Source/xml/presets/AudioRate Arp (midi).nel"/>
+          <FILE id="oZQjfg" name="Broken Tape.nel" compile="0" resource="1" file="Source/xml/presets/Broken Tape.nel"/>
+          <FILE id="XUW7Jp" name="Dream Arp EnvFol.nel" compile="0" resource="1"
+                file="Source/xml/presets/Dream Arp EnvFol.nel"/>
+          <FILE id="ql7Hov" name="Flanger.nel" compile="0" resource="1" file="Source/xml/presets/Flanger.nel"/>
+          <FILE id="cpAPfJ" name="Init.nel" compile="0" resource="1" file="Source/xml/presets/Init.nel"/>
+          <FILE id="NsQUlc" name="Psychosis.nel" compile="0" resource="1" file="Source/xml/presets/Psychosis.nel"/>
+          <FILE id="rokh6X" name="Resample.nel" compile="0" resource="1" file="Source/xml/presets/Resample.nel"/>
+          <FILE id="UHRvg8" name="Shoegaze.nel" compile="0" resource="1" file="Source/xml/presets/Shoegaze.nel"/>
+          <FILE id="Ufdy47" name="Sines.nel" compile="0" resource="1" file="Source/xml/presets/Sines.nel"/>
+          <FILE id="gn5TrZ" name="Thicc.nel" compile="0" resource="1" file="Source/xml/presets/Thicc.nel"/>
+        </GROUP>
+        <FILE id="x2tTLB" name="menu.xml" compile="0" resource="1" file="Source/xml/menu.xml"/>
       </GROUP>
       <GROUP id="{FE66FC35-0867-A645-7FF8-6E8DD7C732A0}" name="oversampling">
+        <FILE id="o2Sblu" name="IIRFilter.h" compile="0" resource="0" file="Source/oversampling/IIRFilter.h"/>
         <FILE id="Bq0cwR" name="ConvolutionFilter.h" compile="0" resource="0"
               file="Source/oversampling/ConvolutionFilter.h"/>
         <FILE id="npdYae" name="Filter.h" compile="0" resource="0" file="Source/oversampling/Filter.h"/>
         <FILE id="uBL8je" name="Oversampling.h" compile="0" resource="0" file="Source/oversampling/Oversampling.h"/>
       </GROUP>
       <GROUP id="{64C413BA-3699-8A57-746B-A094BA76D880}" name="dsp">
+        <FILE id="mnD5YL" name="DryWetProcessor.h" compile="0" resource="0"
+              file="Source/dsp/DryWetProcessor.h"/>
         <FILE id="bv92ia" name="MidSideEncoder.h" compile="0" resource="0"
               file="Source/dsp/MidSideEncoder.h"/>
+        <FILE id="sWUzN7" name="ModsGUI.h" compile="0" resource="0" file="Source/dsp/ModsGUI.h"/>
+        <FILE id="LZVNwr" name="Modulator.h" compile="0" resource="0" file="Source/dsp/Modulator.h"/>
         <FILE id="NhBr3Z" name="Vibrato.h" compile="0" resource="0" file="Source/dsp/Vibrato.h"/>
-      </GROUP>
-      <GROUP id="{506F3931-B583-C784-A391-2F9193648856}" name="modsys">
-        <FILE id="XNErho" name="Destination.h" compile="0" resource="0" file="Source/modsys/Destination.h"/>
-        <FILE id="pPb3lJ" name="EnvelopeFollowerModulator.h" compile="0" resource="0"
-              file="Source/modsys/EnvelopeFollowerModulator.h"/>
-        <FILE id="LTKKv6" name="LFOModulator.h" compile="0" resource="0" file="Source/modsys/LFOModulator.h"/>
-        <FILE id="Bi64TZ" name="MacroModulator.h" compile="0" resource="0"
-              file="Source/modsys/MacroModulator.h"/>
-        <FILE id="VZYZ7Z" name="Matrix.h" compile="0" resource="0" file="Source/modsys/Matrix.h"/>
-        <FILE id="TOXU69" name="MIDIModulator.h" compile="0" resource="0" file="Source/modsys/MIDIModulator.h"/>
-        <FILE id="cxCTK5" name="ModSystem.h" compile="0" resource="0" file="Source/modsys/ModSystem.h"/>
-        <FILE id="WfEtwS" name="Modulator.h" compile="0" resource="0" file="Source/modsys/Modulator.h"/>
-        <FILE id="L4WToN" name="Parameter.h" compile="0" resource="0" file="Source/modsys/Parameter.h"/>
-        <FILE id="DTMHnv" name="PerlinModulator.h" compile="0" resource="0"
-              file="Source/modsys/PerlinModulator.h"/>
-        <FILE id="MCkq6t" name="RandomModulator.h" compile="0" resource="0"
-              file="Source/modsys/RandomModulator.h"/>
-        <FILE id="tHrdt8" name="Utils.h" compile="0" resource="0" file="Source/modsys/Utils.h"/>
       </GROUP>
       <GROUP id="{DF5CA124-D2C0-471E-8D17-297CEBC9FA0F}" name="releasePool">
         <FILE id="ZsHHV2" name="ReleasePool.cpp" compile="1" resource="0" file="Source/releasePool/ReleasePool.cpp"/>
         <FILE id="wMeHhK" name="ReleasePool.h" compile="0" resource="0" file="Source/releasePool/ReleasePool.h"/>
       </GROUP>
-      <GROUP id="{E7C26409-5FA8-4FFC-B81A-4D1B04E433DC}" name="comp">
-        <FILE id="ybltcf" name="Component.h" compile="0" resource="0" file="Source/comp/Component.h"/>
-        <FILE id="wRDs2r" name="Menu.h" compile="0" resource="0" file="Source/comp/Menu.h"/>
-        <FILE id="LYSgbX" name="ModsComps.h" compile="0" resource="0" file="Source/comp/ModsComps.h"/>
-        <FILE id="Po4xEG" name="Parameter.h" compile="0" resource="0" file="Source/comp/Parameter.h"/>
-        <FILE id="VrcIYP" name="ParameterRandomizer.h" compile="0" resource="0"
-              file="Source/comp/ParameterRandomizer.h"/>
-        <FILE id="ZlThXB" name="PixelArt.h" compile="0" resource="0" file="Source/comp/PixelArt.h"/>
-        <FILE id="vWq25b" name="Visualizer.h" compile="0" resource="0" file="Source/comp/Visualizer.h"/>
-      </GROUP>
       <GROUP id="{EB637F68-8B54-CF39-23F4-99282698FA6E}" name="Img">
-        <FILE id="UlEIyH" name="bluecat.png" compile="0" resource="1" file="Source/Img/bluecat.png"/>
         <FILE id="qMlrvH" name="cursorCross.png" compile="0" resource="1" file="Source/Img/cursorCross.png"/>
         <FILE id="ok6eqm" name="cursor.png" compile="0" resource="1" file="Source/Img/cursor.png"/>
         <FILE id="ciQHKW" name="juce.png" compile="0" resource="1" file="Source/Img/juce.png"/>
         <FILE id="Y03fii" name="shuttle.png" compile="0" resource="1" file="Source/Img/shuttle.png"/>
-        <FILE id="xFrvgl" name="tap.png" compile="0" resource="1" file="Source/Img/tap.png"/>
         <FILE id="e3uEiq" name="vst3_logo_small.png" compile="0" resource="1"
               file="Source/Img/vst3_logo_small.png"/>
       </GROUP>
+      <FILE id="NKabK2" name="Menu.h" compile="0" resource="0" file="Source/Menu.h"/>
       <FILE id="jJ2XEr" name="Approx.h" compile="0" resource="0" file="Source/Approx.h"/>
       <FILE id="xZdKBx" name="Outtakes.h" compile="0" resource="0" file="Source/Outtakes.h"/>
       <FILE id="RWsf1L" name="Interpolation.h" compile="0" resource="0" file="Source/Interpolation.h"/>
@@ -79,7 +75,8 @@
             file="Source/PluginProcessor.h"/>
     </GROUP>
   </MAINGROUP>
-  <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"/>
+  <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"
+               JUCE_ENABLE_REPAINT_DEBUGGING="0"/>
   <EXPORTFORMATS>
     <VS2019 targetFolder="Builds/VisualStudio2019">
       <CONFIGURATIONS>
@@ -101,6 +98,7 @@
         <MODULEPATH id="juce_graphics" path="../../JUCE/modules"/>
         <MODULEPATH id="juce_gui_basics" path="../../JUCE/modules"/>
         <MODULEPATH id="juce_gui_extra" path="../../JUCE/modules"/>
+        <MODULEPATH id="juce_dsp" path="../../JUCE/modules"/>
       </MODULEPATHS>
     </VS2019>
   </EXPORTFORMATS>
@@ -114,6 +112,7 @@
     <MODULE id="juce_audio_utils" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_core" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_data_structures" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_dsp" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_events" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_graphics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_gui_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>

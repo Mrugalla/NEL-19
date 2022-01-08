@@ -55,32 +55,40 @@ private:
 * to ensure thread- and realtime-safety
 */
 template<class Type>
-struct ThreadSafePtr {
-    ThreadSafePtr(Type&& args) :
+struct RealtimePtr
+{
+    RealtimePtr(Type&& args) :
         curPtr(std::make_shared<Type>(args)),
         updatedPtr(curPtr),
         spinLock()
-    { ReleasePool::theReleasePool.add(curPtr); }
-    ~ThreadSafePtr() {
+    {
+        ReleasePool::theReleasePool.add(curPtr);
+    }
+    ~RealtimePtr()
+    {
         curPtr.reset(); updatedPtr.reset();
         ReleasePool::theReleasePool.release();
     }
-    std::shared_ptr<Type> getCopyOfUpdatedPtr() {
+    std::shared_ptr<Type> getCopyOfUpdatedPtr()
+    {
         spinLock.enter();
         auto copiedPtr = std::make_shared<Type>(*updatedPtr.get());
         spinLock.exit();
         return copiedPtr;
     }
-    void replaceUpdatedPtrWith(const std::shared_ptr<Type>& newPtr) {
+    void replaceUpdatedPtrWith(const std::shared_ptr<Type>& newPtr)
+    {
         spinLock.enter();
         updatedPtr = newPtr;
         ReleasePool::theReleasePool.add(updatedPtr);
         spinLock.exit();
     }
-    std::shared_ptr<Type> getUpdatedPtr() noexcept {
+    std::shared_ptr<Type> getUpdatedPtr() noexcept
+    {
         return updatedPtr;
     }
-    std::shared_ptr<Type> updateAndLoadCurrentPtr() noexcept {
+    std::shared_ptr<Type> updateAndLoadCurrentPtr() noexcept
+    {
         if (curPtr != updatedPtr)
             if (spinLock.tryEnter()) {
                 curPtr = updatedPtr;
@@ -88,8 +96,12 @@ struct ThreadSafePtr {
             }
         return curPtr;
     }
-    const std::shared_ptr<Type>& operator->() const noexcept { return curPtr; }
-    void dbgReferenceCount(juce::String&& start = juce::String("")) const {
+    const std::shared_ptr<Type>& operator->() const noexcept
+    {
+        return curPtr;
+    }
+    void dbgReferenceCount(juce::String&& start = juce::String("")) const
+    {
         DBG(start);
         ReleasePool::theReleasePool.dbg();
         DBG("current: " << curPtr.use_count() << " :: " << "updated: " << updatedPtr.use_count());

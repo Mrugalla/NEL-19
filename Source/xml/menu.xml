@@ -1,27 +1,71 @@
 <menu id="options">
   <menu id="audio" tooltip="adjust properties of this instance's core dsp">
     <textbox id="buffersize" tooltip="adjust the size of the vibrato's delay buffer."/>
-    <switch id="interpolation" tooltip="select the method that is used to interplate the delay.">
+    <switch id="interpolation" tooltip="select the method that is used to interpolate the vibrato's delay.">
       <option id="lerp"/>
       <option id="spline"/>
       <option id="lagrange"/>
       <option id="sinc"/>
     </switch>
-    <switch id="oversampling" tooltip="turn on oversampling to get lower sidelobes.">
+    <switch id="oversampling" tooltip="turn on oversampling to get lower sidelobes on strong modulation.">
       <option id="1x"/>
       <option id="4x"/>
+    </switch>
+    <switch id="lookahead" tooltip="turn lookahead on to compensate for the vibrato's latency.">
+      <option id="off"/>
+      <option id="on"/>
     </switch>
   </menu>
   <menu id="graphics" tooltip="individualize the appearance of the plugin here.">
     <menu id="colours" tooltip="individualize the colour sheme of the plugin here.">
-      <colourselector id="background"/>
-      <colourselector id="normal"/>
-      <colourselector id="interactable"/>
-      <colourselector id="modulation"/>
-      <colourselector id="inactive"/>
+      <colourselector id="txt"/>
+      <colourselector id="bg"/>
       <colourselector id="abort"/>
-      <colourselector id="hoverBg"/>
+      <colourselector id="mod"/>
+      <colourselector id="interact"/>
+      <colourselector id="inactive"/>
       <colourselector id="darken"/>
+      <colourselector id="hover"/>
+    </menu>
+  </menu>
+  <menu id="workflow" tooltip="settings that affect your workflow experience.">
+    <menu id="randomizer" tooltip="refine the functionality of the parameter randomizers.">
+      <textbox id="r_depth" tooltip="defines the depth of each randomization step."/>
+    </menu>
+    <menu id="default state" tooltip="define the default state of the plugin to fit your workflow.">
+      <textbox id="buffersize def" tooltip="adjust the size of the vibrato's delay buffer."/>
+      <switch id="interpolation def" tooltip="select the method that is used to interpolate the vibrato's delay.">
+        <option id="lerp"/>
+        <option id="spline"/>
+        <option id="lagrange"/>
+        <option id="sinc"/>
+      </switch>
+      <switch id="oversampling def" tooltip="turn on oversampling to get lower sidelobes on strong modulation.">
+        <option id="1x"/>
+        <option id="4x"/>
+      </switch>
+      <switch id="lookahead def" tooltip="turn lookahead on to compensate for the vibrato's latency.">
+        <option id="off"/>
+        <option id="on"/>
+      </switch>
+      <switch id="modType 0 def" tooltip="choose a default modulator for this slot.">
+        <option id="Perlin"/>
+        <option id="Audiorate"/>
+        <option id="Dropout"/>
+        <option id="EnvFol"/>
+        <option id="Macro"/>
+        <option id="Pitchwheel"/>
+        <option id="LFO"/>
+      </switch>
+      <switch id="modType 1 def" tooltip="choose a default modulator for this slot.">
+        <option id="Perlin"/>
+        <option id="Audiorate"/>
+        <option id="Dropout"/>
+        <option id="EnvFol"/>
+        <option id="Macro"/>
+        <option id="Pitchwheel"/>
+        <option id="LFO"/>
+      </switch>
     </menu>
   </menu>
   <menu id="help" tooltip="get help! literally.">
@@ -29,9 +73,13 @@
       <option id="disable"/>
       <option id="enable"/>
     </switch>
-    <switch id="parameter popup" tooltip="turn on/off parameter popup here.">
-      <option id="disable"/>
-      <option id="enable"/>
-    </switch>
+  </menu>
+  <menu id="thank you" tooltip="i always wanted to become a VST Developer.">
+    <imgStrip id="logos"/>
+    <txt id="thanksText" text="I just want to thank everyone! It really means a lot to me. I'm producing my own music since I was a child. I was always fascinated by the creativity used to make all these different kinds of VST effects and instruments. VST is much more than just a technology or a trademark. It is a lifestyle! A lifestyle about experiencing transcendental moments and a lifestyle about sharing these experiences with each other. Needless to say my own music was always heavily influenced by my urge to explore all of these experiences. I want to make people feel just what I felt through my plugins now and I really hope I am able to do that."/>
+    <linkstrip id="linkstrip">
+      <link id="support me" link="https://www.paypal.com/paypalme/alteoma" tooltip="consider this if you find yourself continuously enjoying the experience."/>
+      <link id="discord" link="https://discord.gg/PFnAsvMW5f" tooltip="come to my discord to receive news, or to tell me about bugs or feature requests."/>
+    </linkstrip>
   </menu>
 </menu>

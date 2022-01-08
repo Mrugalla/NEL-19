@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<state InterpolationType="spline" DelaySize="420.0" oversamplingOrder="1"
+       lookaheadEnabled="1">
+  <params>
+    <param name="MS Macro 0" value="0.4800002574920654" locked="0"/>
+    <param name="MS Macro 1" value="0.0" locked="0"/>
+    <param name="MS Macro 2" value="0.0" locked="0"/>
+    <param name="MS Macro 3" value="0.0" locked="0"/>
+    <param name="Perlin 0 Freq Hz" value="0.7755196094512939" locked="0"/>
+    <param name="Perlin 0 Octaves" value="0.4865722358226776" locked="0"/>
+    <param name="Perlin 0 Width" value="0.7270001769065857" locked="0"/>
+    <param name="AudioRate 0 Oct" value="0.5" locked="0"/>
+    <param name="AudioRate 0 Semi" value="0.5" locked="0"/>
+    <param name="AudioRate 0 Fine" value="0.5" locked="0"/>
+    <param name="AudioRate 0 Width" value="0.5" locked="0"/>
+    <param name="AudioRate 0 RetuneSpeed" value="0.06294368207454681" locked="0"/>
+    <param name="AudioRate 0 Attack" value="0.1542075574398041" locked="0"/>
+    <param name="AudioRate 0 Decay" value="0.1542075574398041" locked="0"/>
+    <param name="AudioRate 0 Sustain" value="1.0" locked="0"/>
+    <param name="AudioRate 0 Release" value="0.1542075574398041" locked="0"/>
+    <param name="Dropout 0 Decay" value="0.8465248942375183" locked="0"/>
+    <param name="Dropout 0 Spin" value="0.302325576543808" locked="0"/>
+    <param name="Dropout 0 Chance" value="0.8465248942375183" locked="0"/>
+    <param name="Dropout 0 Smooth" value="0.5855996012687683" locked="0"/>
+    <param name="Dropout 0 Width" value="0.0" locked="0"/>
+    <param name="EnvFol 0 Attack" value="0.43876051902771" locked="0"/>
+    <param name="EnvFol 0 Release" value="0.729979932308197" locked="0"/>
+    <param name="EnvFol 0 Gain" value="0.5" locked="0"/>
+    <param name="EnvFol 0 Width" value="0.0" locked="0"/>
+    <param name="Macro 0" value="0.5" locked="0"/>
+    <param name="Pitchbend 0 Smooth" value="0.6625306606292725" locked="0"/>
+    <param name="LFO 0 FreeSync" value="1.0" locked="0"/>
+    <param name="LFO 0 Rate Free" value="0.692307710647583" locked="0"/>
+    <param name="LFO 0 Rate Sync" value="0.5635713338851929" locked="0"/>
+    <param name="LFO 0 Waveform" value="0.0" locked="0"/>
+    <param name="LFO 0 Phase" value="0.3799998760223389" locked="0"/>
+    <param name="LFO 0 Width" value="0.0" locked="0"/>
+    <param name="Perlin 1 Freq Hz" value="0.7885196805000305" locked="0"/>
+    <param name="Perlin 1 Octaves" value="0.4285714626312256" locked="0"/>
+    <param name="Perlin 1 Width" value="1.0" locked="0"/>
+    <param name="AudioRate 1 Oct" value="0.5" locked="0"/>
+    <param name="AudioRate 1 Semi" value="0.5" locked="0"/>
+    <param name="AudioRate 1 Fine" value="0.5" locked="0"/>
+    <param name="AudioRate 1 Width" value="0.5" locked="0"/>
+    <param name="AudioRate 1 RetuneSpeed" value="0.06294368207454681" locked="0"/>
+    <param name="AudioRate 1 Attack" value="0.1542075574398041" locked="0"/>
+    <param name="AudioRate 1 Decay" value="0.1542075574398041" locked="0"/>
+    <param name="AudioRate 1 Sustain" value="1.0" locked="0"/>
+    <param name="AudioRate 1 Release" value="0.1542075574398041" locked="0"/>
+    <param name="Dropout 1 Decay" value="0.8465248942375183" locked="0"/>
+    <param name="Dropout 1 Spin" value="0.302325576543808" locked="0"/>
+    <param name="Dropout 1 Chance" value="0.8465248942375183" locked="0"/>
+    <param name="Dropout 1 Smooth" value="0.5855996012687683" locked="0"/>
+    <param name="Dropout 1 Width" value="0.0" locked="0"/>
+    <param name="EnvFol 1 Attack" value="0.43876051902771" locked="0"/>
+    <param name="EnvFol 1 Release" value="0.729979932308197" locked="0"/>
+    <param name="EnvFol 1 Gain" value="0.5" locked="0"/>
+    <param name="EnvFol 1 Width" value="0.0" locked="0"/>
+    <param name="Macro 1" value="0.5" locked="0"/>
+    <param name="Pitchbend 1 Smooth" value="0.6625306606292725" locked="0"/>
+    <param name="LFO 1 FreeSync" value="1.0" locked="0"/>
+    <param name="LFO 1 Rate Free" value="0.3173078298568726" locked="0"/>
+    <param name="LFO 1 Rate Sync" value="0.7350002527236938" locked="0"/>
+    <param name="LFO 1 Waveform" value="0.5699998140335083" locked="0"/>
+    <param name="LFO 1 Phase" value="0.7500002384185791" locked="0"/>
+    <param name="LFO 1 Width" value="0.7349998950958252" locked="0"/>
+    <param name="Depth" value="0.9050000905990601" locked="0"/>
+    <param name="Mods Mix" value="0.0" locked="0"/>
+    <param name="DryWet Mix" value="1.0" locked="0"/>
+    <param name="Gain Wet" value="0.583941638469696" locked="0"/>
+    <param name="Stereo Config" value="1.0" locked="0"/>
+  </params>
+  <connex/>
+  <ModType ModType0="LFO" ModType1="LFO"/>
+  <Wavetable0 Wavetable0="Triangle"/>
+  <Wavetable1 Wavetable1="Sinc"/>
+</state>

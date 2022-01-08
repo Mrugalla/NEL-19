@@ -1,229 +1,252 @@
 #pragma once
-#define DebugVibrato false
-#define LookAheadEnabled true
 #include <JuceHeader.h>
 #include <limits>
 
-namespace vibrato {
-	static inline float mix(const float a, float const b, const float m) noexcept {
+namespace vibrato
+{
+	static inline float mix(float a, float b, float m) noexcept
+	{
 		return std::sqrt(1.f - m) * a + std::sqrt(m) * b;
 	}
 
-	enum InterpolationType { Lerp, Spline, LagRange, Sinc, NumInterpolationTypes };
-
-	struct FFDelay {
-		FFDelay() :
-			ringBuffer(),
-			wHead(0), rHead(0)
-		{}
-		// SET
-		void setDelaySize(const int delaySize) {
-			ringBuffer.resize(delaySize / 2, 0.f);
-			wHead = 0;
-			rHead = 1;
-		}
-		// PROCESS
-		void processBlock(float* dry, const int numSamples) noexcept {
-			for (auto s = 0; s < numSamples; ++s) {
-				ringBuffer[wHead] = dry[s];
-				dry[s] = ringBuffer[rHead];
-				++wHead;
-				if (wHead == ringBuffer.size())
-					wHead = 0;
-				rHead = wHead + 1;
-				if (rHead == ringBuffer.size())
-					rHead = 0;
-			}
-		}
-	protected:
-		std::vector<float> ringBuffer;
-		size_t wHead, rHead;
+	enum class InterpolationType
+	{
+		Lerp, Spline, LagRange, Sinc,
+		NumInterpolationTypes
 	};
+	inline juce::String toString(InterpolationType t)
+	{
+		switch (t)
+		{
+		case InterpolationType::Lerp: return "lerp";
+		case InterpolationType::Spline: return "spline";
+		case InterpolationType::LagRange: return "lagrange";
+		case InterpolationType::Sinc: return "sinc";
+		default: return "";
+		}
+	}
+	inline InterpolationType toType(const juce::String& t)
+	{
+		const auto numTypes = static_cast<int>(InterpolationType::NumInterpolationTypes);
+		for (auto i = 0; i < numTypes; ++i)
+		{
+			const auto type = static_cast<InterpolationType>(i);
+			if (t == toString(type))
+				return type;
+		}
+		return InterpolationType::NumInterpolationTypes;
+	}
+	
+	using Buffer = std::array<std::vector<float>, 2>;
 
-	struct Delay {
-		Delay(juce::AudioBuffer<float>& vibBuf, int channel, InterpolationType it = InterpolationType::Spline) :
+	struct Delay
+	{
+		Delay(Buffer& vibBuf, int channel, InterpolationType it) :
 			delayBuffer(vibBuf),
 			ringBuffer(),
-			delaySize(0.f), delayMid(0.f),
+			delaySize(0.f), delayMid(0.f), delayMax(0.f),
 			interpolationType(it),
 			ch(channel)
 		{
 		}
-		void setDelaySize(const size_t s) {
+		void setDelaySize(size_t s)
+		{
 			ringBuffer.resize(s, 0.f);
 			delaySize = static_cast<float>(s);
 			delayMid = s * .5f;
+			delayMax = delaySize - 1.f;
 		}
-		void setInterpolationType(const InterpolationType t) noexcept { interpolationType = t; }
+		void setInterpolationType(InterpolationType t) noexcept { interpolationType = t; }
 		// PROCESS
-		void processBlock(float* samples, const float* dry, const float* dryWetMix, const int numSamples, const size_t* writeHead) noexcept {
-			
-#if DebugVibrato
-			processBlockDebug(samples, numSamples);
-#elif !DebugVibrato
+		void processBlockBypassed() noexcept
+		{
+			for (auto& s : ringBuffer)
+				s = 0.f;
+		}
+		void processBlock(float* samples,
+			int numSamples, const size_t* writeHead) noexcept
+		{
 			processBlockReadHead(numSamples, writeHead);
-			processBlockDelay(samples, dry, dryWetMix, numSamples, writeHead);
-#endif
+			processBlockDelay(samples, numSamples, writeHead);
 		}
 		// GET
-		const size_t size() const noexcept { return ringBuffer.size(); }
-		const InterpolationType getInterpolationType() const noexcept { return interpolationType; }
+		size_t size() const noexcept { return ringBuffer.size(); }
+		InterpolationType getInterpolationType() const noexcept { return interpolationType; }
 	private:
-		juce::AudioBuffer<float>& delayBuffer;
+		Buffer& delayBuffer;
 		std::vector<float> ringBuffer;
-		float delaySize, delayMid;
+		float delaySize, delayMid, delayMax;
 		InterpolationType interpolationType;
 		int ch;
 
-		void processBlockDebug(float* samples, const int numSamples) noexcept {
-			auto delay = delayBuffer.getWritePointer(ch);
+		void processBlockReadHead(int numSamples, const size_t* writeHead) noexcept
+		{
+			auto& buf = delayBuffer[ch];
+			// map buffer [-1, 1] to [0, delaySize]
+			juce::FloatVectorOperations::multiply(buf.data(), delayMid, numSamples);
+			juce::FloatVectorOperations::add(buf.data(), delayMid, numSamples);
 			for (auto s = 0; s < numSamples; ++s)
-				samples[s] = delay[s];
-		}
-
-		void processBlockReadHead(const int numSamples, const size_t* writeHead) noexcept {
-			auto delay = delayBuffer.getWritePointer(ch);
-			for (auto s = 0; s < numSamples; ++s) {
-				// map delay [-1, 1] to [0, delaySize]
-				const auto d = delay[s] * delayMid + delayMid;
-				// calc readHead
-				const auto rh = static_cast<float>(writeHead[s]) - d;
-				delay[s] = rh < 0.f ? rh + delaySize : rh;
+			{
+				const auto dly = buf[s];
+				auto rh = static_cast<float>(writeHead[s]) - dly;
+				if (rh < 0.f)
+					rh += delaySize;
+				buf[s] = juce::jlimit(0.f, delayMax, rh);
 			}
 		}
 		
-		void processBlockDelay(float* samples, const float* dry, const float* dryWetMix, const int numSamples, const size_t* writeHead) noexcept {
-			switch (interpolationType) {
-			case InterpolationType::Lerp: return processBlockDelayLERP(samples, dry, dryWetMix, numSamples, writeHead);
-			case InterpolationType::Spline: return processBlockDelaySPLINE(samples, dry, dryWetMix, numSamples, writeHead);
-			case InterpolationType::LagRange: return processBlockDelayLAGRANGE(samples, dry, dryWetMix, numSamples, writeHead);
-			case InterpolationType::Sinc: return processBlockDelaySINC(samples, dry, dryWetMix, numSamples, writeHead);
+		void processBlockDelay(float* samples,
+			int numSamples, const size_t* writeHead) noexcept
+		{
+			switch (interpolationType)
+			{
+			case InterpolationType::Lerp: return processBlockDelayLERP(samples, numSamples, writeHead);
+			case InterpolationType::Spline: return processBlockDelaySPLINE(samples, numSamples, writeHead);
+			case InterpolationType::LagRange: return processBlockDelayLAGRANGE(samples, numSamples, writeHead);
+			case InterpolationType::Sinc: return processBlockDelaySINC(samples, numSamples, writeHead);
 			}
 		}
-		void processBlockDelayLERP(float* samples, const float* dry, const float* dryWetMix, const int numSamples, const size_t* writeHead) noexcept {
-			const auto delay = delayBuffer.getReadPointer(ch);
-			for (auto s = 0; s < numSamples; ++s) {
+		void processBlockDelayLERP(float* samples,
+			const int numSamples, const size_t* writeHead) noexcept
+		{
+			const auto sizeInt = static_cast<int>(size());
+			for (auto s = 0; s < numSamples; ++s)
+			{
 				ringBuffer[writeHead[s]] = samples[s];
-				const auto val = interpolation::lerp(ringBuffer.data(), delay[s], size());
-				samples[s] = mix(dry[s], val, dryWetMix[s]);
+				const auto val = interpolation::lerp(ringBuffer.data(), delayBuffer[ch][s], sizeInt);
+				samples[s] = val;
 			}
 		}
-		void processBlockDelaySPLINE(float* samples, const float* dry, const float* dryWetMix, const int numSamples, const size_t* writeHead) noexcept {
-			const auto delay = delayBuffer.getReadPointer(ch);
-			for (auto s = 0; s < numSamples; ++s) {
+		void processBlockDelaySPLINE(float* samples,
+			const int numSamples, const size_t* writeHead) noexcept
+		{
+			const auto sizeInt = static_cast<int>(size());
+			for (auto s = 0; s < numSamples; ++s)
+			{
 				ringBuffer[writeHead[s]] = samples[s];
-				const auto val = interpolation::cubicHermiteSpline(ringBuffer.data(), delay[s], size());
-				samples[s] = mix(dry[s], val, dryWetMix[s]);
+				const auto val = interpolation::cubicHermiteSpline(ringBuffer.data(), delayBuffer[ch][s], sizeInt);
+				samples[s] = val;
 			}
 		}
-		void processBlockDelayLAGRANGE(float* samples, const float* dry, const float* dryWetMix, const int numSamples, const size_t* writeHead) noexcept {
-			const auto delay = delayBuffer.getReadPointer(ch);
-			for (auto s = 0; s < numSamples; ++s) {
+		void processBlockDelayLAGRANGE(float* samples,
+			const int numSamples, const size_t* writeHead) noexcept
+		{
+			const auto sizeInt = static_cast<int>(size());
+			for (auto s = 0; s < numSamples; ++s)
+			{
 				ringBuffer[writeHead[s]] = samples[s];
-				const auto val = interpolation::lagrange(ringBuffer.data(), delay[s], size(), 9);
-				samples[s] = mix(dry[s], val, dryWetMix[s]);
+				const auto val = interpolation::lagrange(ringBuffer.data(), delayBuffer[ch][s], sizeInt, 9);
+				samples[s] = val;
 			}
 		}
-		void processBlockDelaySINC(float* samples, const float* dry, const float* dryWetMix, const int numSamples, const size_t* writeHead) noexcept {
-			const auto delay = delayBuffer.getReadPointer(ch);
-			for (auto s = 0; s < numSamples; ++s) {
+		void processBlockDelaySINC(float* samples,
+			const int numSamples, const size_t* writeHead) noexcept
+		{
+			const auto sizeInt = static_cast<int>(size());
+			for (auto s = 0; s < numSamples; ++s)
+			{
 				ringBuffer[writeHead[s]] = samples[s];
-				const auto val = interpolation::lanczosSinc(ringBuffer.data(), delay[s], size(), 9);
-				samples[s] = mix(dry[s], val, dryWetMix[s]);
+				const auto val = interpolation::lanczosSinc(ringBuffer.data(), delayBuffer[ch][s], sizeInt, 9);
+				samples[s] = val;
 			}
 		}
 	};
 
 	struct Processor
 	{
-		Processor(juce::AudioProcessor* p, juce::AudioBuffer<float>& vibBuf, juce::AudioBuffer<float>& dryWetMixP, const int channelCount) :
-			audioProcessor(p),
-			dryDelay(),
+		Processor(Buffer& vibBuf, int _numChannels) :
 			writeHead(),
-			delay(),
-			dryWetMixParam(dryWetMixP),
-			wHead(-1),
-			rBufferSize(0)
+			delay
+			{
+				Delay(vibBuf, 0, InterpolationType::Spline),
+				Delay(vibBuf, 1, InterpolationType::Spline)
+			},
+			wHead(static_cast<size_t>(-1)),
+			rBufferSize(0),
+			numChannels(_numChannels),
+			wannaUpdate(false),
+			interpolationType(InterpolationType::Spline)
 		{
-			dryDelay.resize(channelCount);
-			delay.reserve(channelCount);
-			for (auto ch = 0; ch < channelCount; ++ch)
-				delay.emplace_back(vibBuf, ch);
 		}
-		Processor(Processor& other) :
-			audioProcessor(other.audioProcessor),
-			dryBuffer(other.dryBuffer),
-			dryDelay(other.dryDelay),
-			writeHead(other.writeHead),
-			delay(other.delay),
-			dryWetMixParam(other.dryWetMixParam),
-			wHead(-1),
-			rBufferSize(other.ringBufferSize())
-		{}
 		// PREPARE
-		void prepareToPlay(const int blockSize) {
+		void prepareToPlay(const int blockSize)
+		{
 			writeHead.resize(blockSize, 0);
-			dryBuffer.setSize(numChannels(), blockSize, false, false, false);
 		}
-		void resizeDelay(const size_t size) {
+		void resizeDelay(size_t size)
+		{
 			rBufferSize = size;
+			for (auto ch = 0; ch < numChannels; ++ch)
+				delay[ch].setDelaySize(rBufferSize);
+		}
+		void triggerUpdate() noexcept
+		{
+			wannaUpdate.store(true);
+		}
+		void setInterpolationType(InterpolationType t) noexcept
+		{
+			interpolationType.store(t);
 			for (auto& d : delay)
-				d.setDelaySize(rBufferSize);
-			for (auto& d : dryDelay)
-				d.setDelaySize(getLatency());
-		}
-		// PARAMETERS
-		void resizeDelaySafe(juce::AudioProcessor& p, const float ms) {
-			rBufferSize = static_cast<size_t>(ms * static_cast<float>(p.getSampleRate()) / 1000.f);
-			for (auto& d : dryDelay)
-				d.setDelaySize(getLatency());
-			//audioProcessor->setLatencySamples(getLatency());
-		}
-		void setInterpolationType(InterpolationType t) noexcept {
-			for (auto& d : delay) d.setInterpolationType(t);
+				d.setInterpolationType(t);
 		}
 		// PROCESS
-		void processBlock(juce::AudioBuffer<float>& audioBuffer) {
-			if (rBufferSize != ringBufferSize())
-				return resizeDelay(rBufferSize);
-			auto samples = audioBuffer.getArrayOfWritePointers();
-			auto dry = dryBuffer.getArrayOfWritePointers();
-			const auto numSamples = audioBuffer.getNumSamples();
-			for (auto ch = 0; ch < numChannels(); ++ch)
-				juce::FloatVectorOperations::copy(dry[ch], samples[ch], numSamples);
-#if LookAheadEnabled
-			for (auto ch = 0; ch < numChannels(); ++ch)
-				dryDelay[ch].processBlock(dry[ch], numSamples);
-#endif	
-			processBlockWriteHead(numSamples);
-			const auto dwmp = dryWetMixParam.getReadPointer(0);
-			for (auto ch = 0; ch < numChannels(); ++ch)
-				delay[ch].processBlock(samples[ch], dry[ch], dwmp, numSamples, writeHead.data());
+		bool processBlock(juce::AudioBuffer<float>& audioBuffer, juce::AudioProcessor* p, int numChannelsOut)
+		{
+			if (wannaUpdate.load())
+			{
+				p->prepareToPlay(p->getSampleRate(), p->getBlockSize());
+				wannaUpdate.store(false);
+				return false;
+			}
+			processBlock(audioBuffer, numChannelsOut);
+			return true;
+		}
+		bool processBlockBypassed(juce::AudioProcessor* p, int numChannelsOut)
+		{
+			if (wannaUpdate.load())
+			{
+				p->prepareToPlay(p->getSampleRate(), p->getBlockSize());
+				wannaUpdate.store(false);
+				return false;
+			}
+			for (auto ch = 0; ch < numChannelsOut; ++ch)
+				delay[ch].processBlockBypassed();
+			return true;
 		}
 		// GET
-		const float getSizeInMs(const juce::AudioProcessor& p) const noexcept {
-			auto dlyTime = static_cast<double>(1000. * ringBufferSize()) / p.getSampleRate();
-			return static_cast<float>(dlyTime);
+		float getSizeInMs(float Fs) const noexcept
+		{
+			return 1000.f * static_cast<float>(ringBufferSize()) / Fs;
 		}
-		const InterpolationType getInterpolationType() const noexcept { return delay[0].getInterpolationType(); }
-		const int getLatency() const noexcept {
-#if LookAheadEnabled
-			return ringBufferSize() / 2;
-#elif
-			return 0;
-#endif
+		InterpolationType getInterpolationType() const noexcept
+		{
+			return interpolationType.load();
 		}
-	private:
-		juce::AudioProcessor* audioProcessor;
-		juce::AudioBuffer<float> dryBuffer;
-		std::vector<FFDelay> dryDelay;
+		int getLatency() const noexcept
+		{
+			return static_cast<int>(ringBufferSize()) / 2;
+		}
+	protected:
 		std::vector<size_t> writeHead;
-		std::vector<Delay> delay;
-		juce::AudioBuffer<float>& dryWetMixParam;
+		std::array<Delay, 2> delay;
 		size_t wHead, rBufferSize;
+		const int numChannels;
+		std::atomic<bool> wannaUpdate;
+		std::atomic<InterpolationType> interpolationType;
 
-		inline void processBlockWriteHead(const int numSamples) noexcept {
-			for (auto s = 0; s < numSamples; ++s) {
+		void processBlock(juce::AudioBuffer<float>& audioBuffer, int numChannelsOut) noexcept
+		{
+			auto samples = audioBuffer.getArrayOfWritePointers();
+			const auto numSamples = audioBuffer.getNumSamples();
+			processBlockWriteHead(numSamples);
+			for (auto ch = 0; ch < numChannelsOut; ++ch)
+				delay[ch].processBlock(samples[ch], numSamples, writeHead.data());
+		}
+
+		void processBlockWriteHead(const int numSamples) noexcept
+		{
+			for (auto s = 0; s < numSamples; ++s)
+			{
 				++wHead;
 				if (wHead >= ringBufferSize())
 					wHead = 0;
@@ -231,32 +254,18 @@ namespace vibrato {
 			}
 		}
 		
-		const size_t numChannels() const noexcept { return delay.size(); }
 		const size_t ringBufferSize() const noexcept { return delay[0].size(); }
 	};
 }
 
-#undef DebugVibrato
-#undef LookAheadEnabled
-
 /*
+
 lagrange interpolator
 	worse in lowend
 	better in highend
 	>> brittle noise in highend when used on mixed signal (inter-modulation?)
 
-dryWetMix uses 2 sqrt in method. whole buffer calculates through twice, because buffer is const
-
 feature ideas:
-	m/s encoding
-	allpass instead delay (or in feedback loop, considering fb delay)
+	allpass instead of delay (or in feedback loop, considering fb delay)
 
-	advanced settings
-		change fps of visualizer
-
-	post processing modulation output before going into vibrato
-		lowpass
-		waveshaper
-		wavefolder
-		bitcrusher
 */

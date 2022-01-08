@@ -3,20 +3,20 @@
 #include "Outtakes.h"
 #include "Param.h"
 #include "Interpolation.h"
+#include "dsp/DryWetProcessor.h"
 #include "dsp/MidSideEncoder.h"
+#include "dsp/Modulator.h"
 #include "dsp/Vibrato.h"
 #include "oversampling/Oversampling.h"
 #include <JuceHeader.h>
-#include "releasePool/ReleasePool.h"
-#include "modsys/ModSystem.h"
+#include "modsys/ModSys.h"
 
 #include <limits>
 
 struct Nel19AudioProcessor :
     public juce::AudioProcessor
 {
-    enum Mods { EnvFol, LFO, Rand, Perlin };
-    enum PID { Depth, ModsMix, StereoConfig, EnumSize };
+    static constexpr int NumActiveMods = 2;
 
     Nel19AudioProcessor();
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
@@ -40,47 +40,40 @@ struct Nel19AudioProcessor :
     void changeProgramName (int index, const juce::String& newName) override;
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
+    void savePatch();
+    void loadPatch();
     juce::PropertiesFile::Options makeOptions();
 
     juce::ApplicationProperties appProperties;
-    param::MultiRange modRateRanges;
+    const int numChannels;
 
-    // midi modulator stuff
-    std::array<std::atomic<bool>, 2> midiLearn;
-    std::array<float, 2> midiSignal;
+    drywet::Processor dryWet;
 
-    juce::AudioProcessorValueTreeState apvts;
-
-    oversampling::Processor oversampling;
-
-    ThreadSafePtr<modSys2::Matrix> matrix;
-    std::vector<int> mtrxParams;
-
-    std::array<std::vector<juce::Identifier>, 2> modsIDs;
-    juce::Identifier modulatorsID;
+    modSys6::ModSys modSys;
 
     midSide::Processor midSideProcessor;
-    std::array<juce::AudioBuffer<float>, 2> vibDelay;
-    juce::AudioBuffer<float> vibDelayUp;
-    vibrato::Processor vibrato;
-    std::vector<juce::Atomic<float>> vibDelayVisualizerValue;
-
+    oversampling::Processor oversampling;
+    
+    std::array<vibrato::Modulator, NumActiveMods> modulators;
+    std::array<std::vector<float>, 2> modsBuffer;
+    std::array<vibrato::ModType, NumActiveMods> modType;
+    
+    vibrato::Processor vibrat;
+    
+    std::vector<float> visualizerValues;
 private:
     const juce::CriticalSection mutex;
+    modSys6::Smooth depthSmooth, modsMixSmooth;
+    std::vector<float> depthBuf, modsMixBuf;
 
-    bool processBlockReady(juce::AudioBuffer<float>&);
-    const std::shared_ptr<modSys2::Matrix> processBlockModSys(juce::AudioBuffer<float>&, const juce::MidiBuffer&);
-    void processBlockVibDelay(juce::AudioBuffer<float>&, const std::shared_ptr<modSys2::Matrix>&);
-    void processBlockEmpty();
+    void processBlockVibrato(juce::AudioBuffer<float>&, const juce::MidiBuffer&, int, int);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Nel19AudioProcessor)
 };
 
 /*
 
-oversampling crunshes cpu on dbg. 4% on rls.
-    replace import juceheader with smaller modules everywhere
-    actually not oversample modsys if possible
+graphics / visualizer fps
 
 debugger:
 
@@ -92,5 +85,6 @@ DAWS Debug:
 D:\Pogramme\Cubase 9.5\Cubase9.5.exe
 D:\Pogramme\FL Studio 20\FL64.exe
 D:\Pogramme\Studio One 5\Studio One.exe
+D:\Pogramme\Reaper\reaper.exe
 
 */
