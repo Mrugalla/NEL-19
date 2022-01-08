@@ -931,6 +931,16 @@ namespace modSys6
                         if (p.updateConnecDepth())
                             p.repaint();
                     }
+                    else if (t == NotificationType::PatchUpdated)
+                    {
+                        auto& modDial = p.getModDial();
+                        const auto selectedModIdx = p.utils.getSelectedModIdx();
+                        if (modDial.updateSetSelected(selectedModIdx))
+                        {
+                            p.updateConnecDepth();
+                            p.repaint();
+                        }
+                    }
                     return false;
                 };
             }
