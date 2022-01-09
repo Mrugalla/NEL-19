@@ -483,6 +483,7 @@ namespace vibrato
 	// of some ModType (like perlin, audiorate, dropout etc.)
 	class Modulator
 	{
+		static constexpr float SafetyCoeff = .99f;
 		using Buffer = std::array<std::vector<float>, 4>;
 		using BeatsData = modSys6::BeatsData;
 		using Tables = LFOTables;
@@ -724,7 +725,7 @@ namespace vibrato
 						for (auto s = 0; s < numSamples; ++s)
 						{
 							bufNotes[s] = currentValue;
-							bufEnv[s] = env();
+							bufEnv[s] = env() * SafetyCoeff;
 						}
 					}	
 					else
@@ -1282,7 +1283,7 @@ namespace vibrato
 					{
 						auto buf = buffer[ch].data();
 						for (auto s = 0; s < numSamples; ++s)
-							buf[s] = tables(waveformSmooth(waveformV), buf[s]);
+							buf[s] = tables(waveformSmooth(waveformV), buf[s]) * SafetyCoeff;
 					}
 				}
 			}
