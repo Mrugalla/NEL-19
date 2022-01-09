@@ -200,7 +200,12 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
 
     setBufferedToImage(true);
     setResizable(true, true);
-    setSize(nelG::Width, nelG::Height);
+    {
+        const auto user = p.appProperties.getUserSettings();
+        const auto w = user->getIntValue("BoundsWidth", nelG::Width);
+        const auto h = user->getIntValue("BoundsHeight", nelG::Height);
+        setSize(w, h);
+    }
 }
 void Nel19AudioProcessorEditor::resized()
 {
@@ -249,6 +254,13 @@ void Nel19AudioProcessorEditor::resized()
     layoutMainParams.place(stereoConfig, 0, 3, 2, 1, thicc, true);
 
     layout.place(presetBrowser, 1, 1, 2, 4, thicc, false);
+
+    {
+        auto user = audioProcessor.appProperties.getUserSettings();
+        user->setValue("BoundsWidth", getWidth());
+        user->setValue("BoundsHeight", getHeight());
+    }
+    
 
     /*
     layoutTopBar.place(menuButton, 0, 0, 1, 1, nelG::Thicc, true);
