@@ -984,6 +984,7 @@ namespace vibrato
 				gainSmooth(), widthSmooth(),
 
 				envelope{ 0.f, 0.f },
+				envSmooth(),
 				Fs(1.f),
 
 				attackInMs(-1.f), releaseInMs(-1.f), gain(-420.f),
@@ -998,6 +999,8 @@ namespace vibrato
 				Fs = sampleRate;
 				modSys6::Smooth::makeFromDecayInMs(gainSmooth, 10.f, Fs);
 				modSys6::Smooth::makeFromDecayInMs(widthSmooth, 10.f, Fs);
+				for(auto ch = 0; ch < numChannels; ++ch)
+					modSys6::Smooth::makeFromDecayInHz(envSmooth[ch], 20.f, Fs);
 				{
 					const auto inSamples = attackInMs * Fs * .001f;
 					attackV = 1.f / inSamples;
@@ -1081,11 +1084,22 @@ namespace vibrato
 						}
 					}
 				}
+				{ // PROCESS ANTI-CLIPPING
+					for (auto ch = 0; ch < numChannelsOut; ++ch)
+					{
+						auto buf = buffer[ch].data();
+						auto& smooth = envSmooth[ch];
+
+						for (auto s = 0; s < numSamples; ++s)
+							buf[s] = smooth(buf[s] < 1.f ? buf[s] : 1.f);
+					}
+				}
 			}
 		protected:
 			modSys6::Smooth gainSmooth, widthSmooth;
 
 			std::array<float, 2> envelope;
+			std::array<modSys6::Smooth, 2> envSmooth;
 			float Fs;
 
 			float attackInMs, releaseInMs, gain;
