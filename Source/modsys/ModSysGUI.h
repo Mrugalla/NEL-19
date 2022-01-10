@@ -559,7 +559,10 @@ namespace modSys6
             {
                 env *= x;
                 if (env < eps)
+                {
+                    env = 0.f;
                     stopTimer();
+                } 
                 comp->repaint();
             }
         };

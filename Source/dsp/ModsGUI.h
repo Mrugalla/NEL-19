@@ -469,7 +469,7 @@ namespace modSys6
             }
             void resized() override
             {
-                smooth.setBounds(getLocalBounds());
+                smooth.setBounds(getLocalBounds().toFloat().reduced(Shared::shared.thicc * 4.f).toNearestInt());
             }
         };
 
