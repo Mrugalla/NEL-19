@@ -966,12 +966,13 @@ namespace modSys6
                 public Comp
             {
                 ModDial(Utils& u, Paramtr& _paramtr) :
-                    Comp(u, "Drag to change the selected modulator's depth.", CursorType::Mod),
+                    Comp(u, "Drag to modulate parameter. Rightclick to remove modulator.", CursorType::Mod),
                     paramtr(_paramtr),
                     dragY(0.f),
                     connecIdx(u.getConnecIdxWith(u.getSelectedModIdx(), paramtr.getPID())),
                     tryRemove(false)
                 {
+                    setBufferedToImage(false);
                 }
                 bool updateSetSelected(int selectedModIdx) noexcept
                 {
@@ -1000,17 +1001,32 @@ namespace modSys6
                     const auto bounds = getLocalBounds().toFloat().reduced(thicc);
                     g.setColour(Shared::shared.colour(ColourID::Bg));
                     g.fillEllipse(bounds);
+                    juce::String txt;
                     if (isSelected())
                         if (tryRemove)
                         {
                             g.setColour(Shared::shared.colour(ColourID::Abort));
-                            g.drawFittedText("!", getLocalBounds(), juce::Justification::centred, 1);
+                            txt = "!";
                         }
                         else
+                        {
                             g.setColour(paramtr.col(Shared::shared.colour(ColourID::Mod)));
+                            txt = "M";
+                        }
+                            
                     else
+                    {
                         g.setColour(paramtr.col(Shared::shared.colour(ColourID::Interact)));
+                        txt = "M";
+                    } 
                     g.drawEllipse(bounds, thicc);
+                    {
+                        const auto font = g.getCurrentFont();
+                        const auto strWidth = font.getStringWidthFloat(txt);
+                        const auto nHeight = .5f * font.getHeight() * bounds.getWidth() / strWidth;
+                        g.setFont(nHeight);
+                        g.drawFittedText(txt, bounds.toNearestInt(), juce::Justification::centred, 1);
+                    }
                 }
 
                 void mouseDown(const juce::MouseEvent& evt) override
