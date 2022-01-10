@@ -75,7 +75,7 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
 
     visualizer(utils, "Visualizes the sum of the vibrato's modulators.", p.getChannelCountOfBus(false, 0), 1),
 
-    paramRandomizer(utils, modulatables),
+    paramRandomizer(utils, modulatables, "MainRandomizer"),
 
     popUp(utils),
     enterValue(utils),

@@ -9,7 +9,7 @@ namespace modSys6
 	static constexpr float piQuart = .785398163397f;
 	static constexpr float piInv = 1.f / pi;
 
-	inline juce::String toID(juce::String& name) { return name.toLowerCase().removeCharacters(" "); }
+	inline juce::String toID(const juce::String& name) { return name.toLowerCase().removeCharacters(" "); }
 
 	enum class PID
 	{
@@ -425,10 +425,7 @@ namespace modSys6
 			strToVal(_strToVal),
 			unit(_unit),
 
-			valNormMod(0.f), valNormSum(0.f),
-
-			valNormLock(0.f),
-			locked(false)
+			valNormMod(0.f), valNormSum(0.f)
 		{
 		}
 		Param(const int pID, const juce::NormalisableRange<float>& _range, const float _valDenormDefault,
@@ -445,10 +442,7 @@ namespace modSys6
 			strToVal(_strToVal),
 			unit(_unit),
 
-			valNormMod(0.f), valNormSum(0.f),
-
-			valNormLock(0.f),
-			locked(false)
+			valNormMod(0.f), valNormSum(0.f)
 		{
 		}
 
@@ -495,10 +489,7 @@ namespace modSys6
 
 		void processBlockInit() noexcept
 		{
-			if (!locked)
-				valNormMod = valNorm.load();
-			else
-				valNormMod = valNormLock;
+			valNormMod = valNorm.load();
 		}
 		void processBlockModulate(float m) noexcept
 		{
@@ -525,22 +516,6 @@ namespace modSys6
 			DBG(_toString());
 		}
 
-		void lock()
-		{
-			locked = true;
-			valNormLock = getValue();
-		}
-		void unlock()
-		{
-			locked = false;
-		}
-		void setLock(bool e)
-		{
-			if (e) return lock();
-			unlock();
-		}
-		bool isLocked() const noexcept { return locked; }
-
 		const PID id;
 		const juce::NormalisableRange<float> range;
 		const ModTypeContext attachedMod;
@@ -552,9 +527,6 @@ namespace modSys6
 		Unit unit;
 
 		float valNormMod, valNormSum;
-		
-		float valNormLock;
-		bool locked;
 	};
 
 	struct Params
@@ -786,7 +758,7 @@ namespace modSys6
 				audioProcessor.addParameter(param);
 		}
 		
-		void loadPatch(juce::ValueTree state/*, const LockHandler& lockHandler*/)
+		void loadPatch(juce::ValueTree state)
 		{
 			const StateIDs ids;
 
@@ -804,11 +776,7 @@ namespace modSys6
 					if (pIdx != -1)
 					{
 						const auto pVal = static_cast<float>(childParam.getProperty(ids.value));
-						
 						params[pIdx]->setValueNotifyingHost(pVal);
-						//const auto locked = static_cast<int>(childParam.getProperty(ids.locked, 0)) == 0 ? false : true;
-						//if (locked)
-						//	lockHandler(*params[pIdx]);
 					}
 				}
 			}
@@ -826,7 +794,7 @@ namespace modSys6
 			
 			for (auto param : params)
 			{
-				const auto paramID = toString(param->id);
+				const auto paramID = toID(toString(param->id));
 				auto childParam = childParams.getChildWithProperty(ids.name, paramID);
 				if (!childParam.isValid())
 				{
@@ -835,7 +803,6 @@ namespace modSys6
 					childParams.appendChild(childParam, nullptr);
 				}
 				childParam.setProperty(ids.value, param->getValue(), nullptr);
-				//childParam.setProperty(ids.locked, (param->isLocked() ? 1 : 0), nullptr);
 			}
 		}
 
@@ -853,8 +820,11 @@ namespace modSys6
 		int getParamIdx(const juce::String& name) const noexcept
 		{
 			for (auto p = 0; p < params.size(); ++p)
-				if (name == toString(params[p]->id))
+			{
+				const auto str = toString(params[p]->id);
+				if (name == str || name == toID(str))
 					return p;
+			}	
 			return -1;
 		}
 
@@ -1102,28 +1072,21 @@ namespace modSys6
 			}
 		}
 
-		void triggerUpdatePatch(juce::String&& xmlString)
+		void triggerUpdatePatch(const juce::String& xmlString)
 		{
 			state = state.fromXml(xmlString);
+			wannaUpdatePatch.store(true);
+		}
+		void triggerUpdatePatch(const juce::ValueTree& newState)
+		{
+			state = newState;
 			wannaUpdatePatch.store(true);
 		}
 
 		void loadPatch()
 		{
 			connex.loadPatch(state);
-
-			/*
-			auto lockHandler = [this](Param& param)
-			{
-				param.processBlockInit();
-				mods.processBlock(1);
-				connex.processBlock(params, mods);
-				params.processBlockFinish();
-				param.lock();
-			};
-			*/
-
-			params.loadPatch(state/*, lockHandler*/);
+			params.loadPatch(state);
 		}
 		void savePatch()
 		{
@@ -1191,8 +1154,6 @@ namespace modSys6
 			const bool paramDoesntExist = param == nullptr;
 			if (paramDoesntExist)
 				return false;
-			if (param->isLocked())
-				return false;
 
 			const auto& mod = mods[mIdx];
 			for (auto p = 0; p < mod.params.size(); ++p)
@@ -1218,24 +1179,16 @@ namespace modSys6
 		bool disableConnection(int cIdx) noexcept
 		{
 			const auto param = params[connex[cIdx].getPIdx()];
-			if (!param->isLocked())
-			{
-				connex[cIdx].disable();
-				return true;
-			}
-			return false;	
+			connex[cIdx].disable();
+			return true;	
 		}
 
 		float getConnecDepth(int cIdx) const noexcept { return connex[cIdx].getDepth(); }
 		bool setConnecDepth(int cIdx, float depth) noexcept
 		{
 			const auto param = params[connex[cIdx].getPIdx()];
-			if (!param->isLocked())
-			{
-				connex[cIdx].setDepth(depth);
-				return true;
-			}
-			return false;
+			connex[cIdx].setDepth(depth);
+			return true;
 		}
 
 		bool getHasPlayHead() const noexcept { return hasPlayHead.load(); }

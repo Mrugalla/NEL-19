@@ -304,9 +304,13 @@ namespace modSys6
                 notify(NotificationType::ModSelectionChanged);
             }
 
-            void triggerUpdatePatch(juce::String&& xmlString)
+            void triggerUpdatePatch(const juce::String& xmlString)
             {
-                modSys.triggerUpdatePatch(std::move(xmlString));
+                modSys.triggerUpdatePatch(xmlString);
+            }
+            void triggerUpdatePatch(const juce::ValueTree& state)
+            {
+                modSys.triggerUpdatePatch(state);
             }
 
             juce::Colour colour(ColourID c) const noexcept { return Shared::shared.colour(c); }
@@ -420,6 +424,8 @@ namespace modSys6
             {
                 return comp.getScreenBounds() - pluginTop.getScreenPosition();
             }
+
+            juce::ValueTree& getState() noexcept { return modSys.state; }
 
             Events events;
             juce::Component& pluginTop;
@@ -895,6 +901,116 @@ namespace modSys6
             };
         }
 
+        struct Lock :
+            public Comp
+        {
+            static constexpr float LockAlpha = .4f;
+
+            inline juce::Colour col(juce::Colour c)
+            {
+                return c.withMultipliedAlpha(locked ? LockAlpha : 1.f);
+            }
+
+            Lock(Utils& u, Comp* _comp, juce::String&& _id) :
+                Comp(u, "Click here to (un)lock this component."),
+                comp(_comp),
+                id(toID(_id)),
+                locked(false)
+            {
+                auto& state = u.getState();
+                const juce::Identifier locksID("locks");
+                auto child = state.getChildWithName(locksID);
+                if (!child.isValid())
+                {
+                    child = juce::ValueTree(locksID);
+                    state.appendChild(child, nullptr);
+                }
+                locked = static_cast<int>(child.getProperty(id, 0)) == 0 ? false : true;
+            }
+            bool isLocked() { return locked; }
+            void switchLock()
+            {
+                locked = !locked;
+                auto& state = this->utils.getState();
+                const juce::Identifier locksID("locks");
+                auto child = state.getChildWithName(locksID);
+                if (!child.isValid())
+                {
+                    child = juce::ValueTree(locksID);
+                    state.appendChild(child, nullptr);
+                }
+                child.setProperty(id, locked ? 1 : 0, nullptr);
+            }
+        protected:
+            Comp* comp;
+            juce::Identifier id;
+            bool locked;
+
+            void paint(juce::Graphics& g) override
+            {
+                const auto thicc = Shared::shared.thicc;
+                const auto thicc2 = thicc * 2.f;
+                const auto bounds = getLocalBounds().toFloat().reduced(thicc);
+                const juce::Point<float> centre(
+                    bounds.getX() + bounds.getWidth() * .5f,
+                    bounds.getY() + bounds.getHeight() * .5f
+                );
+
+                if (isMouseOver())
+                {
+                    g.setColour(Shared::shared.colour(ColourID::Hover));
+                    g.fillRoundedRectangle(bounds, thicc);
+                    if (isMouseButtonDown())
+                        g.fillRoundedRectangle(bounds, thicc);
+                    g.setColour(Shared::shared.colour(ColourID::Interact));
+                }
+                else
+                    g.setColour(juce::Colour(0xff999999));
+
+                juce::Rectangle<float> bodyArea, arcArea;
+                {
+                    auto x = bounds.getX();
+                    auto w = bounds.getWidth();
+                    auto h = bounds.getHeight() * .6f;
+                    auto y = bounds.getBottom() - h;
+                    bodyArea.setBounds(x, y, w, h);
+                    g.fillRoundedRectangle(bodyArea, thicc);
+                }
+                {
+                    const juce::Point<float> rad(
+                        bounds.getWidth() * .5f - thicc,
+                        bounds.getHeight() * .5f - thicc
+                    );
+                    juce::Path arc;
+                    arc.addCentredArc(centre.x, centre.y, rad.x, rad.y, 0.f, -piHalf, piHalf, true);
+                    g.strokePath(arc, juce::PathStrokeType(thicc));
+                }
+            }
+
+            void mouseEnter(const juce::MouseEvent& evt) override
+            {
+                Comp::mouseEnter(evt);
+                repaint();
+            }
+            void mouseExit(const juce::MouseEvent&) override
+            {
+                repaint();
+            }
+            void mouseDown(const juce::MouseEvent&) override
+            {
+                repaint();
+            }
+            void mouseUp(const juce::MouseEvent& evt) override
+            {
+                if (!evt.mouseWasDraggedSinceMouseDown())
+                {
+                    switchLock();
+                    comp->repaint();
+                }
+                repaint();
+            }
+        };
+
         enum class ParameterType { Knob, Switch, NumTypes };
 
         static constexpr float SensitiveDrag = .2f;
@@ -1066,83 +1182,6 @@ namespace modSys6
                     repaintWithChildren(getParentComponent());
                 }
             };
-
-            struct Lock :
-                public Comp
-            {
-                Lock(Utils& u, Paramtr& _param) :
-                    Comp(u, "Click here to (un)lock this parameter."),
-                    param(_param)
-                {}
-            protected:
-                Paramtr& param;
-
-                void paint(juce::Graphics& g) override
-                {
-                   const auto thicc = Shared::shared.thicc;
-                   const auto thicc2 = thicc * 2.f;
-                   const auto bounds = getLocalBounds().toFloat().reduced(thicc);
-                   const juce::Point<float> centre(
-                       bounds.getX() + bounds.getWidth() * .5f,
-                       bounds.getY() + bounds.getHeight() * .5f
-                   );
-
-                   if (isMouseOver())
-                   {
-                       g.setColour(Shared::shared.colour(ColourID::Hover));
-                       g.fillRoundedRectangle(bounds, thicc);
-                       if(isMouseButtonDown())
-                           g.fillRoundedRectangle(bounds, thicc);
-                       g.setColour(Shared::shared.colour(ColourID::Interact));
-                   }
-                   else
-                      g.setColour(juce::Colour(0xff999999));
-                   
-                   juce::Rectangle<float> bodyArea, arcArea;
-                   {
-                       auto x = bounds.getX();
-                       auto w = bounds.getWidth();
-                       auto h = bounds.getHeight() * .6f;
-                       auto y = bounds.getBottom() - h;
-                       bodyArea.setBounds(x, y, w, h);
-                       g.fillRoundedRectangle(bodyArea, thicc);
-                   }
-                   {
-                       const juce::Point<float> rad(
-                           bounds.getWidth() * .5f - thicc,
-                           bounds.getHeight() * .5f - thicc
-                       );
-                       juce::Path arc;
-                       arc.addCentredArc(centre.x, centre.y, rad.x, rad.y, 0.f, -piHalf, piHalf, true);
-                       g.strokePath(arc, juce::PathStrokeType(thicc));
-                   }
-                }
-              
-                void mouseEnter(const juce::MouseEvent& evt) override
-                {
-                    Comp::mouseEnter(evt);
-                    repaint();
-                }
-                void mouseExit(const juce::MouseEvent&) override
-                {
-                    repaint();
-                }
-                void mouseDown(const juce::MouseEvent&) override
-                {
-                    repaint();
-                }
-                void mouseUp(const juce::MouseEvent& evt) override
-                {
-                    if (!evt.mouseWasDraggedSinceMouseDown())
-                    {
-                       param.param.setLock(!param.isLocked());
-                       param.repaint();
-                       param.modDial.repaint();
-                    }
-                    repaint();
-                }
-            };
-
         public:
             Paramtr(Utils& u, juce::String&& _name, juce::String&& _tooltip, PID _pID, std::vector<Paramtr*>& modulatables, ParameterType _pType = ParameterType::Knob) :
                 juce::Timer(),
@@ -1151,7 +1190,7 @@ namespace modSys6
                 pType(_pType),
                 label(u, std::move(_name)),
                 modDial(u, *this),
-                lockr(u, *this),
+                lockr(u, this, toString(getPID())),
                 attachedModSelected(u.getSelectedMod() == param.attachedMod),
                 valNorm(0.f), valSum(0.f), connecDepth(u.getConnecDepth(modDial.getConnecIdx())), dragY(0.f)
             {
@@ -1164,7 +1203,7 @@ namespace modSys6
                 pType(_pType),
                 label(u, std::move(_name)),
                 modDial(u, *this),
-                lockr(u, *this),
+                lockr(u, this, toString(getPID())),
                 attachedModSelected(u.getSelectedMod() == param.attachedMod),
                 valNorm(0.f), valSum(0.f), connecDepth(u.getConnecDepth(modDial.getConnecIdx())), dragY(0.f)
             {
@@ -1188,17 +1227,14 @@ namespace modSys6
                 }
                 return false;
             }
+            
             bool isLocked()
             {
-                return param.isLocked();
+                return lockr.isLocked();
             }
-            void lock()
+            void switchLock()
             {
-                param.lock();
-            }
-            void unlock()
-            {
-                param.unlock();
+                lockr.switchLock();
             }
         protected:
             Param& param;
@@ -1236,9 +1272,16 @@ namespace modSys6
                 const auto vns = param.getValueSum();
                 if (valNorm != vn || valSum != vns)
                 {
-                    valSum = vns;
-                    valNorm = vn;
-                    repaint();
+                    if (lockr.isLocked())
+                    {
+                        param.setValueWithGesture(valNorm);
+                    }
+                    else
+                    {
+                        valSum = vns;
+                        valNorm = vn;
+                        repaint();
+                    }
                 }
             }
             void callbackSwitch()
@@ -1246,8 +1289,15 @@ namespace modSys6
                 const auto vn = param.getValue();
                 if (valNorm != vn)
                 {
-                    valNorm = vn;
-                    repaint();
+                    if (lockr.isLocked())
+                    {
+                        param.setValueWithGesture(valNorm);
+                    }
+                    else
+                    {
+                        valNorm = vn;
+                        repaint();
+                    }
                 }
             }
 
@@ -1528,7 +1578,7 @@ namespace modSys6
 
             juce::Colour col(juce::Colour c)
             {
-                return c.withMultipliedAlpha((isLocked() ? LockAlpha : 1.f));
+                return lockr.col(c);
             }
         };
 
@@ -1955,17 +2005,21 @@ namespace modSys6
         {
             using RandFunc = std::function<void(juce::Random&)>;
 
-            ParamtrRandomizer(Utils& u, std::vector<Paramtr*>& _randomizables) :
+            ParamtrRandomizer(Utils& u, std::vector<Paramtr*>& _randomizables, juce::String&& _id) :
                 Comp(u, makeTooltip()),
                 randomizables(_randomizables),
-                randFuncs()
+                randFuncs(),
+                lock(u, this, std::move(_id))
             {
+                addAndMakeVisible(lock);
             }
-            ParamtrRandomizer(Utils& u) :
+            ParamtrRandomizer(Utils& u, juce::String&& _id) :
                 Comp(u, makeTooltip()),
                 randomizables(),
-                randFuncs()
+                randFuncs(),
+                lock(u, this, std::move(_id))
             {
+                addAndMakeVisible(lock);
             }
 
             void clear()
@@ -1978,6 +2032,7 @@ namespace modSys6
 
             void operator()()
             {
+                if (lock.isLocked()) return;
                 juce::Random rand;
                 const auto r_depth = Shared::shared.r_depth;
                 for (auto& func : randFuncs)
@@ -1986,17 +2041,29 @@ namespace modSys6
                 {
                     const PID pID = randomizable->getPID();
                     auto param = utils.getParam(pID);
-                    if (!param->isLocked())
-                    {
-                        auto val = param->getValue();
-                        val += (2.f * rand.nextFloat() - 1.f) * r_depth;
-                        param->setValueNotifyingHost(juce::jlimit(0.f, 1.f, val));
-                    }
+
+                    auto val = param->getValue();
+                    val += (1.f * rand.nextFloat() - .5f) * r_depth;
+                    param->setValueNotifyingHost(juce::jlimit(0.f, 1.f, val));
                 }
             }
         protected:
             std::vector<Paramtr*> randomizables;
             std::vector<RandFunc> randFuncs;
+            Lock lock;
+
+            void resized() override
+            {
+                const auto thicc = Shared::shared.thicc;
+                const auto bounds = getLocalBounds().toFloat().reduced(thicc);
+                {
+                    const auto w = std::min(getWidth(), getHeight()) / 3;
+                    const auto h = w;
+                    const auto x = getWidth() - w;
+                    const auto y = 0;
+                    lock.setBounds(x, y, w, h);
+                }
+            }
 
             void paint(juce::Graphics& g) override
             {
@@ -2012,15 +2079,19 @@ namespace modSys6
                 );
                 const auto thicc = Shared::shared.thicc;
                 bounds.reduce(thicc, thicc);
-                g.setColour(Shared::shared.colour(ColourID::Bg));
+                g.setColour(lock.col(Shared::shared.colour(ColourID::Bg)));
                 g.fillRoundedRectangle(bounds, thicc);
-                if (isMouseOver()) {
-                    g.setColour(Shared::shared.colour(ColourID::Hover));
+                juce::Colour mainCol;
+                if (isMouseOver())
+                {
+                    g.setColour(lock.col(Shared::shared.colour(ColourID::Hover)));
                     g.fillRoundedRectangle(bounds, thicc);
-                    g.setColour(Shared::shared.colour(ColourID::Interact));
+                    mainCol = Shared::shared.colour(ColourID::Interact);
                 }
                 else
-                    g.setColour(Shared::shared.colour(ColourID::Txt));
+                    mainCol = Shared::shared.colour(ColourID::Txt);
+
+                g.setColour(lock.col(mainCol));
                 g.drawRoundedRectangle(bounds, thicc, thicc);
 
                 minDimen = std::min(bounds.getWidth(), bounds.getHeight());

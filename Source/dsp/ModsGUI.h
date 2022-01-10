@@ -756,7 +756,7 @@ namespace modSys6
                 pitchbend(u, modulatables, mOff),
                 lfo(u, modulatables, _tables, mOff),
 
-                randomizer(u),
+                randomizer(u, "ModRandomizer" + juce::String(mOff)),
                 selectorButton(u, "Select another modulator for this slot."),
 
                 selector(nullptr)
