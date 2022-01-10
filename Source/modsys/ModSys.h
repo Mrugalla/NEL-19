@@ -557,8 +557,6 @@ namespace modSys6
 		bool locked;
 	};
 
-	using LockHandler = std::function<void(Param&)>;
-
 	struct Params
 	{
 		int getDigitFromString(const juce::String& txt) noexcept
@@ -748,7 +746,7 @@ namespace modSys6
 				params.push_back(new Param(withOffset(PID::AudioRate0Semi, offset), makeRange::stepped(-12.f, 12.f, 1.f), 0.f, valToStrSemi, strToValSemi, Unit::Semi));
 				params.push_back(new Param(withOffset(PID::AudioRate0Fine, offset), makeRange::biasXL(-1.f, 1.f, 0.f), 0.f, valToStrFine, strToValFine, Unit::Fine));
 				params.push_back(new Param(withOffset(PID::AudioRate0Width, offset), makeRange::biasXL(-1.f, 1.f, 0.f), 0.f, valToStrPhase, strToValPhase, Unit::Degree));
-				params.push_back(new Param(withOffset(PID::AudioRate0RetuneSpeed, offset), makeRange::biasXL(1.f, 2000.f, -.75f), 20.f, valToStrMs, strToValMs, Unit::Ms));
+				params.push_back(new Param(withOffset(PID::AudioRate0RetuneSpeed, offset), makeRange::biasXL(1.f, 2000.f, -.97f), 1.f, valToStrMs, strToValMs, Unit::Ms));
 				params.push_back(new Param(withOffset(PID::AudioRate0Atk, offset), makeRange::biasXL(1.f, 2000.f, -.9f), 20.f, valToStrMs, strToValMs, Unit::Ms));
 				params.push_back(new Param(withOffset(PID::AudioRate0Dcy, offset), makeRange::biasXL(1.f, 2000.f, -.9f), 20.f, valToStrMs, strToValMs, Unit::Ms));
 				params.push_back(new Param(withOffset(PID::AudioRate0Sus, offset), makeRange::biasXL(0.f, 1.f, 0.f), 1.f, valToStrPercent, strToValPercent, Unit::Percent));
