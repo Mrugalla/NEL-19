@@ -1,4 +1,5 @@
 #pragma once
+//#include "windows.h"
 #include "ModSys.h"
 #include <array>
 
@@ -146,23 +147,6 @@ namespace modSys6
             return { w, h };
         }
 
-        inline juce::Point<int> getWindowPos(const juce::Component* comp) noexcept
-        {
-            return comp->getScreenPosition() - comp->getTopLevelComponent()->getScreenPosition();
-        }
-        inline juce::Point<int> getWindowPos(const juce::Component& comp) noexcept
-        {
-            return comp.getScreenPosition() - comp.getTopLevelComponent()->getScreenPosition();
-        }
-        inline juce::Rectangle<int> getWindowBounds(const juce::Component* comp) noexcept
-        {
-            return comp->getScreenBounds() - comp->getTopLevelComponent()->getScreenPosition();
-        }
-        inline juce::Rectangle<int> getWindowBounds(const juce::Component& comp) noexcept
-        {
-            return comp.getScreenBounds() - comp.getTopLevelComponent()->getScreenPosition();
-        }
-
         inline void repaintWithChildren(juce::Component* comp)
         {
             comp->repaint();
@@ -305,7 +289,9 @@ namespace modSys6
 
         struct Utils
         {
-            Utils(ModSys& _modSys, juce::PropertiesFile* props) :
+            Utils(ModSys& _modSys, juce::Component& _pluginTop, juce::PropertiesFile* props) :
+                events(),
+                pluginTop(_pluginTop),
                 modSys(_modSys),
                 tooltip(&Shared::shared.tooltipDefault),
                 selectedMod({ ModType::Macro, 0 }),
@@ -405,7 +391,38 @@ namespace modSys6
             const juce::String* getTooltip() const noexcept { return tooltip; }
             juce::String* getTooltip() noexcept { return tooltip; }
 
+            juce::Point<int> getWindowPos(const juce::Component& comp) noexcept
+            {
+                return comp.getScreenPosition() - pluginTop.getScreenPosition();
+            }
+            juce::Point<int> getWindowCentre(const juce::Component& comp) noexcept
+            {
+                const juce::Point<int> centre(
+                    comp.getWidth() / 2,
+                    comp.getHeight() / 2
+                );
+                return getWindowPos(comp) + centre;
+            }
+            juce::Point<int> getWindowNearby(const juce::Component& comp) noexcept
+            {
+                const auto pos = getWindowCentre(comp).toFloat();
+                const auto w = static_cast<float>(comp.getWidth());
+                const auto h = static_cast<float>(comp.getHeight());
+                const auto off = (w + h) * .5f;
+                const auto pluginCentre = juce::Point<int>(
+                    pluginTop.getWidth(),
+                    pluginTop.getHeight()
+                ).toFloat() * .5f;
+                const juce::Line<float> vec(pos, pluginCentre);
+                return juce::Line<float>::fromStartAndAngle(pos, off, vec.getAngle()).getEnd().toInt();
+            }
+            inline juce::Rectangle<int> getWindowBounds(const juce::Component& comp) noexcept
+            {
+                return comp.getScreenBounds() - pluginTop.getScreenPosition();
+            }
+
             Events events;
+            juce::Component& pluginTop;
         protected:
             ModSys& modSys;
             juce::String* tooltip;
@@ -1594,7 +1611,7 @@ namespace modSys6
                 for (const auto p : modulatables)
                     if (p->isShowing())
                         if(!p->isLocked())
-                            if (!getWindowBounds(this).getIntersection(getWindowBounds(p)).isEmpty())
+                            if (!this->utils.getWindowBounds(*this).getIntersection(this->utils.getWindowBounds(*p)).isEmpty())
                                 return p;
                 return nullptr;
             }
@@ -1667,7 +1684,7 @@ namespace modSys6
                         const auto valTxt = param->getValueAsText();
                         if (valTxt.isNotEmpty())
                         {
-                            const auto pt = getWindowPos(param);
+                            const auto pt = p.utils.getWindowNearby(*param);
                             p.update(param->getName() + "\n" + valTxt, pt);
                             return true;
                         }
@@ -1707,7 +1724,7 @@ namespace modSys6
             }
             void update(juce::String&& txt, juce::Point<int> pt)
             {
-                setTopLeftPosition(pt);
+                setCentrePosition(pt);
                 update(std::move(txt));
             }
             void update(juce::String&& txt)
@@ -1764,7 +1781,7 @@ namespace modSys6
                     {
                         const auto param = static_cast<const Paramtr*>(stuff);
                         const auto pID = param->getPID();
-                        evc.enable(pID, getWindowPos(param));
+                        evc.enable(pID, evc.utils.getWindowNearby(*param));
                         return true;
                     }
                     if (type == NotificationType::KillEnterValue)
@@ -1789,7 +1806,7 @@ namespace modSys6
             }
             void enable(PID pID, juce::Point<int> pt)
             {
-                setTopLeftPosition(pt);
+                setCentrePosition(pt);
                 param = this->utils.getParam(pID);
                 initValue = param->getValue();
                 txt = param->getCurrentValueAsText();

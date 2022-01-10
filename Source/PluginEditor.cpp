@@ -41,7 +41,7 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
         { 30, 30, 30, 270, 70 },
         { 1 }
     ),
-    utils(p.modSys, p.appProperties.getUserSettings()),
+    utils(p.modSys, *this, p.appProperties.getUserSettings()),
     notify(utils.events, makeNotify(this)),
 
     nelLabel(utils, "<< NEL >>", modSys6::gui::ColourID::Transp, modSys6::gui::ColourID::Transp, modSys6::gui::ColourID::Txt),
