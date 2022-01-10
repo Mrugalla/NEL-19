@@ -312,7 +312,7 @@ namespace modSys6
                     Paramtr(u, "Decay", "The approximate decay of the dropout.", withOffset(PID::Dropout0Decay, mOff), modulatables),
                     Paramtr(u, "Spin", "Give it a little spin.", withOffset(PID::Dropout0Spin, mOff), modulatables),
                     Paramtr(u, "Chance", "The likelyness of new dropouts to appear.", withOffset(PID::Dropout0Chance, mOff), modulatables),
-                    Paramtr(u, "Smooth", "Smoothens the texture of the dropouts.", withOffset(PID::Dropout0Smooth, mOff), modulatables),
+                    Paramtr(u, "Hard", "Defines the smoothness of the dropouts.", withOffset(PID::Dropout0Smooth, mOff), modulatables),
                     Paramtr(u, "Width", "The modulator's stereo-width", withOffset(PID::Dropout0Width, mOff), modulatables)
             }
             {
