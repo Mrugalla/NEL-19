@@ -194,6 +194,12 @@ namespace modSys6
                             susY
                         );
                     }
+                    else
+                    {
+                        const auto susY = bounds.getBottom() - bounds.getHeight() * sus;
+                        path.lineTo(bounds.getX(), susY);
+                        path.lineTo(bounds.getRight(), susY);
+                    }
 
                     path.lineTo(bounds.getBottomRight());
                     path.closeSubPath();
