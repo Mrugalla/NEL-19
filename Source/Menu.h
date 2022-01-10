@@ -10,15 +10,18 @@ namespace menu2
 	struct ButtonM :
 		public Comp
 	{
-		ButtonM(Utils& u, const juce::String& tooltp, std::function<void()> _onClick, std::function<void(juce::Graphics&, const ButtonM&)> _onPaint) :
+		ButtonM(Utils& u, const juce::String& tooltp, std::function<void()> _onClick, std::function<void(juce::Graphics&, ButtonM&)> _onPaint) :
 			Comp(u, tooltp, CursorType::Interact),
 			onClick(_onClick),
-			onPaint(_onPaint)
+			onPaint(_onPaint),
+			blinkyBoy(this)
 		{
 		}
+		BlinkyBoy& getBlinky() noexcept { return blinkyBoy; }
 	protected:
 		std::function<void()> onClick;
-		std::function<void(juce::Graphics&, const ButtonM&)> onPaint;
+		std::function<void(juce::Graphics&, ButtonM&)> onPaint;
+		BlinkyBoy blinkyBoy;
 
 		void mouseEnter(const juce::MouseEvent& evt) override
 		{
@@ -26,30 +29,37 @@ namespace menu2
 			repaint();
 		}
 		void mouseExit(const juce::MouseEvent&) override { repaint(); }
-		void mouseUp(const juce::MouseEvent& evt) override {
+		void mouseUp(const juce::MouseEvent& evt) override
+		{
 			if (evt.mouseWasDraggedSinceMouseDown()) return;
 			onClick();
+			blinkyBoy.trigger(3.f);
 		}
 		void paint(juce::Graphics& g) override { onPaint(g, *this); }
 	};
 
-	inline void paintMenuButton(juce::Graphics& g, const ButtonM& b, const Utils& utils, bool selected = false)
+	inline void paintMenuButton(juce::Graphics& g, ButtonM& b, const Utils& utils, bool selected = false)
 	{
+		auto& blinky = b.getBlinky();
+		blinky.flash(g, juce::Colours::white);
 		const auto thicc = Shared::shared.thicc;
 		const auto bounds = b.getLocalBounds().toFloat().reduced(thicc);
 		const auto bounds2 = bounds.reduced(thicc);
 		g.setColour(utils.colour(ColourID::Bg));
 		g.fillRoundedRectangle(bounds2, thicc);
+		juce::Colour mainCol;
 		if (b.isMouseOver())
 		{
 			g.setColour(utils.colour(ColourID::Hover));
 			g.fillRoundedRectangle(bounds2, thicc);
 		}
 		if (selected)
-			g.setColour(utils.colour(ColourID::Interact));
+			mainCol = utils.colour(ColourID::Interact);
 		else
-			g.setColour(utils.colour(ColourID::Txt));
+			mainCol = utils.colour(ColourID::Txt);
 		g.setFont(Shared::shared.font);
+		g.setColour(mainCol);
+		blinky.flash(g, mainCol);
 		g.drawRoundedRectangle(bounds, thicc, thicc);
 		g.drawFittedText(b.getName(), bounds.toNearestInt(), juce::Justification::centred, 1);
 	}
@@ -84,9 +94,9 @@ namespace menu2
 		ColourSelector(Utils& u, int idx, std::function<void()> _onExit) :
 			Comp(u, "", CursorType::Interact),
 			selector(27, 4, 7),
-			okButton(u, "you accept the changes you made.", [this]() { onClickOK(); }, [this](juce::Graphics& g, const ButtonM& b) { paintMenuButton(g, b, utils); }),
-			undoButton(u, "you want to go back to better times.", [this]() { onClickUNDO(); }, [this](juce::Graphics& g, const ButtonM& b) { paintMenuButton(g, b, utils); }),
-			defaultButton(u, "back to default colour.", [this]() { onClickDEFAULT(); }, [this](juce::Graphics& g, const ButtonM& b) { paintMenuButton(g, b, utils); }),
+			okButton(u, "you accept the changes you made.", [this]() { onClickOK(); }, [this](juce::Graphics& g, ButtonM& b) { paintMenuButton(g, b, utils); }),
+			undoButton(u, "you want to go back to better times.", [this]() { onClickUNDO(); }, [this](juce::Graphics& g, ButtonM& b) { paintMenuButton(g, b, utils); }),
+			defaultButton(u, "back to default colour.", [this]() { onClickDEFAULT(); }, [this](juce::Graphics& g, ButtonM& b) { paintMenuButton(g, b, utils); }),
 			startColour(utils.colour(static_cast<ColourID>(idx))),
 			colIdx(idx),
 			onExit(_onExit)
@@ -160,18 +170,20 @@ namespace menu2
 			buttons()
 		{
 			for (auto i = 0; i < options.size(); ++i) {
-				auto onClick = [os = onSwitch, &btns = buttons, j = i]() {
+				auto onClick = [os = onSwitch, &btns = buttons, j = i]()
+				{
 					os(j);
 					for (auto& btn : btns)
 						btn->repaint();
 				};
-				auto onPaint = [this, isEnabled = onIsEnabled, j = i](juce::Graphics& g, const ButtonM& b) {
+				auto onPaint = [this, isEnabled = onIsEnabled, j = i](juce::Graphics& g, ButtonM& b)
+				{
 					paintMenuButton(g, b, utils, isEnabled(j));
 				};
 
 				buttons.push_back(std::make_unique<ButtonM>(
 					u, std::move(tooltp), onClick, onPaint
-					));
+				));
 				buttons[i]->setName(options[i].toString());
 				addAndMakeVisible(buttons[i].get());
 			}
@@ -182,7 +194,7 @@ namespace menu2
 		std::vector<std::unique_ptr<ButtonM>> buttons;
 
 		void paint(juce::Graphics&) override {}
-
+		
 		void resized() override
 		{
 			auto x = 0.f;
@@ -208,6 +220,7 @@ namespace menu2
 		TextBox(Utils& u, const juce::String& tooltp, const juce::String& _name,
 			std::function<bool(const juce::String& txt)> _onUpdate, std::function<juce::String()> onDefaultText, juce::String&& _unit = "") :
 			Comp(u, tooltp),
+			blinkyBoy(this),
 			onUpdate(_onUpdate),
 			txt(onDefaultText()),
 			txtDefault(txt),
@@ -219,6 +232,7 @@ namespace menu2
 			setWantsKeyboardFocus(true);
 		}
 	protected:
+		BlinkyBoy blinkyBoy;
 		std::function<bool(const juce::String& txt)> onUpdate;
 		juce::String txt, txtDefault, unit;
 		int pos;
@@ -233,11 +247,14 @@ namespace menu2
 
 		void paint(juce::Graphics& g) override
 		{
+			blinkyBoy.flash(g, juce::Colours::white);
+
 			const auto thicc = Shared::shared.thicc;
 			const auto bounds = getLocalBounds().toFloat().reduced(thicc);
 			g.setFont(Shared::shared.font);
 			g.setColour(utils.colour(ColourID::Bg));
 			g.fillRoundedRectangle(bounds, thicc);
+			blinkyBoy.flash(g, utils.colour(ColourID::Interact));
 			g.setColour(utils.colour(ColourID::Interact));
 			g.drawRoundedRectangle(bounds, thicc, thicc);
 			if (showTick)
@@ -296,7 +313,10 @@ namespace menu2
 			{
 				bool successful = onUpdate(txt);
 				if (successful)
+				{
+					blinkyBoy.trigger(3.f);
 					txtDefault = txt;
+				}
 				else
 					backToDefault();
 				repaintWithTick();
@@ -561,7 +581,7 @@ namespace menu2
 					subMenu->setBounds(getLocalBounds());
 				}
 			};
-			const auto onPaint = [this](juce::Graphics& g, const ButtonM& b)
+			const auto onPaint = [this](juce::Graphics& g, ButtonM& b)
 			{
 				paintMenuButton(g, b, utils);
 			};
@@ -591,7 +611,7 @@ namespace menu2
 				colourSelector->setBounds(top->getLocalBounds().reduced(reduced));
 				setVisibleAllMenus(false);
 			};
-			const auto onPaint = [this](juce::Graphics& g, const ButtonM& b)
+			const auto onPaint = [this](juce::Graphics& g, ButtonM& b)
 			{
 				paintMenuButton(g, b, utils);
 			};
@@ -904,7 +924,7 @@ namespace menu2
 		}
 	};
 
-	inline void paintMenuButton(juce::Graphics& g, const ButtonM& button, Utils& utils, Menu* menu)
+	inline void paintMenuButton(juce::Graphics& g, ButtonM& button, Utils& utils, Menu* menu)
 	{
 		const auto width = static_cast<float>(button.getWidth());
 		const auto height = static_cast<float>(button.getHeight());

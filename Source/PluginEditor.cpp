@@ -85,7 +85,7 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
         utils,
         "All the extra stuff.",
         [this]() { menu2::openMenu(menu, audioProcessor, utils, *this, layout(1, 1, 2, 4).toNearestInt(), menuButton); },
-        [this](juce::Graphics& g, const menu2::ButtonM& b) { menu2::paintMenuButton(g, menuButton, utils, menu.get());
+        [this](juce::Graphics& g, menu2::ButtonM& b) { menu2::paintMenuButton(g, menuButton, utils, menu.get());
     }),
 
     presetBrowser(utils, *p.appProperties.getUserSettings())

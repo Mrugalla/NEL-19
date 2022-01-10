@@ -529,6 +529,41 @@ namespace modSys6
             }
         };
 
+        struct BlinkyBoy :
+            public juce::Timer
+        {
+            BlinkyBoy(Comp* _comp) :
+                juce::Timer(),
+                comp(_comp),
+                env(0.f), x(0.f)
+            {
+
+            }
+            void flash(juce::Graphics& g, juce::Colour col)
+            {
+                g.fillAll(col.withAlpha(env * env));
+            }
+
+            void trigger(float durationInSec)
+            {
+                startTimerHz(30);
+                env = 1.f;
+                x = 1.f - 1.f / (30.f / durationInSec);
+                eps = (1.f - x) * 2.f;
+            }
+        protected:
+            Comp* comp;
+            float env, x, eps;
+
+            void timerCallback() override
+            {
+                env *= x;
+                if (env < eps)
+                    stopTimer();
+                comp->repaint();
+            }
+        };
+
         struct ImageComp :
             public Comp
         {
