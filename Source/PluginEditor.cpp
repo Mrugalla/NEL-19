@@ -84,7 +84,7 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     menuButton(
         utils,
         "All the extra stuff.",
-        [this]() { menu2::openMenu(menu, audioProcessor, utils, *this, layout(1, 1, 2, 4).toNearestInt(), menuButton); },
+        [this]() { menu2::openMenu(menu, audioProcessor, utils, *this, layout(1, 1, 2, 3).toNearestInt(), menuButton); },
         [this](juce::Graphics& g, menu2::ButtonM& b) { menu2::paintMenuButton(g, menuButton, utils, menu.get());
     }),
 
@@ -221,8 +221,7 @@ void Nel19AudioProcessorEditor::resized()
     layoutTopBar.setBounds(layout.topBar());
     layoutMacros.setBounds(layout(0, 1, 1, 3).reduced(thicc));
     layoutMainParams.setBounds(layout(2, 1, 1, 3).reduced(thicc));
-    //layoutMiscs.setBounds(layout(3, 1, 1, 4).reduced(thicc));
-
+    
     layoutBottomBar.place(tooltips, 0, 0, 1, 1, thicc, false);
     layoutBottomBar.place(buildDate, 1, 0, 1, 1, thicc, false);
 
@@ -246,7 +245,7 @@ void Nel19AudioProcessorEditor::resized()
 
     layout.place(modComps[0], 1, 2, 1, 1, thicc, false);
     layout.place(modComps[1], 1, 3, 1, 1, thicc, false);
-
+    
     layoutMainParams.place(modsDepth,    0, 0, 2, 1, thicc, true);
     layoutMainParams.place(modsMix,      0, 1, 2, 1, thicc, true);
     layoutMainParams.place(dryWetMix,    1, 2, 1, 1, thicc, true);
@@ -261,11 +260,7 @@ void Nel19AudioProcessorEditor::resized()
         user->setValue("BoundsHeight", getHeight());
     }
     
-
-    /*
-    layoutTopBar.place(menuButton, 0, 0, 1, 1, nelG::Thicc, true);
-    layout.place(menu.get(), 1, 1, 4, 4);
-    */
+    layout.place(menu.get(), 1, 1, 2, 3, 0.f, false);
 }
 void Nel19AudioProcessorEditor::paint(juce::Graphics& g)
 {

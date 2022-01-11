@@ -648,7 +648,8 @@ namespace modSys6
         };
 
         class ModComp :
-            public Comp
+            public Comp,
+            public juce::Timer
         {
             class Selector :
                 public Comp
@@ -749,6 +750,7 @@ namespace modSys6
                     { 80, 10, 10 },
                     { 30, 70 }
                 ),
+                modDepth(0.f),
                 mOff(_mOff),
 
                 onModChange([](vibrato::ModType){}),
@@ -798,6 +800,8 @@ namespace modSys6
                 addAndMakeVisible(selectorButton);
                 
                 setBufferedToImage(false);
+
+                startTimerHz(8);
             }
             void updateMod() { setMod(getModType()); }
             void setMod(vibrato::ModType t)
@@ -860,6 +864,7 @@ namespace modSys6
         protected:
             nelG::Layout layout;
             Label label;
+            float modDepth;
             int mOff;
 
             ModCompPerlin perlin;
@@ -878,11 +883,12 @@ namespace modSys6
             void paint(juce::Graphics& g) override
             {
                 const auto thicc = Shared::shared.thicc;
+                const auto col = Shared::shared.colour(modSys6::gui::ColourID::Hover).interpolatedWith(Shared::shared.colour(modSys6::gui::ColourID::Mod), modDepth);
                 visualizeGroup(
                     g,
                     "Mod " + juce::String(mOff == 0 ? 0 : 1),
                     getLocalBounds().toFloat().reduced(thicc),
-                    utils.colour(modSys6::gui::ColourID::Hover),
+                    col,
                     thicc
                 );
             }
@@ -913,6 +919,18 @@ namespace modSys6
             void mouseEnter(const juce::MouseEvent& evt) override
             {
                 Comp::mouseEnter(evt);
+            }
+
+            void timerCallback() override
+            {
+                const auto param = this->utils.getParam(PID::ModsMix);
+                const auto valSum = param->getValueSum();
+                const auto v = mOff == 0 ? 1.f - valSum : valSum;
+                if (modDepth != v)
+                {
+                    modDepth = v;
+                    repaint();
+                }
             }
         };
     }
