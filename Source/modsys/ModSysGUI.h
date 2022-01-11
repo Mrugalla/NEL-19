@@ -154,14 +154,6 @@ namespace modSys6
                 repaintWithChildren(comp->getChildComponent(c));
         }
         
-        inline float getDragSpeed(const juce::Component* topLevelComponent) noexcept
-        {
-            static constexpr float DragSpeed = .5f;
-            const auto height = static_cast<float>(topLevelComponent->getHeight());
-            const auto speed = DragSpeed * height;
-            return speed;
-        }
-
         struct Shared
         {
             Shared() :
@@ -302,6 +294,14 @@ namespace modSys6
             void init()
             {
                 notify(NotificationType::ModSelectionChanged);
+            }
+
+            float getDragSpeed() noexcept
+            {
+                static constexpr float DragSpeed = .5f;
+                const auto height = static_cast<float>(pluginTop.getHeight());
+                const auto speed = DragSpeed * height;
+                return speed;
             }
 
             void triggerUpdatePatch(const juce::String& xmlString)
@@ -1186,13 +1186,13 @@ namespace modSys6
                 void mouseDown(const juce::MouseEvent& evt) override
                 {
                     if (paramtr.isLocked()) return;
-                    dragY = evt.position.y / getDragSpeed(getTopLevelComponent());
+                    dragY = evt.position.y / this->utils.getDragSpeed();
                     updateSetSelected(this->utils.getSelectedModIdx());
                 }
                 void mouseDrag(const juce::MouseEvent& evt) override
                 {
                     if (!isSelected() || paramtr.isLocked()) return;
-                    const auto dragYNew = evt.position.y / getDragSpeed(getTopLevelComponent());
+                    const auto dragYNew = evt.position.y / this->utils.getDragSpeed();
                     const auto sensitive = evt.mods.isShiftDown() ? SensitiveDrag : 1.f;
                     const auto dragMove = (dragYNew - dragY) * sensitive;
                     const auto depth = juce::jlimit(-1.f, 1.f, this->utils.getConnecDepth(connecIdx) - dragMove);
@@ -1508,7 +1508,7 @@ namespace modSys6
                         {
                             notify(NotificationType::KillEnterValue);
                             param.beginGesture();
-                            dragY = evt.position.y / getDragSpeed(getTopLevelComponent());
+                            dragY = evt.position.y / this->utils.getDragSpeed();
                         }
                         return;
                     case ParameterType::Switch:
@@ -1521,7 +1521,7 @@ namespace modSys6
                 if(!isLocked() && pType == ParameterType::Knob)
                     if (evt.mods.isLeftButtonDown())
                     {
-                        const auto dragYNew = evt.position.y / getDragSpeed(getTopLevelComponent());
+                        const auto dragYNew = evt.position.y / this->utils.getDragSpeed();
                         auto dragOffset = dragYNew - dragY;
                         if (evt.mods.isShiftDown())
                             dragOffset *= SensitiveDrag;
@@ -2448,11 +2448,11 @@ namespace modSys6
             }
             void mouseDown(const juce::MouseEvent& evt)
             {
-                dragY = evt.position.y / getDragSpeed(getTopLevelComponent());
+                dragY = evt.position.y / this->utils.getDragSpeed();
             }
             void mouseDrag(const juce::MouseEvent& evt)
             {
-                const auto dragYNew = evt.position.y / getDragSpeed(getTopLevelComponent());
+                const auto dragYNew = evt.position.y / this->utils.getDragSpeed();
                 auto dragOffset = dragYNew - dragY;
                 if (evt.mods.isShiftDown())
                     dragOffset *= SensitiveDrag;

@@ -671,6 +671,7 @@ namespace vibrato
 		public:
 			AudioRate(int _numChannels) :
 				retuneSpeedSmooth(),
+				widthSmooth(),
 
 				numChannels(_numChannels),
 				osc(),
@@ -692,6 +693,7 @@ namespace vibrato
 					o.prepare(sampleRate);
 				env.prepare(Fs);
 				modSys6::Smooth::makeFromDecayInMs(retuneSpeedSmooth, retuneSpeed, Fs);
+				modSys6::Smooth::makeFromDecayInMs(widthSmooth, 10.f, Fs);
 			}
 			void setParameters(float _noteOffset, float _width, float _retuneSpeed,
 				float _attack, float _decay, float _sustain, float _release) noexcept
@@ -810,28 +812,19 @@ namespace vibrato
 					}
 					else
 					{ // PROCESS STEREO WIDTH
-						if(width == 0.f)
-							for (auto s = 0; s < numSamples; ++s)
-							{
-								const auto freq = buffer[1][s];
-								osc[0].setFrequencyHz(freq);
-								buffer[0][s] = osc[0]() * bufEnv[s];
-								buffer[1][s] = buffer[0][s];
-							}
-						else
-							for (auto s = 0; s < numSamples; ++s)
-							{
-								const auto freq = buffer[1][s];
-								osc[0].setFrequencyHz(freq);
-								buffer[0][s] = osc[0]() * bufEnv[s];
-								buffer[1][s] = osc[1].withPhaseOffset(osc[0], width) * bufEnv[s];
-							}
+						for (auto s = 0; s < numSamples; ++s)
+						{
+							const auto freq = buffer[1][s];
+							osc[0].setFrequencyHz(freq);
+							buffer[0][s] = osc[0]() * bufEnv[s];
+							buffer[1][s] = osc[1].withPhaseOffset(osc[0], widthSmooth(width)) * bufEnv[s];
+						}
 					}
 				}
 #endif
 			}
 		protected:
-			modSys6::Smooth retuneSpeedSmooth;
+			modSys6::Smooth retuneSpeedSmooth, widthSmooth;
 
 			const int numChannels;
 			std::vector<Osc> osc;

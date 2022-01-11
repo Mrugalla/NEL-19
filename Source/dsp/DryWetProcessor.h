@@ -72,7 +72,7 @@ namespace drywet
 		}
 		void prepare(float sampleRate, int maxBufferSize, int latency)
 		{
-			modSys6::Smooth::makeFromDecayInMs(mixSmooth, 12.f, sampleRate);
+			modSys6::Smooth::makeFromDecayInMs(mixSmooth, 20.f, sampleRate);
 			modSys6::Smooth::makeFromDecayInMs(gainWetSmooth, 12.f, sampleRate);
 			for (auto& b : dryBuffer)
 				b.resize(maxBufferSize, 0.f);
