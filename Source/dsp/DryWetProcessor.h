@@ -55,12 +55,12 @@ namespace drywet
 		using Buffer = std::array<std::vector<float>, 3>;
 
 		Processor(int _numChannels) :
-			mixSmooth(),
+			mixSmooth(false),
 			dryBuffer(), paramBuffer(),
 			numChannels(_numChannels),
 			
 			gainWet(420.f), gainWetVal(1.f),
-			gainWetSmooth(),
+			gainWetSmooth(false),
 
 			lookaheadEnabled(true),
 			lookaheadState(true)
@@ -72,8 +72,8 @@ namespace drywet
 		}
 		void prepare(float sampleRate, int maxBufferSize, int latency)
 		{
-			modSys6::Smooth::makeFromDecayInMs(mixSmooth, 20.f, sampleRate);
-			modSys6::Smooth::makeFromDecayInMs(gainWetSmooth, 12.f, sampleRate);
+			modSys6::Smooth::makeFromDecayInMs(mixSmooth, 10.f, sampleRate);
+			modSys6::Smooth::makeFromDecayInMs(gainWetSmooth, 4.f, sampleRate);
 			for (auto& b : dryBuffer)
 				b.resize(maxBufferSize, 0.f);
 			for (auto& b : paramBuffer)

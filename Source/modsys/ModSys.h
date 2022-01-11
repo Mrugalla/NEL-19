@@ -229,11 +229,12 @@ namespace modSys6
 			makeFromDecayInSamples(s, d * Fs * .001f);
 		}
 
-		Smooth() :
+		Smooth(const bool _snap = true) :
 			a0(1.f),
 			b1(0.f),
 			y1(0.f),
-			eps(0.f)
+			eps(0.f),
+			snap(_snap)
 		{}
 		void reset()
 		{
@@ -266,12 +267,13 @@ namespace modSys6
 		}
 	protected:
 		float a0, b1, y1, eps;
+		const bool snap;
 
 		float processSample(float x0) noexcept
-		{;
-			if (std::abs(y1 - x0) < eps)
+		{
+			if (snap && std::abs(y1 - x0) < eps)
 				y1 = x0;
-			else	
+			else
 				y1 = x0 * a0 + y1 * b1;
 			return y1;
 		}
