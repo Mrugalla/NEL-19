@@ -796,6 +796,8 @@ namespace modSys6
 
                 addAndMakeVisible(randomizer);
                 addAndMakeVisible(selectorButton);
+                
+                setBufferedToImage(false);
             }
             void updateMod() { setMod(getModType()); }
             void setMod(vibrato::ModType t)
@@ -876,11 +878,13 @@ namespace modSys6
             void paint(juce::Graphics& g) override
             {
                 const auto thicc = Shared::shared.thicc;
-                const auto bounds = getLocalBounds().toFloat().reduced(thicc);
-                g.setColour(Shared::shared.colour(ColourID::Bg));
-                g.fillRoundedRectangle(bounds, thicc);
-                g.setColour(Shared::shared.colour(ColourID::Mod));
-                g.drawRoundedRectangle(bounds, thicc, thicc);
+                visualizeGroup(
+                    g,
+                    "Mod " + juce::String(mOff == 0 ? 0 : 1),
+                    getLocalBounds().toFloat().reduced(thicc),
+                    utils.colour(modSys6::gui::ColourID::Hover),
+                    thicc
+                );
             }
 
             void resized() override
@@ -890,7 +894,7 @@ namespace modSys6
 
                 layout.setBounds(getLocalBounds().toFloat().reduced(thicc4));
 
-                layout.place(label, 0, 0, 1, 1, thicc, false);
+                layout.place(label, 0, 0, 1, 1, thicc4, false);
                 layout.place(randomizer, 1, 0, 1, 1, thicc, true);
                 layout.place(selectorButton, 2, 0, 1, 1, thicc, true);
 

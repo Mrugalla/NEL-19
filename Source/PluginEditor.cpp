@@ -19,7 +19,7 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     audioProcessor(p),
     layout(
         { 25, 150, 50 },
-        { 50, 50, 150, 150, 50, 30 }
+        { 50, 15, 150, 150, 30 }
     ),
     layoutMacros(
         { 1 },
@@ -219,8 +219,8 @@ void Nel19AudioProcessorEditor::resized()
     layout.setBounds(getLocalBounds().toFloat().reduced(thicc));
     layoutBottomBar.setBounds(layout.bottomBar());
     layoutTopBar.setBounds(layout.topBar());
-    layoutMacros.setBounds(layout(0, 1, 1, 4).reduced(thicc));
-    layoutMainParams.setBounds(layout(2, 1, 1, 4).reduced(thicc));
+    layoutMacros.setBounds(layout(0, 1, 1, 3).reduced(thicc));
+    layoutMainParams.setBounds(layout(2, 1, 1, 3).reduced(thicc));
     //layoutMiscs.setBounds(layout(3, 1, 1, 4).reduced(thicc));
 
     layoutBottomBar.place(tooltips, 0, 0, 1, 1, thicc, false);
@@ -244,8 +244,8 @@ void Nel19AudioProcessorEditor::resized()
     popUp.setBounds({ 0, 0, 100, 50 });
     enterValue.setBounds({ 0, 0, 100, 50 });
 
-    for(auto m = 0; m < modComps.size(); ++m)
-        layout.place(modComps[m], 1, 1 + m * 2, 1, 2, thicc, false);
+    layout.place(modComps[0], 1, 2, 1, 1, thicc, false);
+    layout.place(modComps[1], 1, 3, 1, 1, thicc, false);
 
     layoutMainParams.place(modsDepth,    0, 0, 2, 1, thicc, true);
     layoutMainParams.place(modsMix,      0, 1, 2, 1, thicc, true);
@@ -253,7 +253,7 @@ void Nel19AudioProcessorEditor::resized()
     layoutMainParams.place(gainWet,      0, 2, 1, 1, thicc, true);
     layoutMainParams.place(stereoConfig, 0, 3, 2, 1, thicc, true);
 
-    layout.place(presetBrowser, 1, 1, 2, 4, thicc, false);
+    layout.place(presetBrowser, 1, 1, 2, 3, thicc, false);
 
     {
         auto user = audioProcessor.appProperties.getUserSettings();
@@ -270,6 +270,13 @@ void Nel19AudioProcessorEditor::resized()
 void Nel19AudioProcessorEditor::paint(juce::Graphics& g)
 {
     g.fillAll(utils.colour(modSys6::gui::ColourID::Bg));
+    modSys6::gui::visualizeGroup(
+        g,
+        "Mods",
+        layout(1, 1, 1, 3, 0.f, false),
+        utils.colour(modSys6::gui::ColourID::Hover),
+        modSys6::gui::Shared::shared.thicc
+    );
 }
 void Nel19AudioProcessorEditor::mouseEnter(const juce::MouseEvent&)
 {

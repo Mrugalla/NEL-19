@@ -124,6 +124,14 @@ namespace modSys6
 
         enum class CursorType { Default, Interact, Mod, Cross, NumCursors };
 
+        inline int getNumRows(const juce::String& txt)
+        {
+            auto rows = 1;
+            for (auto i = 0; i < txt.length(); ++i)
+                rows = txt[i] == '\n' ? rows + 1 : rows;
+            return rows;
+        }
+
         inline juce::Rectangle<float> maxQuadIn(const juce::Rectangle<float>& b) noexcept {
             const auto minDimen = std::min(b.getWidth(), b.getHeight());
             const auto x = b.getX() + .5f * (b.getWidth() - minDimen);
@@ -251,6 +259,47 @@ namespace modSys6
 
             static Shared shared;
         };
+
+        static void visualizeGroup(juce::Graphics& g, juce::String&& txt,
+            juce::Rectangle<float> bounds, juce::Colour col, float thicc)
+        {
+            g.setColour(col);
+            g.setFont(Shared::shared.font);
+            {
+                const auto edgeLen = std::min(bounds.getWidth(), bounds.getHeight()) * .2f;
+                {
+                    const auto x = bounds.getX();
+                    const auto y = bounds.getY();
+                    g.fillRect(x + thicc, y, edgeLen, thicc);
+                    g.fillRect(x, y + thicc, thicc, edgeLen);
+                    const juce::Rectangle<float> txtBounds(
+                        x + edgeLen + thicc * 2.f,
+                        y,
+                        bounds.getWidth(),
+                        bounds.getHeight()
+                    );
+                    g.drawFittedText(txt, txtBounds.toNearestInt(), juce::Justification::topLeft, 1);
+                }
+                {
+                    const auto x = bounds.getRight();
+                    const auto y = bounds.getY();
+                    g.fillRect(x - edgeLen - thicc, y, edgeLen, thicc);
+                    g.fillRect(x, y + thicc, thicc, edgeLen);
+                }
+                {
+                    const auto x = bounds.getRight();
+                    const auto y = bounds.getBottom();
+                    g.fillRect(x - edgeLen - thicc, y, edgeLen, thicc);
+                    g.fillRect(x, y - edgeLen - thicc, thicc, edgeLen);
+                }
+                {
+                    const auto x = bounds.getX();
+                    const auto y = bounds.getBottom();
+                    g.fillRect(x + thicc, y, edgeLen, thicc);
+                    g.fillRect(x, y - edgeLen - thicc, thicc, edgeLen);
+                }
+            }
+        }
 
         inline void makeCursor(juce::Component& c, CursorType t)
         {
@@ -618,10 +667,11 @@ namespace modSys6
             void setText(const juce::String& t)
             {
                 txt = t;
+                updateBounds();
             }
             void setText(juce::String&& t)
             {
-                txt = t;
+                setText(t);
             }
             const juce::String& getText() const noexcept { return txt; }
             juce::String& getText() noexcept { return txt; }
@@ -630,6 +680,11 @@ namespace modSys6
         protected:
             juce::String txt;
             ColourID bgC, outlineC, txtC;
+
+            void resized() override
+            {
+                updateBounds();
+            }
 
             void paint(juce::Graphics& g) override
             {
@@ -644,6 +699,22 @@ namespace modSys6
                 g.drawFittedText(
                     txt, getLocalBounds(), juce::Justification::centred, 1
                 );
+            }
+
+            void updateBounds()
+            {
+                const auto height = getHeight();
+                const auto minHeight = font.getHeight() * getNumRows(txt);
+                const auto dif = height - minHeight;
+                if (dif < 0)
+                {
+                    const auto dif2 = dif / 2;
+                    const auto x = getX();
+                    const auto y = getY() + dif2;
+                    const auto w = getWidth();
+                    const auto h = getHeight() - dif;
+                    setBounds(x, y, w, h);
+                }
             }
         };
 
