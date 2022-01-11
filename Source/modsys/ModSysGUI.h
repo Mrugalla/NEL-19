@@ -2708,20 +2708,7 @@ namespace modSys6
                 openCloseButton.onClick = [this]()
                 {
                     const bool e = !browser.isVisible();
-                    browser.setVisible(e);
-                    presetNameEditor.setVisible(e);
-                    saveButton.setVisible(e);
-                    pathButton.setVisible(e);
-                    if (e)
-                    {
-                        initBrowser();
-                        startTimerHz(4);
-                    }   
-                    else
-                    {
-                        browser.clearEntries();
-                        stopTimer();
-                    }
+                    setBrowserOpen(e);
                 };
 
                 pathButton.onPaint = makeButtonOnPaintDirectory();
@@ -2765,6 +2752,24 @@ namespace modSys6
 
             juce::PropertiesFile& user;
             juce::String presetsPath;
+
+            void setBrowserOpen(bool e)
+            {
+                browser.setVisible(e);
+                presetNameEditor.setVisible(e);
+                saveButton.setVisible(e);
+                pathButton.setVisible(e);
+                if (e)
+                {
+                    initBrowser();
+                    startTimerHz(4);
+                }
+                else
+                {
+                    browser.clearEntries();
+                    stopTimer();
+                }
+            }
         private:
             void paint(juce::Graphics&) override {}
             void resized() override
@@ -2820,6 +2825,7 @@ namespace modSys6
                         {
                             utils.triggerUpdatePatch(file.loadFileAsString());
                             notify(NotificationType::PatchUpdated);
+                            setBrowserOpen(false);
                         },
                         juce::Justification::left
                     );
