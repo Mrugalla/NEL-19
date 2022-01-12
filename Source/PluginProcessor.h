@@ -1,7 +1,6 @@
 #pragma once
 #include "Approx.h"
 #include "Outtakes.h"
-#include "Param.h"
 #include "Interpolation.h"
 #include "dsp/DryWetProcessor.h"
 #include "dsp/MidSideEncoder.h"

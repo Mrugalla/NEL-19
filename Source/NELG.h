@@ -10,8 +10,8 @@ namespace nelG
     static constexpr float PiHalf = Pi * .5f;
     static constexpr float PiQuart = Pi * .25f;
     // DEFAULT BOUNDS
-    static constexpr int Width = 512 + 256;
-    static constexpr int Height = 256 + 128 + 16;
+    static constexpr int Width = 546;
+    static constexpr int Height = 447;
 
     inline juce::Rectangle<float> maxQuadIn(const juce::Rectangle<float>& b) noexcept
     {

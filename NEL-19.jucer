@@ -64,7 +64,6 @@
       <FILE id="xZdKBx" name="Outtakes.h" compile="0" resource="0" file="Source/Outtakes.h"/>
       <FILE id="RWsf1L" name="Interpolation.h" compile="0" resource="0" file="Source/Interpolation.h"/>
       <FILE id="xxe5Fr" name="NELG.h" compile="0" resource="0" file="Source/NELG.h"/>
-      <FILE id="PdaT6g" name="Param.h" compile="0" resource="0" file="Source/Param.h"/>
       <FILE id="KltU2P" name="nel19.ttf" compile="0" resource="1" file="Source/Font/nel19.ttf"/>
       <FILE id="bs2nAY" name="PluginEditor.cpp" compile="1" resource="0"
             file="Source/PluginEditor.cpp"/>

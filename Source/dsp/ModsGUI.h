@@ -755,6 +755,7 @@ namespace modSys6
 
                 onModChange([](vibrato::ModType){}),
                 label(u, "", ColourID::Transp, ColourID::Transp, ColourID::Mod),
+                inputLabel(u, "", ColourID::Transp, ColourID::Transp, ColourID::Hover),
 
                 perlin(u, modulatables, mOff),
                 audioRate(u, modulatables, mOff),
@@ -787,6 +788,9 @@ namespace modSys6
                 };
 
                 addAndMakeVisible(label);
+                addAndMakeVisible(inputLabel);
+                inputLabel.setJustifaction(juce::Justification::left);
+                
                 
                 addChildComponent(perlin);
                 addChildComponent(audioRate);
@@ -814,6 +818,7 @@ namespace modSys6
                 pitchbend.setVisible(false);
                 lfo.setVisible(false);
                 randomizer.clear();
+                inputLabel.setText("");
 
                 switch (t)
                 {
@@ -824,6 +829,7 @@ namespace modSys6
                 case vibrato::ModType::AudioRate:
                     audioRate.activate(randomizer);
                     label.setText("AudioRate");
+                    inputLabel.setText("midi in >>");
                     break;
                 case vibrato::ModType::Dropout:
                     dropout.activate(randomizer);
@@ -832,6 +838,7 @@ namespace modSys6
                 case vibrato::ModType::EnvFol:
                     envFol.activate(randomizer);
                     label.setText("Envelope\nFollower");
+                    inputLabel.setText("audio in >>");
                     break;
                 case vibrato::ModType::Macro:
                     macro.activate(randomizer);
@@ -840,6 +847,7 @@ namespace modSys6
                 case vibrato::ModType::Pitchwheel:
                     pitchbend.setVisible(true);
                     label.setText("Pitchbend");
+                    inputLabel.setText("midi in >>");
                     break;
                 case vibrato::ModType::LFO:
                     lfo.activate(randomizer);
@@ -848,6 +856,7 @@ namespace modSys6
                 }
 
                 label.repaint();
+                inputLabel.repaint();
                 selector.reset(nullptr);
 
                 onModChange(t);
@@ -863,7 +872,7 @@ namespace modSys6
             std::function<vibrato::ModType()> getModType;
         protected:
             nelG::Layout layout;
-            Label label;
+            Label label, inputLabel;
             float modDepth;
             int mOff;
 
@@ -901,6 +910,7 @@ namespace modSys6
                 layout.setBounds(getLocalBounds().toFloat().reduced(thicc4));
 
                 layout.place(label, 0, 0, 1, 1, thicc4, false);
+                layout.place(inputLabel, 0, 0, 1, 1, thicc4, false);
                 layout.place(randomizer, 1, 0, 1, 1, thicc, true);
                 layout.place(selectorButton, 2, 0, 1, 1, thicc, true);
 

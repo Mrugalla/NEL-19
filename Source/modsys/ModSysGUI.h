@@ -658,10 +658,12 @@ namespace modSys6
         {
             Label(Utils& u, juce::String&& _txt, ColourID _bgC = ColourID::Transp, ColourID _outlineC = ColourID::Transp, ColourID _txtC = ColourID::Txt) :
                 Comp(u, "", modSys6::gui::CursorType::Default),
+                font(),
                 txt(_txt),
                 bgC(_bgC),
                 outlineC(_outlineC),
-                txtC(_txtC)
+                txtC(_txtC),
+                just(juce::Justification::centred)
             {
                 setInterceptsMouseClicks(false, false);
             }
@@ -671,7 +673,8 @@ namespace modSys6
                 txt(_txt),
                 bgC(_bgC),
                 outlineC(_outlineC),
-                txtC(_txtC)
+                txtC(_txtC),
+                just(juce::Justification::centred)
             {
                 setInterceptsMouseClicks(false, false);
             }
@@ -688,10 +691,14 @@ namespace modSys6
             const juce::String& getText() const noexcept { return txt; }
             juce::String& getText() noexcept { return txt; }
             
+            void setJustifaction(juce::Justification j) noexcept { just = j; }
+            juce::Justification getJustification() const noexcept { return just; }
+
             juce::Font font;
         protected:
             juce::String txt;
             ColourID bgC, outlineC, txtC;
+            juce::Justification just;
 
             void resized() override
             {
@@ -709,7 +716,7 @@ namespace modSys6
                 g.drawRoundedRectangle(bounds, thicc, thicc);
                 g.setColour(Shared::shared.colour(txtC));
                 g.drawFittedText(
-                    txt, getLocalBounds(), juce::Justification::centred, 1
+                    txt, getLocalBounds(), just, 1
                 );
             }
 
