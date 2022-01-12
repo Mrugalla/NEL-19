@@ -219,8 +219,8 @@ void Nel19AudioProcessorEditor::resized()
     layout.setBounds(getLocalBounds().toFloat().reduced(thicc));
     layoutBottomBar.setBounds(layout.bottomBar());
     layoutTopBar.setBounds(layout.topBar());
-    layoutMacros.setBounds(layout(0, 1, 1, 3).reduced(thicc));
-    layoutMainParams.setBounds(layout(2, 1, 1, 3).reduced(thicc));
+    layoutMacros.setBounds(layout(0, 2, 1, 2).reduced(thicc));
+    layoutMainParams.setBounds(layout(2, 2, 1, 2).reduced(thicc));
     
     layoutBottomBar.place(tooltips, 0, 0, 1, 1, thicc, false);
     layoutBottomBar.place(buildDate, 1, 0, 1, 1, thicc, false);
@@ -271,6 +271,14 @@ void Nel19AudioProcessorEditor::paint(juce::Graphics& g)
         layout(1, 1, 1, 3, 0.f, false),
         utils.colour(modSys6::gui::ColourID::Hover),
         modSys6::gui::Shared::shared.thicc
+    );
+    modSys6::gui::visualizeGroup(
+        g,
+        "Main",
+        layout(2, 1, 1, 3, 0.f, false),
+        utils.colour(modSys6::gui::ColourID::Hover),
+        modSys6::gui::Shared::shared.thicc,
+        false, false
     );
 }
 void Nel19AudioProcessorEditor::mouseEnter(const juce::MouseEvent&)

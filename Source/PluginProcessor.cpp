@@ -471,7 +471,7 @@ void Nel19AudioProcessor::savePatch()
     }
     {
         const juce::Identifier id(vibrato::toString(vibrato::ObjType::DelaySize));
-        const auto bufferSize = vibrat.getSizeInMs(oversampling.getSampleRateUpsampled());
+        const auto bufferSize = vibrat.getSizeInMs(static_cast<float>(oversampling.getSampleRateUpsampled()));
         modSys.state.setProperty(id, bufferSize, nullptr);
     }
     {

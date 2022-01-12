@@ -261,7 +261,8 @@ namespace modSys6
         };
 
         static void visualizeGroup(juce::Graphics& g, juce::String&& txt,
-            juce::Rectangle<float> bounds, juce::Colour col, float thicc)
+            juce::Rectangle<float> bounds, juce::Colour col, float thicc,
+            bool drawLeft = true, bool drawRight = true)
         {
             g.setColour(col);
             g.setFont(Shared::shared.font);
@@ -271,7 +272,8 @@ namespace modSys6
                     const auto x = bounds.getX();
                     const auto y = bounds.getY();
                     g.fillRect(x + thicc, y, edgeLen, thicc);
-                    g.fillRect(x, y + thicc, thicc, edgeLen);
+                    if(drawLeft)
+                        g.fillRect(x, y + thicc, thicc, edgeLen);
                     const juce::Rectangle<float> txtBounds(
                         x + edgeLen + thicc * 2.f,
                         y,
@@ -284,19 +286,22 @@ namespace modSys6
                     const auto x = bounds.getRight();
                     const auto y = bounds.getY();
                     g.fillRect(x - edgeLen - thicc, y, edgeLen, thicc);
-                    g.fillRect(x, y + thicc, thicc, edgeLen);
+                    if(drawRight)
+                        g.fillRect(x, y + thicc, thicc, edgeLen);
                 }
                 {
                     const auto x = bounds.getRight();
                     const auto y = bounds.getBottom();
                     g.fillRect(x - edgeLen - thicc, y, edgeLen, thicc);
-                    g.fillRect(x, y - edgeLen - thicc, thicc, edgeLen);
+                    if(drawRight)
+                        g.fillRect(x, y - edgeLen - thicc, thicc, edgeLen);
                 }
                 {
                     const auto x = bounds.getX();
                     const auto y = bounds.getBottom();
                     g.fillRect(x + thicc, y, edgeLen, thicc);
-                    g.fillRect(x, y - edgeLen - thicc, thicc, edgeLen);
+                    if(drawLeft)
+                        g.fillRect(x, y - edgeLen - thicc, thicc, edgeLen);
                 }
             }
         }
@@ -584,13 +589,20 @@ namespace modSys6
             BlinkyBoy(Comp* _comp) :
                 juce::Timer(),
                 comp(_comp),
-                env(0.f), x(0.f)
+                env(0.f), x(0.f),
+                eps(1.f)
             {
 
             }
             void flash(juce::Graphics& g, juce::Colour col)
             {
                 g.fillAll(col.withAlpha(env * env));
+            }
+            void flash(juce::Graphics& g, const juce::Rectangle<float>& bounds, juce::Colour col)
+            {
+                const auto thicc = Shared::shared.thicc;
+                g.setColour(col.withAlpha(env * env));
+                g.fillRoundedRectangle(bounds, thicc);
             }
 
             void trigger(float durationInSec)
@@ -737,6 +749,7 @@ namespace modSys6
             OnClick onClick;
         protected:
             int state;
+
             void paint(juce::Graphics& g) override
             {
                 onPaint(g, *this);
@@ -771,6 +784,7 @@ namespace modSys6
                 const auto bounds = button.getLocalBounds().toFloat().reduced(thicc);
                 g.setColour(Shared::shared.colour(ColourID::Bg));
                 g.fillRoundedRectangle(bounds, thicc);
+                juce::Colour mainCol;
                 if (button.isMouseButtonDown())
                 {
                     g.setColour(Shared::shared.colour(ColourID::Hover));
@@ -778,7 +792,7 @@ namespace modSys6
 
                     if (button.isMouseOver())
                         g.fillRoundedRectangle(bounds, thicc);
-                    g.setColour(Shared::shared.colour(ColourID::Interact));
+                    mainCol = Shared::shared.colour(ColourID::Interact);
                 }
                 else
                 {
@@ -786,11 +800,12 @@ namespace modSys6
                     {
                         g.setColour(Shared::shared.colour(ColourID::Hover));
                         g.fillRoundedRectangle(bounds, thicc);
-                        g.setColour(Shared::shared.colour(ColourID::Interact));
+                        mainCol = Shared::shared.colour(ColourID::Interact);
                     }
                     else
-                        g.setColour(Shared::shared.colour(ColourID::Txt));
+                        mainCol = Shared::shared.colour(ColourID::Txt);
                 }
+                g.setColour(mainCol);
                 g.drawRoundedRectangle(bounds, thicc, thicc);
                 g.setFont(Shared::shared.font);
                 g.drawFittedText(txt, bounds.toNearestInt(), just, 1);
