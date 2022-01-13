@@ -756,7 +756,8 @@ namespace vibrato
 									}
 									else if (msg.isNoteOff())
 									{
-										noteOn = false;
+										if(static_cast<int>(noteValue) == msg.getNoteNumber())
+											noteOn = false;
 									}
 									else if (msg.isPitchWheel())
 									{

@@ -1,11 +1,15 @@
 #pragma once
+#include <cmath>
+#include <math.h>
 
-namespace interpolation {
+namespace interpolation
+{
 	static constexpr float Pi = 3.14159265359f;
 	
 	static float sinc(const float xPi) noexcept { return std::sin(xPi) / xPi; }
 
-	namespace window {
+	namespace window
+	{
 		static float lanczos(const float xPi, const float alphaInv) noexcept { return sinc(xPi * alphaInv); }
 		static float circular(const float x, const float alphaInv) noexcept {
 			const auto a = x * alphaInv;
@@ -13,7 +17,8 @@ namespace interpolation {
 		}
 	}
 
-	static float lanczosSinc(const float* buffer, const float readHead, const int size, const int alpha) noexcept {
+	static float lanczosSinc(const float* buffer, const float readHead, const int size, const int alpha) noexcept
+	{
 		const auto iFloor = std::floor(readHead);
 		const auto iFloorInt = static_cast<int>(iFloor);
 		const auto x = readHead - iFloor;
@@ -40,7 +45,8 @@ namespace interpolation {
 
 	static float lerp(float a, float b, float x) noexcept { return a + x * (b - a); }
 
-	static float lerp(const float* buffer, const float readHead, const int size) {
+	static float lerp(const float* buffer, const float readHead, const int size)
+	{
 		const auto iFloor = std::floor(readHead);
 		const auto i0 = static_cast<int>(iFloor);
 		auto i1 = i0 + 1;
@@ -96,7 +102,8 @@ namespace interpolation {
 		return ((c3 * t + c2) * t + c1) * t + c0;
 	}
 	
-	static float lagrange(const float* buffer, const float readHead, const int size, const int N) {
+	static float lagrange(const float* buffer, const float readHead, const int size, const int N)
+	{
 		const float iFloor = std::floor(readHead);
 		const int iFloorInt = static_cast<int>(iFloor);
 		float yp = 0.f;

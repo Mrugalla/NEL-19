@@ -1,6 +1,5 @@
 #pragma once
 #include "Approx.h"
-#include "Outtakes.h"
 #include "Interpolation.h"
 #include "dsp/DryWetProcessor.h"
 #include "dsp/MidSideEncoder.h"
@@ -9,7 +8,6 @@
 #include "oversampling/Oversampling.h"
 #include <JuceHeader.h>
 #include "modsys/ModSys.h"
-
 #include <limits>
 
 struct Nel19AudioProcessor :

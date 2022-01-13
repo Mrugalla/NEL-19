@@ -722,9 +722,9 @@ namespace modSys6
 
             void updateBounds()
             {
-                const auto height = getHeight();
-                const auto minHeight = font.getHeight() * getNumRows(txt);
-                const auto dif = height - minHeight;
+                const auto height = static_cast<float>(getHeight());
+                const auto minHeight = font.getHeight() * static_cast<float>(getNumRows(txt));
+                const auto dif = static_cast<int>(height - minHeight);
                 if (dif < 0)
                 {
                     const auto dif2 = dif / 2;
