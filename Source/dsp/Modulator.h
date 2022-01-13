@@ -1244,19 +1244,15 @@ namespace vibrato
 					p.inc = rateFree * fsInv;
 				}
 				modSys6::Smooth::makeFromDecayInMs(waveformSmooth, 10.f, fs);
-				modSys6::Smooth::makeFromDecayInMs(widthSmooth, 10.f, fs);
+				modSys6::Smooth::makeFromDecayInMs(widthSmooth, 12.f, fs);
+				modSys6::Smooth::makeFromDecayInMs(rateSmooth, 12.f, fs);
 			}
 			void setParameters(bool _isSync, float _rateFree, float _rateSync, float _waveform, float _phase, float _width) noexcept
 			{
 				isSync = _isSync;
 				rateSyncV = beatsData[static_cast<int>(_rateSync)].val;
 				rateSyncInv = 1.f / rateSyncV;
-				if (rateFree != _rateFree)
-				{
-					rateFree = _rateFree;
-					for (auto& p : phasor)
-						p.inc = rateFree * fsInv;
-				}
+				rateFree = _rateFree;
 				waveformV = _waveform;
 				phaseV = _phase;
 				widthV = _width;
@@ -1267,22 +1263,38 @@ namespace vibrato
 				{ // SYNTHESIZE PHASOR
 					if (isSync && canBeSync)
 					{
+						auto& phasr = phasor[0];
+						auto buf = buffer[0].data();
+
 						canBeSync = playHead->getCurrentPosition(transport) && transport.isPlaying;
 						if (canBeSync)
-							processTempoSyncStuff();
+							processTempoSyncStuff(buf, numSamples);
+						for (auto s = 0; s < numSamples; ++s)
+							buf[s] = phasr.process();
 					}
-					synthesizePhase(buffer, 0, numSamples);
+					else
+					{
+						auto& phasr = phasor[0];
+						auto buf = buffer[0].data();
+						for (auto s = 0; s < numSamples; ++s)
+						{
+							phasr.inc = rateSmooth(rateFree) * fsInv;
+							buf[s] = phasr.process();
+						}
+							
+					}
 				}
 				{ // PROCESS WIDTH
 					if (numChannelsOut == 2)
 					{
-						auto buf = buffer[1].data();
-						juce::FloatVectorOperations::copy(buf, buffer[0].data(), numSamples);
+						const auto buf0 = buffer[0].data();
+						auto buf1 = buffer[1].data();
+						juce::FloatVectorOperations::copy(buf1, buf0, numSamples);
 						for (auto s = 0; s < numSamples; ++s)
 						{
-							buf[s] += widthSmooth(widthV);
-							if (buf[s] >= 1.f)
-								--buf[s];
+							buf1[s] = buf0[s] + widthSmooth(widthV);
+							if (buf1[s] >= 1.f)
+								--buf1[s];
 						}
 					}
 				}
@@ -1299,7 +1311,7 @@ namespace vibrato
 			const Tables& tables;
 			const BeatsData& beatsData;
 
-			modSys6::Smooth waveformSmooth, widthSmooth;
+			modSys6::Smooth waveformSmooth, widthSmooth, rateSmooth;
 
 			juce::AudioPlayHead::CurrentPositionInfo transport;
 			std::array<Phasor<float>, 2> phasor;
@@ -1313,22 +1325,15 @@ namespace vibrato
 
 			int numChannels, extLatency;
 
-			void synthesizePhase(Buffer& buffer, int ch, int numSamples)
+			void processTempoSyncStuff(float* buffer, int numSamples)
 			{
-				for (auto s = 0; s < numSamples; ++s)
-				{
-					phasor[ch]();
-					buffer[ch][s] = phasor[ch].phase;
-				}
-			}
+				auto& phasr = phasor[0];
 
-			void processTempoSyncStuff()
-			{
 				const auto bpm = static_cast<float>(transport.bpm);
 				const auto bps = bpm / 60.f;
 				const auto quarterNoteLengthInSamples = fs / bps;
 				const auto barLengthInSamples = quarterNoteLengthInSamples * 4.f;
-				phasor[0].inc = 1.f / (barLengthInSamples * rateSyncV);
+				phasr.inc = 1.f / (barLengthInSamples * rateSyncV);
 
 				const auto latencyLengthInQuarterNotes = static_cast<float>(extLatency) / quarterNoteLengthInSamples;
 				auto ppq = (static_cast<float>(transport.ppqPosition) - latencyLengthInQuarterNotes) * .25f;
@@ -1341,7 +1346,7 @@ namespace vibrato
 					++phase;
 				else if (phase >= 1.f)
 					--phase;
-				phasor[0].phase = phase;
+				phasr.phase = phase;
 			}
 		};
 
