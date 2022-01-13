@@ -241,7 +241,7 @@ namespace menu2
 		void mouseUp(const juce::MouseEvent& evt) override
 		{
 			if (evt.mouseWasDraggedSinceMouseDown()) return;
-			startTimer(static_cast<int>(1000.f / 1.5f));
+			startTimer(static_cast<int>(1000.f / 3.f));
 			grabKeyboardFocus();
 		}
 
@@ -316,12 +316,15 @@ namespace menu2
 				{
 					blinkyBoy.trigger(3.f);
 					txtDefault = txt;
+					stopTimer();
+					giveAwayKeyboardFocus();
 				}
 				else
 					backToDefault();
 				repaintWithTick();
 			}
-			else {
+			else
+			{
 				// character is text
 				txt = txt.substring(0, pos) + key.getTextCharacter() + txt.substring(pos);
 				++pos;
