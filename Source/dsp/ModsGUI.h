@@ -143,13 +143,13 @@ namespace modSys6
                     setBufferedToImage(false);
                     setInterceptsMouseClicks(false, false);
                 }
-                void update()
+                void update(bool forced = false)
                 {
                     const auto atk = params[A]->getValue();
                     const auto dcy = params[D]->getValue();
                     const auto sus = params[S]->getValue();
                     const auto rls = params[R]->getValue();
-                    if (vals[A] != atk || vals[D] != dcy || vals[S] != sus || vals[R] != rls)
+                    if (forced || vals[A] != atk || vals[D] != dcy || vals[S] != sus || vals[R] != rls)
                     {
                         vals[A] = atk;
                         vals[D] = dcy;
@@ -213,7 +213,7 @@ namespace modSys6
 
                 void resized() override
                 {
-                    update();
+                    update(true);
                 }
 
                 void paint(juce::Graphics& g) override
