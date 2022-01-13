@@ -2,7 +2,7 @@
 An open-source creative vibrato.
 
 
-NEL requires C++14 dependencies. you can download and install them here until i make a proper installer that takes care of that:
+NEL requires C++20 dependencies. you can download and install them here until i make a proper installer that takes care of that:
 https://aka.ms/vs/16/release/vc_redist.x64.exe
 
 ----------- INTRODUCTION: -----------
