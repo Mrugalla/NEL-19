@@ -278,6 +278,32 @@ namespace modSys6
 			return y1;
 		}
 	};
+	
+	struct Smooth2
+	{
+		void makeFromDecayInMs(float d, float Fs) noexcept
+		{
+			for (auto& s : smooth)
+				Smooth::makeFromDecayInMs(s, d, Fs);
+		}
+
+		Smooth2(const bool snap = true, const int order = 2) :
+			smooth(snap)
+		{
+			for (auto o = 0; o < order; ++o)
+				smooth.push_back(snap);
+		}
+		void reset() { for (auto& s : smooth) s.reset(); }
+		void setX(float x) { for (auto& s : smooth) s.setX(x); }
+		float operator()(float sample) noexcept
+		{
+			for (auto& s : smooth)
+				sample = s(sample);
+			return sample;
+		}
+	protected:
+		std::vector<Smooth> smooth;
+	};
 
 	struct StateIDs
 	{

@@ -1208,6 +1208,8 @@ namespace vibrato
 		
 		class LFO
 		{
+			using WaveformSmooth = modSys6::Smooth2;
+
 			struct TempoSync
 			{
 				TempoSync(const BeatsData& _beatsData) :
@@ -1269,7 +1271,7 @@ namespace vibrato
 				tables(_tables),
 				tempoSync(_beatsData),
 
-				waveformSmooth(),
+				waveformSmooth(false, 4),
 				widthSmooth(),
 				
 				rateFree(-1.f),
@@ -1286,7 +1288,7 @@ namespace vibrato
 				const auto fs = sampleRate;
 				fsInv = 1.f / fs;
 				tempoSync.prepare(sampleRate, latency);
-				modSys6::Smooth::makeFromDecayInMs(waveformSmooth, 20.f, fs);
+				waveformSmooth.makeFromDecayInMs(500.f, fs);
 				modSys6::Smooth::makeFromDecayInMs(widthSmooth, 20.f, fs);
 				modSys6::Smooth::makeFromDecayInMs(rateSmooth, 12.f, fs);
 			}
@@ -1345,7 +1347,8 @@ namespace vibrato
 		protected:
 			const Tables& tables;
 			TempoSync tempoSync;
-			modSys6::Smooth waveformSmooth, widthSmooth, rateSmooth;
+			WaveformSmooth waveformSmooth;
+			modSys6::Smooth widthSmooth, rateSmooth;
 
 			Phasor<double> phasor;
 
