@@ -363,8 +363,8 @@ namespace modSys6
                     { 20, 80 }
                 ),
                 params{
-                    Paramtr(u, "Attack", "The envelope follower's attack time in millisecounds.", withOffset(PID::EnvFol0Attack, mOff), modulatables),
-                    Paramtr(u, "Release", "The envelope follower's release time in millisecounds.", withOffset(PID::EnvFol0Release, mOff), modulatables),
+                    Paramtr(u, "Attack", "The envelope follower's attack time in milliseconds.", withOffset(PID::EnvFol0Attack, mOff), modulatables),
+                    Paramtr(u, "Release", "The envelope follower's release time in milliseconds.", withOffset(PID::EnvFol0Release, mOff), modulatables),
                     Paramtr(u, "Gain", "This modulator's input gain.", withOffset(PID::EnvFol0Gain, mOff), modulatables),
                     Paramtr(u, "Width", "The modulator's stereo-width", withOffset(PID::EnvFol0Width, mOff), modulatables)
             }

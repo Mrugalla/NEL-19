@@ -2258,7 +2258,7 @@ namespace modSys6
             juce::String makeTooltip()
             {
                 juce::Random rand;
-                static constexpr float count = 180.f;
+                static constexpr float count = 181.f;
                 const auto v = static_cast<int>(std::rint(rand.nextFloat() * count));
                 switch (v)
                 {
@@ -2443,6 +2443,7 @@ namespace modSys6
                 case 178: return "Music is a mirror of your soul and has the potential to heal.";
                 case 179: return "Lmao, nxt patch is going to be garbage";
                 case 180: return "Insanity is doing the same thing over and over again.";
+                case 181: return "If you're uninspired just do household-chores. Your brain will try to justify coming back.";
                 default: "Are you sure?";
                 }
                 return "You are not supposed to read this message!";
