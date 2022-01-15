@@ -488,10 +488,73 @@ namespace vibrato
 		using BeatsData = modSys6::BeatsData;
 		using Tables = LFOTables;
 
-		struct Perlin
+		class Perlin
 		{
+			struct Perlinizer
+			{
+				Perlinizer() :
+					octaves(-1),
+					gainAccum(1.f)
+				{}
+				void setParameters(const float* sclInv, int _octaves) noexcept
+				{
+					if (octaves != _octaves)
+					{
+						octaves = _octaves;
+						gainAccum = 0.f;
+						for (auto o = 0; o < octaves; ++o)
+							gainAccum += sclInv[o];
+						gainAccum = 1.f / gainAccum;
+					}
+				}
+				void operator()(float* buffer, const float* phasorBuf, 
+					const float* scl, const float* sclInv, const float* noise, 
+					float noiseSizeF, float phaseOffset, int numSamples, const int* octBuf) noexcept
+				{
+					for (auto s = 0; s < numSamples; ++s)
+					{
+						setParameters(sclInv, octBuf[s]);
+
+						auto smpl = 0.f;
+						for (int o = 0; o < octaves; ++o)
+						{
+							auto x = phasorBuf[s] * scl[o] + phaseOffset;
+							while (x >= noiseSizeF)
+								x -= noiseSizeF;
+							smpl += interpolation::cubicHermiteSpline(noise, x) * sclInv[o];
+						}
+						smpl *= gainAccum;
+						buffer[s] = smpl;
+					}
+				}
+				void operator()(float* buffer, const float* phasorBuf,
+					const float* scl, const float* sclInv, const float* noise,
+					float noiseSizeF, float phaseOffset, int numSamples,
+					const int* octBuf, const float* mix) noexcept
+				{
+					for (auto s = 0; s < numSamples; ++s)
+					{
+						setParameters(sclInv, octBuf[s]);
+
+						auto smpl = 0.f;
+						for (int o = 0; o < octaves; ++o)
+						{
+							auto x = phasorBuf[s] * scl[o] + phaseOffset;
+							while (x >= noiseSizeF)
+								x -= noiseSizeF;
+							smpl += interpolation::cubicHermiteSpline(noise, x) * sclInv[o];
+						}
+						smpl *= gainAccum;
+						buffer[s] += mix[s] * (smpl - buffer[s]);
+					}
+				}
+			protected:
+				float gainAccum;
+				int octaves;
+			};
+		public:
 			Perlin(int _numChannels, int _maxNumOctaves) :
-				freqSmooth(), widthSmooth(),
+				freqSmooth(false), widthSmooth(false), octSmooth(false, 4.f),
 
 				phasor(),
 
@@ -500,7 +563,8 @@ namespace vibrato
 				fs(0.f),
 
 				rate(-1.f), width(-1.f),
-				octaves(-1),
+
+				perlinizer0(), perlinizer1(),
 
 				maxNumOctaves(_maxNumOctaves),
 				noiseSize(1 << maxNumOctaves),
@@ -508,7 +572,7 @@ namespace vibrato
 				noiseSizeInv(.5f / noiseSizeF),
 				noiseSizeHalf(noiseSizeF * .5f),
 
-				gainAccum(1.f), widthV(1.f),
+				widthV(1.f),
 
 				numChannels(_numChannels)
 			{
@@ -536,30 +600,27 @@ namespace vibrato
 					noise[s] = noise[s - noiseSize];
 			}
 
-			void prepare(float sampleRate) noexcept
+			void prepare(float sampleRate, int blockSize) noexcept
 			{
 				if (fs != sampleRate)
 				{
+					const auto oFloor = static_cast<int>(std::floor(octaves));
+					octFloorBuf.resize(blockSize, oFloor);
+					octCeilBuf.resize(blockSize, oFloor + 1);
 					fs = sampleRate;
 					phasor.prepare(static_cast<double>(sampleRate));
 					widthSmooth.reset();
 					freqSmooth.reset();
+					modSys6::Smooth::makeFromDecayInMs(octSmooth, 10.f, sampleRate);
 					modSys6::Smooth::makeFromDecayInMs(widthSmooth, 10.f, sampleRate);
 					modSys6::Smooth::makeFromDecayInMs(freqSmooth, 10.f, sampleRate);
 				}
 			}
 
-			void setParameters(float _rate, int _octaves, float _width) noexcept
+			void setParameters(float _rate, float _octaves, float _width) noexcept
 			{
 				rate = _rate;
-				if (octaves != _octaves)
-				{
-					octaves = _octaves;
-					gainAccum = 0.f;
-					for (auto o = 0; o < octaves; ++o)
-						gainAccum += sclInv[o];
-					gainAccum = 1.f / gainAccum;
-				}
+				octaves = _octaves;
 				if (width != _width)
 				{
 					width = _width;
@@ -571,7 +632,7 @@ namespace vibrato
 
 			void operator()(Buffer& buffer, int numChannelsOut, int numSamples) noexcept
 			{
-				// SYNTHESIZE PHASE
+				// SYNTHESIZE PHASE BUFFER
 				auto phasorBuf = buffer[2].data();
 				for (auto s = 0; s < numSamples; ++s)
 				{
@@ -580,61 +641,57 @@ namespace vibrato
 					phasorBuf[s] = static_cast<float>(phasor.process()) * noiseSizeF;
 				}
 				
-				// PERFORM PERLIN NOISE MAGIC
+				// SYNTHESIZE OCT BUFFERS
+				auto octBuf = buffer[3].data();
 				for (auto s = 0; s < numSamples; ++s)
 				{
-					auto smpl = 0.f;
-					for (int o = 0; o < octaves; ++o)
-					{
-						auto x = phasorBuf[s] * scl[o];
-						while (x >= noiseSizeF)
-							x -= noiseSizeF;
-						smpl += interpolation::cubicHermiteSpline(noise.data(), x) * sclInv[o];
-					}
-					smpl *= gainAccum;
-					buffer[0][s] = smpl;
+					const auto octV = octSmooth(octaves);
+					const auto oFloorF = std::floor(octV);
+					octBuf[s] = octV - oFloorF;
+					octFloorBuf[s] = static_cast<int>(oFloorF);
+					octCeilBuf[s] = octFloorBuf[s] + 1;
 				}
 
-				if (numChannelsOut == 2)
-				{ // PERFORM STEREO STUFF
-					// PERFORM EVEN MORE PERLIN NOISE MAGIC
-					for (auto s = 0; s < numSamples; ++s)
-					{
-						auto smpl = 0.f;
-						for (int o = 0; o < octaves; ++o)
-						{
-							auto x = phasorBuf[s] * scl[o] + noiseSizeHalf;
-							while (x >= noiseSizeF)
-								x -= noiseSizeF;
-							smpl += interpolation::cubicHermiteSpline(noise.data(), x) * sclInv[o];
-						}
-						smpl *= gainAccum;
-						buffer[1][s] = smpl;
-					}
+				// PERFORM PERLIN NOISE
+				synthesizePerlin(buffer[0].data(), phasorBuf, octBuf, 0.f, numSamples);
 
-					// PROCESS WIDTH
+				if (numChannelsOut == 2)
+				{
+					synthesizePerlin(buffer[1].data(), phasorBuf, octBuf, noiseSizeHalf, numSamples);
+
 					for (auto s = 0; s < numSamples; ++s)
 						buffer[1][s] = buffer[0][s] + widthSmooth(widthV) * (buffer[1][s] - buffer[0][s]);
 				}
 			}
 		protected:
-			modSys6::Smooth freqSmooth, widthSmooth;
+			modSys6::Smooth freqSmooth, widthSmooth, octSmooth;
 
 			Phasor<double> phasor;
 			std::vector<float> noise, scl, sclInv;
+			std::vector<int> octFloorBuf, octCeilBuf;
 
 			float fs;
 
-			float rate, width;
-			int octaves;
+			float rate, width, octaves;
+
+			Perlinizer perlinizer0, perlinizer1;
 
 			const int maxNumOctaves;
 			const int noiseSize;
 			const float noiseSizeF, noiseSizeInv, noiseSizeHalf;
 
-			float gainAccum, widthV;
+			float widthV;
 
 			const int numChannels;
+
+			void synthesizePerlin(float* buffer, const float* phasorBuf, const float* octBuf,
+				float phaseOffset, int numSamples) noexcept
+			{
+				perlinizer0(buffer, phasorBuf, scl.data(), sclInv.data(),
+					noise.data(), noiseSizeF, phaseOffset, numSamples, octFloorBuf.data());
+				perlinizer1(buffer, phasorBuf, scl.data(), sclInv.data(),
+					noise.data(), noiseSizeF, phaseOffset, numSamples, octCeilBuf.data(), octBuf);
+			}
 		};
 
 		class AudioRate
@@ -1440,7 +1497,7 @@ namespace vibrato
 		{
 			for(auto& b: buffer)
 				b.resize(maxBlockSize + 4, 0.f); // compensate for potential spline interpolation
-			perlin.prepare(sampleRate);
+			perlin.prepare(sampleRate, maxBlockSize);
 			audioRate.prepare(sampleRate);
 			dropout.prepare(sampleRate);
 			envFol.prepare(sampleRate);
@@ -1450,7 +1507,7 @@ namespace vibrato
 		}
 
 		// parameters
-		void setParametersPerlin(float rate, int octaves, float width) noexcept
+		void setParametersPerlin(float rate, float octaves, float width) noexcept
 		{
 			perlin.setParameters(rate, octaves, width);
 		}

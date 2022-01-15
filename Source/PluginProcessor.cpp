@@ -321,7 +321,7 @@ void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& b, const
         case vibrato::ModType::Perlin:
             mod.setParametersPerlin(
                 modSys.getParam(withOffset(PID::Perlin0FreqHz, offset))->getValSumDenorm(),
-                static_cast<int>(modSys.getParam(withOffset(PID::Perlin0Octaves, offset))->getValSumDenorm()),
+                modSys.getParam(withOffset(PID::Perlin0Octaves, offset))->getValSumDenorm(),
                 modSys.getParam(withOffset(PID::Perlin0Width, offset))->getValSumDenorm()
             );
             break;

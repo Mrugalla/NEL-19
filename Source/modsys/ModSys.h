@@ -229,10 +229,10 @@ namespace modSys6
 			makeFromDecayInSamples(s, d * Fs * .001f);
 		}
 
-		Smooth(const bool _snap = true) :
+		Smooth(const bool _snap = true, const float startVal = 0.f) :
 			a0(1.f),
 			b1(0.f),
-			y1(0.f),
+			y1(startVal),
 			eps(0.f),
 			snap(_snap)
 		{}
@@ -739,7 +739,7 @@ namespace modSys6
 			{
 				const auto offset = m * NumParamsPerMod;
 				params.push_back(new Param(withOffset(PID::Perlin0FreqHz, offset), makeRange::biasXL(.2f, 20.f, -.8f), 6.f, valToStrHz, strToValHz, Unit::Hz));
-				params.push_back(new Param(withOffset(PID::Perlin0Octaves, offset), makeRange::stepped(1.f, 8.f, 1.f), 4.f, valToStrOct, strToValOct, Unit::Octaves));
+				params.push_back(new Param(withOffset(PID::Perlin0Octaves, offset), makeRange::biasXL(1.f, 8.f, 0.f), 4.f, valToStrOct, strToValOct, Unit::Octaves));
 				params.push_back(new Param(withOffset(PID::Perlin0Width, offset), makeRange::biasXL(0.f, 1.f, 0), 1.f, valToStrPercent, strToValPercent, Unit::Percent));
 
 				params.push_back(new Param(withOffset(PID::AudioRate0Oct, offset), makeRange::stepped(-3.f * 12.f, 3.f * 12.f, 12.f), 0.f, valToStrOct2, strToValOct2, Unit::Octaves));
