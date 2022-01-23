@@ -696,7 +696,7 @@ namespace vibrato
 
 		class AudioRate
 		{
-			static constexpr float PBGain = 2.f / static_cast<float>(0x3fff) - 1.f;
+			static constexpr float PBGain = 2.f / static_cast<float>(0x3fff);
 
 			struct Osc
 			{
@@ -797,7 +797,7 @@ namespace vibrato
 							if (ts > s)
 							{
 								bufNotes[s] = currentValue;
-								bufEnv[s] = env();
+								bufEnv[s] = env() * SafetyCoeff;
 							}
 							else
 							{
@@ -818,12 +818,13 @@ namespace vibrato
 									}
 									else if (msg.isPitchWheel())
 									{
-										pitchbendValue = static_cast<float>(msg.getPitchWheelValue()) * PBGain;
+										const auto pwv = msg.getPitchWheelValue();
+										pitchbendValue = static_cast<float>(pwv) * PBGain - 1.f;
 										currentValue = noteValue + pitchbendValue;
 									}
 									++evt;
 									if (evt == midi.end())
-										ts = numSamples;
+ 										ts = numSamples;
 									else
 									{
 										ref = *evt;
@@ -831,7 +832,7 @@ namespace vibrato
 									}
 								}
 								bufNotes[s] = currentValue;
-								bufEnv[s] = env(noteOn);
+								bufEnv[s] = env(noteOn) * SafetyCoeff;
 							}
 						}
 					}

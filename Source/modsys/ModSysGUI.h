@@ -2118,14 +2118,13 @@ namespace modSys6
             public Comp
         {
             BuildDate(Utils& u) :
-                Comp(u, "identifies plugin version."),
-                buildDate(static_cast<juce::String>(__DATE__))
+                Comp(u, "identifies the plugin's version by build date.")
             {
             }
         protected:
-            juce::String buildDate;
             void paint(juce::Graphics& g) override
             {
+                const auto buildDate = static_cast<juce::String>(__DATE__) + " " + static_cast<juce::String>(__TIME__);
                 g.setColour(Shared::shared.colour(ColourID::Txt).withAlpha(.4f));
                 g.drawFittedText(buildDate, getLocalBounds(), juce::Justification::centredRight, 1);
             }

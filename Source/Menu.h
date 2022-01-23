@@ -6,6 +6,7 @@
 namespace menu2
 {
 	using namespace modSys6::gui;
+	using NotificationType = modSys6::gui::NotificationType;
 
 	struct ButtonM :
 		public Comp
@@ -65,10 +66,10 @@ namespace menu2
 	}
 
 	struct LabelM :
-		public Label
+		public modSys6::gui::Label
 	{
 		LabelM(Utils& _utils, const juce::String& _name) :
-			Label(_utils, "< " + _name + " >")
+			modSys6::gui::Label(_utils, "< " + _name + " >")
 		{
 		}
 	protected:
@@ -190,7 +191,7 @@ namespace menu2
 			addAndMakeVisible(label);
 		}
 	protected:
-		Label label;
+		modSys6::gui::Label label;
 		std::vector<std::unique_ptr<ButtonM>> buttons;
 
 		void paint(juce::Graphics&) override {}
@@ -425,7 +426,7 @@ namespace menu2
 			addAndMakeVisible(button);
 		}
 	protected:
-		Button button;
+		modSys6::gui::Button button;
 
 		void paint(juce::Graphics&) override{}
 		void resized() override
@@ -496,7 +497,7 @@ namespace menu2
 	protected:
 		Nel19AudioProcessor& processor;
 		juce::ValueTree xml;
-		Label nameLabel;
+		modSys6::gui::Label nameLabel;
 		std::vector<std::unique_ptr<Comp>> entries;
 		std::unique_ptr<Menu> subMenu;
 		std::unique_ptr<ColourSelector> colourSelector;
