@@ -1080,7 +1080,6 @@ namespace modSys6
             void paint(juce::Graphics& g) override
             {
                 const auto thicc = Shared::shared.thicc;
-                const auto thicc2 = thicc * 2.f;
                 const auto bounds = getLocalBounds().toFloat().reduced(thicc);
                 const juce::Point<float> centre(
                     bounds.getX() + bounds.getWidth() * .5f,
@@ -1929,7 +1928,6 @@ namespace modSys6
                 label.setText(txt);
                 label.setVisible(true);
                 freezeIdx = 0;
-                const auto thicc = Shared::shared.thicc;
                 const auto txtBounds = boundsOf(label.font, label.getText()).toInt();
                 setSize(txtBounds.x, txtBounds.y);
                 label.repaint();
@@ -2257,7 +2255,7 @@ namespace modSys6
             juce::String makeTooltip()
             {
                 juce::Random rand;
-                static constexpr float count = 181.f;
+                static constexpr float count = 182.f;
                 const auto v = static_cast<int>(std::rint(rand.nextFloat() * count));
                 switch (v)
                 {
@@ -2443,6 +2441,7 @@ namespace modSys6
                 case 179: return "Lmao, nxt patch is going to be garbage";
                 case 180: return "Insanity is doing the same thing over and over again.";
                 case 181: return "If you're uninspired just do household-chores. Your brain will try to justify coming back.";
+                case 182: return "You are defining the future standard!";
                 default: "Are you sure?";
                 }
                 return "You are not supposed to read this message!";
@@ -2596,7 +2595,6 @@ namespace modSys6
             {
                 scrollBar.onChange = [this](float barY)
                 {
-                    const auto height = static_cast<float>(getHeight());
                     const auto numEntries = static_cast<float>(getNumEntries());
                     const auto entryHeight = static_cast<float>(MinEntryHeight);
                     const auto highest = numEntries * entryHeight;

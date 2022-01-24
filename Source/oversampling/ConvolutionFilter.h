@@ -52,8 +52,7 @@ namespace oversampling
 		const auto MHalf = static_cast<float>(M) * .5f;
 		const float MInv = 1.f / static_cast<float>(M);
 		const int N = M + 1;
-		const float fcTau = fc * tau;
-
+		
 		const auto h = [&](float i) { // sinc
 			i -= MHalf;
 			if (i != 0.f)

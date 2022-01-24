@@ -1374,7 +1374,7 @@ namespace vibrato
 						for (auto s = 0; s < numSamples; ++s)
 						{
 							phasor.inc = rateSmooth(rateFree) * fsInv;
-							buf[s] = phasor.process();
+							buf[s] = static_cast<float>(phasor.process());
 						}
 							
 					}
