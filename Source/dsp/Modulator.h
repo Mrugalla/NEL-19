@@ -144,6 +144,10 @@ namespace vibrato
 		{
 			return processSample();
 		}
+		void retrig() noexcept
+		{
+			state = State::A;
+		}
 
 		float attack, decay, sustain, release;
 
@@ -810,6 +814,7 @@ namespace vibrato
 										noteValue = static_cast<float>(msg.getNoteNumber());
 										currentValue = noteValue + pitchbendValue;
 										noteOn = true;
+										env.retrig();
 									}
 									else if (msg.isNoteOff())
 									{
@@ -1374,7 +1379,7 @@ namespace vibrato
 						for (auto s = 0; s < numSamples; ++s)
 						{
 							phasor.inc = rateSmooth(rateFree) * fsInv;
-							buf[s] = phasor.process();
+							buf[s] = static_cast<float>(phasor.process());
 						}
 							
 					}

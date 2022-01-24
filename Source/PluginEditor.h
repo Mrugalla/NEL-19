@@ -50,7 +50,6 @@ private:
     void paint(juce::Graphics&) override;
     void mouseEnter(const juce::MouseEvent&) override;
     void mouseDown(const juce::MouseEvent&) override;
-    void initBrowser();
 };
 /*
 

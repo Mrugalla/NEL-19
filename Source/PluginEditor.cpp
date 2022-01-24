@@ -289,7 +289,6 @@ void Nel19AudioProcessorEditor::mouseDown(const juce::MouseEvent&)
 {
     utils.killEnterValue();
 }
-
 /*
 
 

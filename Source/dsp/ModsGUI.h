@@ -651,6 +651,8 @@ namespace modSys6
             public Comp,
             public juce::Timer
         {
+            using ModType = vibrato::ModType;
+
             class Selector :
                 public Comp
             {
@@ -750,10 +752,11 @@ namespace modSys6
                     { 80, 10, 10 },
                     { 30, 70 }
                 ),
+                modType(ModType::NumMods),
                 modDepth(0.f),
                 mOff(_mOff),
 
-                onModChange([](vibrato::ModType){}),
+                onModChange([](ModType){}),
                 label(u, "", ColourID::Transp, ColourID::Transp, ColourID::Mod),
                 inputLabel(u, "", ColourID::Transp, ColourID::Transp, ColourID::Hover),
 
@@ -791,7 +794,6 @@ namespace modSys6
                 addAndMakeVisible(inputLabel);
                 inputLabel.setJustifaction(juce::Justification::left);
                 
-                
                 addChildComponent(perlin);
                 addChildComponent(audioRate);
                 addChildComponent(dropout);
@@ -808,8 +810,10 @@ namespace modSys6
                 startTimerHz(8);
             }
             void updateMod() { setMod(getModType()); }
-            void setMod(vibrato::ModType t)
+            void setMod(ModType t)
             {
+                if (modType == t) return;
+                modType = t;
                 perlin.setVisible(false);
                 audioRate.setVisible(false);
                 dropout.setVisible(false);
@@ -822,34 +826,34 @@ namespace modSys6
 
                 switch (t)
                 {
-                case vibrato::ModType::Perlin:
+                case ModType::Perlin:
                     perlin.activate(randomizer);
                     label.setText("Perlin");
                     break;
-                case vibrato::ModType::AudioRate:
+                case ModType::AudioRate:
                     audioRate.activate(randomizer);
                     label.setText("AudioRate");
                     inputLabel.setText("midi in >>");
                     break;
-                case vibrato::ModType::Dropout:
+                case ModType::Dropout:
                     dropout.activate(randomizer);
                     label.setText("Dropout");
                     break;
-                case vibrato::ModType::EnvFol:
+                case ModType::EnvFol:
                     envFol.activate(randomizer);
                     label.setText("Envelope\nFollower");
                     inputLabel.setText("audio in >>");
                     break;
-                case vibrato::ModType::Macro:
+                case ModType::Macro:
                     macro.activate(randomizer);
                     label.setText("Macro");
                     break;
-                case vibrato::ModType::Pitchwheel:
+                case ModType::Pitchwheel:
                     pitchbend.setVisible(true);
                     label.setText("Pitchbend");
                     inputLabel.setText("midi in >>");
                     break;
-                case vibrato::ModType::LFO:
+                case ModType::LFO:
                     lfo.activate(randomizer);
                     label.setText("LFO");
                     break;
@@ -863,15 +867,16 @@ namespace modSys6
             }
             void randomizeAll() { randomizer(); }
 
-            std::function<void(vibrato::ModType)> onModChange;
+            std::function<void(ModType)> onModChange;
             void addButtonsToRandomizer(ParamtrRandomizer& randomizr)
             {
                 randomizr.add(lfo.getIsSyncButton());
             }
 
-            std::function<vibrato::ModType()> getModType;
+            std::function<ModType()> getModType;
         protected:
             nelG::Layout layout;
+            ModType modType;
             Label label, inputLabel;
             float modDepth;
             int mOff;
@@ -933,6 +938,8 @@ namespace modSys6
 
             void timerCallback() override
             {
+                setMod(getModType());
+
                 const auto param = this->utils.getParam(PID::ModsMix);
                 const auto valSum = param->getValueSum();
                 const auto v = mOff == 0 ? 1.f - valSum : valSum;

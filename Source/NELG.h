@@ -148,7 +148,8 @@ namespace nelG
                 rX[rX.size() - 1] - rX[0],
                 rY[rY.size() - 2] - rY[0] };
         }
-        void paintGrid(juce::Graphics& g) {
+        void paintGrid(juce::Graphics&)
+        {
 #if DebugLayout
             const auto shownAThing = paintNamedLocs(g);
             if(shownAThing)
