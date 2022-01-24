@@ -4,8 +4,14 @@ cmake_minimum_required(VERSION 3.15)
 
 project("NEL")
 
-#find_package(JUCE CONFIG REQUIRED)
-add_subdirectory("G:/PluginDevelopment/JUCE" "JUCE")
+option (USE_SYSTEM_JUCE "Use JUCE found via CMake rather than the bundled one." OFF)
+option (ENABLE_LV2 "Add LV2 format if JUCE supports it" OFF)
+
+if (USE_SYSTEM_JUCE)
+    find_package(JUCE CONFIG REQUIRED)
+else()
+    add_subdirectory ("G:/PluginDevelopment/JUCE" "JUCE")
+endif()
 
 juce_add_plugin(NEL
   VERSION "1.0.0"
@@ -14,6 +20,12 @@ juce_add_plugin(NEL
   FORMATS
     "VST3"
     "Standalone"
+
+if (ENABLE_LV2)
+    "LV2"
+  LV2_URI https://github.com/Mrugalla/NEL-19
+endif()
+
   PLUGIN_NAME "NEL"
   DESCRIPTION "Creative Vibrato For Travellers"
   PLUGIN_MANUFACTURER_CODE "Mrug"
@@ -38,6 +50,8 @@ target_compile_definitions(NEL
     JUCE_WEB_BROWSER=0
 	JUCE_DISPLAY_SPLASH_SCREEN=0
 )
+
+include_directories(Source)
 
 target_sources(NEL
   PRIVATE
@@ -86,6 +100,9 @@ juce_add_binary_data(NEL_BinaryData
     "Source/xml/presets/Sines.nel"
     "Source/xml/presets/Thicc.nel"
 )
+
+set_target_properties(NEL_BinaryData PROPERTIES
+    POSITION_INDEPENDENT_CODE TRUE)
 
 target_link_libraries(NEL
   PRIVATE
