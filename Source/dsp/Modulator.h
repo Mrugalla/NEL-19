@@ -221,7 +221,7 @@ namespace vibrato
 		void makeTableTriangle(int n)
 		{
 			const auto pi = 3.14159265359f;
-			const auto tri = [](float x, float fc, float phase)
+			const auto tri = [&](float x, float fc, float phase)
 			{
 				return 1.f - 2.f * std::acos(std::cos(fc * x * pi + phase * pi)) / pi;
 			};
