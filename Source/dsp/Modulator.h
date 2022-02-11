@@ -1273,20 +1273,44 @@ namespace vibrato
 		{
 			using WaveformSmooth = modSys6::Smooth2;
 
+			template<typename Float>
+			struct PhaseSyncronizer
+			{
+				PhaseSyncronizer() :
+					inc(static_cast<Float>(1))
+				{}
+
+				void prepare(Float Fs, Float timeInMs) noexcept
+				{
+					inc = static_cast<Float>(1) / (Fs * timeInMs * static_cast<Float>(.001));
+				}
+
+				Float operator()(Float curPhase, Float destPhase) const noexcept
+				{
+					const auto dist = destPhase - curPhase;
+					curPhase += inc * dist;
+					return curPhase;
+				}
+			protected:
+				Float inc;
+			};
+
 			struct TempoSync
 			{
 				TempoSync(const BeatsData& _beatsData) :
+					syncer(),
 					phaseSmooth(),
 					transport(),
-					phasor(),
 					beatsData(_beatsData),
-					fs(1.), extLatency(0.)
+					fs(1.), extLatency(0.),
+					phasor(0.), inc(0.)
 				{}
 				void prepare(float sampleRate, int latency)
 				{
 					fs = static_cast<double>(sampleRate);
 					extLatency = static_cast<double>(latency);
 					modSys6::Smooth::makeFromDecayInMs(phaseSmooth, 20.f, sampleRate);
+					syncer.prepare(fs, 420.f);
 				}
 				void processTempoSyncStuff(float* buffer, float rateSync, float phase, int numSamples, juce::AudioPlayHead* playHead)
 				{
@@ -1300,34 +1324,61 @@ namespace vibrato
 						const auto bps = bpm / 60.;
 						const auto quarterNoteLengthInSamples = fs / bps;
 						const auto barLengthInSamples = quarterNoteLengthInSamples * 4.;
-						phasor.inc = 1. / (barLengthInSamples * rateSyncV);
+						inc = 1. / (barLengthInSamples * rateSyncV);
 
 						const auto latencyLengthInQuarterNotes = extLatency / quarterNoteLengthInSamples;
 						auto ppq = (transport.ppqPosition - latencyLengthInQuarterNotes) * .25;
-						while (ppq < 0.f) ++ppq;
-						
+						while (ppq < 0.f)
+							++ppq;
 						const auto ppqCh = ppq * rateSyncInv;
-						const auto phase = (ppqCh - std::floor(ppqCh));
-						phasor.phase = phase;
+						
+						auto newPhasor = ppqCh - std::floor(ppqCh);
+						if (newPhasor < phasor)
+							++newPhasor;
+
+						auto phaseV = 0.f;
+
+						for (auto s = 0; s < numSamples; ++s)
+						{
+							phasor += inc;
+							phasor = syncer(phasor, newPhasor);
+							newPhasor += inc;
+
+							phaseV = static_cast<double>(phaseSmooth(phase));
+							auto shifted = phasor + phaseV;
+							while (shifted < 0.)
+								++shifted;
+							while (shifted >= 1.)
+								--shifted;
+							buffer[s] = shifted;
+						}
+
+						const auto p = buffer[numSamples - 1] - phaseV;
+						phasor = p < 0.f ? p + 1.f : p >= 1.f ? p - 1.f : p;
 					}
-					
-					for (auto s = 0; s < numSamples; ++s)
+					else
 					{
-						const auto phaseV = static_cast<double>(phaseSmooth(phase));
-						auto smpl = phasor.process() + phaseV;
-						if (smpl < 0.)
-							++smpl;
-						else if (smpl >= 1.)
-							--smpl;
-						buffer[s] = smpl;
+						for (auto s = 0; s < numSamples; ++s)
+						{
+							phasor += inc;
+							if (phasor >= 1.f)
+								--phasor;
+							const auto phaseV = static_cast<double>(phaseSmooth(phase));
+							auto shifted = phasor + phaseV;
+							if (shifted < 0.)
+								++shifted;
+							else if (shifted >= 1.)
+								--shifted;
+							buffer[s] = shifted;
+						}
 					}
 				}
 			protected:
+				PhaseSyncronizer<double> syncer;
 				modSys6::Smooth phaseSmooth;
 				juce::AudioPlayHead::CurrentPositionInfo transport;
-				Phasor<double> phasor;
 				const BeatsData& beatsData;
-				double fs, extLatency;
+				double fs, extLatency, phasor, inc;
 			};
 		public:
 			LFO(int _numChannels, const Tables& _tables, const BeatsData& _beatsData) :
