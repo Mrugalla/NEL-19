@@ -80,25 +80,21 @@ target_sources(NEL
     "Source/PluginProcessor.cpp"
 )
 
-juce_add_binary_data(NEL_BinaryData
-  SOURCES
-    "Source/Font/nel19.ttf"
-    "Source/Img/cursor.png"
-    "Source/Img/cursorCross.png"
-    "Source/Img/juce.png"
-    "Source/Img/shuttle.png"
-    "Source/Img/vst3_logo_small.png"
-    "Source/xml/menu.xml"
-    "Source/xml/presets/AudioRate Arp (midi).nel"
-    "Source/xml/presets/Broken Tape.nel"
-    "Source/xml/presets/Dream Arp EnvFol.nel"
-    "Source/xml/presets/Flanger.nel"
-    "Source/xml/presets/Init.nel"
-    "Source/xml/presets/Psychosis.nel"
-    "Source/xml/presets/Resample.nel"
-    "Source/xml/presets/Shoegaze.nel"
-    "Source/xml/presets/Sines.nel"
-    "Source/xml/presets/Thicc.nel"
+#A helper variable to make the decleration shorter:
+set(SourceDir ${CMAKE_CURRENT_LIST_DIR}/Source)
+
+file(GLOB_RECURSE resources
+            "${SourceDir}/Img/*.*"
+            "${SourceDir}/Font/*.*"
+            "${SourceDir}/xml/*.*")
+			
+juce_add_binary_data(NEL_BinaryData SOURCES ${resources})
+
+target_sources(NEL_BinaryData PRIVATE
+  "${SourceDir}/xml/menu.xml"
+)
+set_source_files_properties("${SourceDir}/xml/menu.xml"
+  PROPERTIES HEADER_FILE_ONLY TRUE
 )
 
 set_target_properties(NEL_BinaryData PROPERTIES
@@ -125,3 +121,5 @@ target_link_libraries(NEL
     juce::juce_recommended_lto_flags
     juce::juce_recommended_warning_flags
 )
+
+message (${resources})
