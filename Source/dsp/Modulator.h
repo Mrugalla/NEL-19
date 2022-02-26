@@ -1474,31 +1474,6 @@ namespace vibrato
 			float waveformV, phaseV, widthV;
 
 			int numChannels;
-			/*
-			void processTempoSyncStuff(float* buffer, int numSamples)
-			{
-				auto& phasr = phasor[0];
-
-				const auto bpm = static_cast<float>(transport.bpm);
-				const auto bps = bpm / 60.f;
-				const auto quarterNoteLengthInSamples = fs / bps;
-				const auto barLengthInSamples = quarterNoteLengthInSamples * 4.f;
-				phasr.inc = 1.f / (barLengthInSamples * rateSyncV);
-
-				const auto latencyLengthInQuarterNotes = static_cast<float>(extLatency) / quarterNoteLengthInSamples;
-				auto ppq = (static_cast<float>(transport.ppqPosition) - latencyLengthInQuarterNotes) * .25f;
-				while (ppq < 0.f) ++ppq;
-				// latency stuff end
-				const auto ppqCh = ppq * rateSyncInv;
-				const auto newPhase = (ppqCh - std::floor(ppqCh));
-				auto phase = newPhase + phaseV;
-				if (phase < 0.f)
-					++phase;
-				else if (phase >= 1.f)
-					--phase;
-				phasr.phase = phase;
-			}
-			*/
 		};
 
 	public:
@@ -1536,6 +1511,7 @@ namespace vibrato
 					tables.makeTablesSinc();
 			}
 		}
+
 		void savePatch(juce::ValueTree& state, int mIdx)
 		{
 			const juce::Identifier id(toString(ObjType::Wavetable) + juce::String(mIdx));
@@ -1639,14 +1615,10 @@ lfo mod
 		to make room for more wavetables
 		import wavetables
 		wavetable editor
-	check if needs parameter smoothing
-		rate free
 
 make trigger mod
 	trigger type (midi note, automation(&button), onset envelope)
 	waveform (sinc, tapestop, tapestart, dropout)
-	duration
-	check parameter smoothing
 
 envFol
 	lookahead?
