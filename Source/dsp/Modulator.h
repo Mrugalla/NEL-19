@@ -1,5 +1,5 @@
 #pragma once
-#include "Interpolation.h"
+#include "../Interpolation.h"
 #include "../modsys/ModSys.h"
 #include <random>
 #define DebugAudioRateEnv false
