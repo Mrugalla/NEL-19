@@ -124,13 +124,38 @@ namespace modSys6
         {
             enum { Oct, Semi, Fine, Width, RetuneSpeed, Atk, Dcy, Sus, Rls, NumParams };
 
-            struct ADSR :
+            struct ADSRView :
                 public Comp
+            {
+                ADSRView(Utils& u, int _adsrViewType) :
+                    Comp(u, ""),
+                    onClick(),
+                    adsrViewType(_adsrViewType)
+                {
+                    setBufferedToImage(false);
+                }
+
+                virtual void update(bool) = 0;
+
+                std::function<void()> onClick;
+                int adsrViewType;
+
+            protected:
+                void mouseUp(const MouseEvent& evt) override
+                {
+                    if (!evt.mouseWasDraggedSinceMouseDown())
+                        if(onClick != nullptr)
+                            onClick();
+                }
+            };
+
+            struct ADSRRel :
+                public ADSRView
             {
                 enum { A, D, S, R };
 
-                ADSR(Utils& u, PID _a, PID _d, PID _s, PID _r) :
-                    Comp(u, ""),
+                ADSRRel(Utils& u, PID _a, PID _d, PID _s, PID _r) :
+                    ADSRView(u, 0),
                     params
                     {
                         u.getParam(_a),
@@ -140,10 +165,8 @@ namespace modSys6
                     },
                     vals { -1.f, -1.f, -1.f, -1.f }
                 {
-                    setBufferedToImage(false);
-                    setInterceptsMouseClicks(false, false);
                 }
-                void update(bool forced = false)
+                void update(bool forced = false) override
                 {
                     const auto atk = params[A]->getValue();
                     const auto dcy = params[D]->getValue();
@@ -224,6 +247,108 @@ namespace modSys6
                 }
             };
 
+            struct ADSRAbs :
+                public ADSRView
+            {
+                enum { A, D, S, R };
+
+                ADSRAbs(Utils& u, PID _a, PID _d, PID _s, PID _r) :
+                    ADSRView(u, 1),
+                    params
+                    {
+                        u.getParam(_a),
+                        u.getParam(_d),
+                        u.getParam(_s),
+                        u.getParam(_r)
+                    },
+                    vals{ -1.f, -1.f, -1.f, -1.f },
+                    img(juce::Image::ARGB, 1, 1, false)
+                {
+                }
+
+                void update(bool forced = false) override
+                {
+                    const auto atk = params[A]->denormalized();
+                    const auto dcy = params[D]->denormalized();
+                    const auto sus = params[S]->getValue();
+                    const auto rls = params[R]->denormalized();
+                    if (forced || vals[A] != atk || vals[D] != dcy || vals[S] != sus || vals[R] != rls)
+                    {
+                        vals[A] = atk;
+                        vals[D] = dcy;
+                        vals[S] = sus;
+                        vals[R] = rls;
+                        updateImg();
+                    }
+                }
+
+                void updateImg()
+                {
+                    const auto thicc = Shared::shared.thicc;
+                    const auto bounds = getLocalBounds().toFloat().reduced(thicc);
+                    const auto bY = bounds.getY();
+                    const auto bW = bounds.getWidth();
+                    const auto bH = bounds.getHeight();
+                    const auto bX = bounds.getX();
+
+                    juce::Graphics g{ img };
+                    const auto bgCol = Shared::shared.colour(ColourID::Bg);
+                    g.fillAll(bgCol);
+
+                    const auto col = Shared::shared.colour(ColourID::Interact);
+                    g.setColour(col);
+
+                    const auto atk = vals[A];
+                    const auto dcy = vals[D];
+                    const auto sus = vals[S];
+                    const auto rls = vals[R];
+
+                    vibrato::EnvGen envGen;
+
+                    envGen.attack = atk;
+                    envGen.decay = dcy;
+                    envGen.sustain = sus;
+                    envGen.release = rls;
+
+                    envGen.prepare(100.f);
+
+                    auto noteOn = true;
+                    for (auto x = 0.f; x < bW; ++x)
+                    {
+                        const auto val = envGen(noteOn);
+                        if(envGen.state == vibrato::EnvGen::State::D)
+                            if (val - sus < .001f)
+                                noteOn = false;
+                        const auto hVal = bH * val;
+                        const auto y = bY + bH - hVal;
+                        g.fillRect(x, y, 1.f, hVal);
+                    }
+                    
+                    repaint();
+                }
+            protected:
+                std::array<Param*, 4> params;
+                std::array<float, 4> vals;
+
+                juce::Image img;
+
+                void resized() override
+                {
+                    const auto thicc = Shared::shared.thicc;
+                    const auto b = getLocalBounds().toFloat().reduced(thicc).toNearestInt();
+
+                    img = juce::Image(juce::Image::ARGB, b.getWidth(), b.getHeight(), true);
+                    update(true);
+                }
+
+                void paint(juce::Graphics& g) override
+                {
+                    const auto thicc = static_cast<int>(Shared::shared.thicc);
+
+                    g.drawImageAt(img, thicc, thicc, false);
+                }
+            };
+
         public:
             ModCompAudioRate(Utils& u, std::vector<Paramtr*>& modulatables, int mOff = 0) :
                 Comp(u, "", CursorType::Default),
@@ -243,13 +368,22 @@ namespace modSys6
                 Paramtr(u, "S", "Defines the envelope's sustain value.", withOffset(PID::AudioRate0Sus, mOff), modulatables),
                 Paramtr(u, "R", "Defines the envelope's release value.", withOffset(PID::AudioRate0Rls, mOff), modulatables)
                 },
-                adsr(u, params[Atk].getPID(), params[Dcy].getPID(), params[Sus].getPID(), params[Rls].getPID())
+                adsr(nullptr),
+                wantsToReplaceADSR(false)
             {
+                adsr = std::make_unique<ADSRRel>(u, params[Atk].getPID(), params[Dcy].getPID(), params[Sus].getPID(), params[Rls].getPID());
+
+                adsr->onClick = [&w = wantsToReplaceADSR]()
+                {
+                    w = true;
+                };
+
                 for (auto& p: params)
                 {
                     addAndMakeVisible(p);
                 }
-                addAndMakeVisible(adsr);
+                
+                addAndMakeVisible(*adsr);
                 startTimerHz(24);
             }
             void activate(ParamtrRandomizer& randomizer)
@@ -261,11 +395,27 @@ namespace modSys6
         protected:
             nelG::Layout layout;
             std::array<Paramtr, NumParams> params;
-            ADSR adsr;
+            std::unique_ptr<ADSRView> adsr;
+            bool wantsToReplaceADSR;
 
             void timerCallback() override
             {
-                adsr.update();
+                adsr->update(false);
+                if (wantsToReplaceADSR)
+                {
+                    removeChildComponent(adsr.get());
+                    if (adsr->adsrViewType == 0)
+                        adsr = std::make_unique<ADSRAbs>(utils, params[Atk].getPID(), params[Dcy].getPID(), params[Sus].getPID(), params[Rls].getPID());
+                    else if (adsr->adsrViewType == 1)
+                        adsr = std::make_unique<ADSRRel>(utils, params[Atk].getPID(), params[Dcy].getPID(), params[Sus].getPID(), params[Rls].getPID());
+                    adsr->onClick = [&w = wantsToReplaceADSR]()
+                    {
+                        w = true;
+                    };
+                    layout.place(*adsr, 0, 0, 4, 1, 0.f, false);
+                    addAndMakeVisible(*adsr);
+                    wantsToReplaceADSR = false;
+                }
             }
 
             void mouseEnter(const juce::MouseEvent& evt) override
@@ -286,7 +436,7 @@ namespace modSys6
                 layout.place(params[Sus],           2, 1, 1, 1, 0.f, true);
                 layout.place(params[Rls],           3, 1, 1, 1, 0.f, true);
 
-                layout.place(adsr,                  0, 0, 4, 1, 0.f, false);
+                layout.place(*adsr,                  0, 0, 4, 1, 0.f, false);
 
                 layout.place(params[Oct],           4, 0, 4, 1, 0.f, true);
                 layout.place(params[Semi],          8, 0, 4, 1, 0.f, true);

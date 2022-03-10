@@ -123,8 +123,9 @@ namespace vibrato
 			state(State::R),
 			noteOn(false),
 
-			smooth()
+			smooth(false)
 		{}
+		
 		void prepare(float sampleRate)
 		{
 			Fs = sampleRate;
@@ -135,18 +136,22 @@ namespace vibrato
 			case State::R: modSys6::Smooth::makeFromDecayInMs(smooth, release, Fs);
 			}
 		}
+		
 		float operator()(bool n) noexcept
 		{
 			noteOn = n;
 			return processSample();
 		}
+
 		float operator()() noexcept
 		{
 			return processSample();
 		}
+
 		void retrig() noexcept
 		{
 			state = State::A;
+			modSys6::Smooth::makeFromDecayInMs(smooth, attack, Fs);
 		}
 
 		float attack, decay, sustain, release;
@@ -163,10 +168,13 @@ namespace vibrato
 			{
 			case State::A:
 				if (noteOn)
-					if (env < .99f)
+					if (env < .999f)
+					{
 						env = smooth(1.f);
+					}
 					else
 					{
+						DBG("A >> D: " << env);
 						state = State::D;
 						modSys6::Smooth::makeFromDecayInMs(smooth, decay, Fs);
 					}
@@ -747,6 +755,7 @@ namespace vibrato
 			{
 				osc.resize(numChannels);
 			}
+			
 			void prepare(float sampleRate) noexcept
 			{
 				Fs = sampleRate;
@@ -756,6 +765,7 @@ namespace vibrato
 				modSys6::Smooth::makeFromDecayInMs(retuneSpeedSmooth, retuneSpeed, Fs);
 				modSys6::Smooth::makeFromDecayInMs(widthSmooth, 10.f, Fs);
 			}
+			
 			void setParameters(float _noteOffset, float _width, float _retuneSpeed,
 				float _attack, float _decay, float _sustain, float _release) noexcept
 			{
