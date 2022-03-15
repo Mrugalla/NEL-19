@@ -2255,7 +2255,7 @@ namespace modSys6
             juce::String makeTooltip()
             {
                 juce::Random rand;
-                static constexpr float count = 182.f;
+                static constexpr float count = 187.f;
                 const auto v = static_cast<int>(std::rint(rand.nextFloat() * count));
                 switch (v)
                 {
@@ -2442,6 +2442,11 @@ namespace modSys6
                 case 180: return "Insanity is doing the same thing over and over again.";
                 case 181: return "If you're uninspired just do household-chores. Your brain will try to justify coming back.";
                 case 182: return "You are defining the future standard!";
+                case 183: return "Plugins are a lot like games, but you can't speedrun them.";
+                case 184: return "When applying audiorate mod to mellow sounds it can make them sorta trumpet-ish.";
+                case 185: return "NEL's oversampling is lightweight and reduces aliasing well, but it also alters the sound a bit.";
+                case 186: return "This message was added 2022_03_15 at 18:10! just in case you wanted to know..";
+                case 187: return "This is message no 187. Ratatatatatat.";
                 default: "Are you sure?";
                 }
                 return "You are not supposed to read this message!";
