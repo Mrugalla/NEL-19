@@ -1,7 +1,7 @@
 # NEL - VST3 - 64bit - Windows only
 An open-source creative vibrato.
 
-https://github.com/Mrugalla/NEL-19/issues/5
+![alt text](https://user-images.githubusercontent.com/54960398/167841920-85afd9f4-68f3-41a7-b92c-ccaeda108b2f.PNG)
 
 NEL requires C++20 dependencies. you can download and install them here until i make a proper installer that takes care of that:
 https://aka.ms/vs/16/release/vc_redist.x64.exe
