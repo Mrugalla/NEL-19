@@ -2850,7 +2850,7 @@ namespace modSys6
                         {
                             utils.triggerUpdatePatch(file.loadFileAsString());
                             notify(NotificationType::PatchUpdated);
-                            setBrowserOpen(false);
+                            //setBrowserOpen(false);
                         },
                         juce::Justification::left
                     );
