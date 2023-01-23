@@ -67,7 +67,7 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     dryWetMix(utils, "Mix", "Define the dry/wet ratio of the effect.", modSys6::PID::DryWetMix, modulatables, modSys6::gui::ParameterType::Knob),
     gainWet(utils, "Gain", "The output gain of the wet signal.", modSys6::PID::WetGain, modulatables, modSys6::gui::ParameterType::Knob),
     stereoConfig(utils, "StereoConfig", "Configurate if effect is applied to l/r or m/s", modSys6::PID::StereoConfig, modulatables, modSys6::gui::ParameterType::Switch),
-	seed(utils, "Seed", "Makes modulators procedural if not 0.", modSys6::PID::Seed, modulatables, modSys6::gui::ParameterType::Knob),
+	seed(utils, "Seed", "If enabled perlin, dropout and lfo mod are procedural.", modSys6::PID::Seed, modulatables, modSys6::gui::ParameterType::Knob),
 
     macro0Dragger(utils, modSys6::ModType::Macro, 0, modulatables),
     macro1Dragger(utils, modSys6::ModType::Macro, 1, modulatables),

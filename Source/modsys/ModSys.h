@@ -624,8 +624,11 @@ namespace modSys6
 			const auto valToStrMs = [](float v) { return juce::String(std::floor(v * 10.f) * .1f) + " " + toString(Unit::Ms); };
 			const auto valToStrDb = [](float v) { return juce::String(std::floor(v * 100.f) * .01f) + " " + toString(Unit::Decibel); };
 			const auto valToStrEmpty = [](float) { return juce::String(""); };
-			const auto valToStrSeed = [](float)
+			const auto valToStrSeed = [](float v)
 			{
+				if (v == 0.f)
+					return juce::String("off");
+
 				juce::String str("abcde");
 				juce::Random rnd;
 				for(auto i = 0; i < str.length(); ++i)
