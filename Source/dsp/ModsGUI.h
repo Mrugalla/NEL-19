@@ -289,7 +289,7 @@ namespace modSys6
                     const auto bY = bounds.getY();
                     const auto bW = bounds.getWidth();
                     const auto bH = bounds.getHeight();
-                    const auto bX = bounds.getX();
+                    //const auto bX = bounds.getX();
 
                     juce::Graphics g{ img };
                     const auto bgCol = Shared::shared.colour(ColourID::Bg);

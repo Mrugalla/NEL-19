@@ -6,18 +6,18 @@ namespace interpolation
 {
 	static constexpr float Pi = 3.14159265359f;
 	
-	static float sinc(const float xPi) noexcept { return std::sin(xPi) / xPi; }
+	inline float sinc(const float xPi) noexcept { return std::sin(xPi) / xPi; }
 
 	namespace window
 	{
-		static float lanczos(const float xPi, const float alphaInv) noexcept { return sinc(xPi * alphaInv); }
-		static float circular(const float x, const float alphaInv) noexcept {
+		inline float lanczos(const float xPi, const float alphaInv) noexcept { return sinc(xPi * alphaInv); }
+		inline float circular(const float x, const float alphaInv) noexcept {
 			const auto a = x * alphaInv;
 			return std::sqrt(1.f - a * a);
 		}
 	}
 
-	static float lanczosSinc(const float* buffer, const float readHead, const int size, const int alpha) noexcept
+	inline float lanczosSinc(const float* buffer, const float readHead, const int size, const int alpha) noexcept
 	{
 		const auto iFloor = std::floor(readHead);
 		const auto iFloorInt = static_cast<int>(iFloor);
@@ -43,9 +43,9 @@ namespace interpolation
 		return sum;
 	}
 
-	static float lerp(float a, float b, float x) noexcept { return a + x * (b - a); }
+	inline float lerp(float a, float b, float x) noexcept { return a + x * (b - a); }
 
-	static float lerp(const float* buffer, const float readHead, const int size)
+	inline float lerp(const float* buffer, const float readHead, const int size)
 	{
 		const auto iFloor = std::floor(readHead);
 		const auto i0 = static_cast<int>(iFloor);
@@ -56,7 +56,7 @@ namespace interpolation
 		return lerp(buffer[i0], buffer[i1], x);
 	}
 
-	static float cubicHermiteSpline(const float* buffer, const float readHead, const int size) noexcept
+	inline float cubicHermiteSpline(const float* buffer, const float readHead, const int size) noexcept
 	{
 		const auto iFloor = std::floor(readHead);
 		auto i1 = static_cast<int>(iFloor);
@@ -80,7 +80,8 @@ namespace interpolation
 
 		return ((c3 * t + c2) * t + c1) * t + c0;
 	}
-	static float cubicHermiteSpline(const float* buffer, const float readHead) noexcept
+	
+	inline float cubicHermiteSpline(const float* buffer, const float readHead) noexcept
 	{
 		const auto iFloor = std::floor(readHead);
 		const auto i0 = static_cast<int>(iFloor);
@@ -102,7 +103,7 @@ namespace interpolation
 		return ((c3 * t + c2) * t + c1) * t + c0;
 	}
 	
-	static float lagrange(const float* buffer, const float readHead, const int size, const int N)
+	inline float lagrange(const float* buffer, const float readHead, const int size, const int N)
 	{
 		const float iFloor = std::floor(readHead);
 		const int iFloorInt = static_cast<int>(iFloor);

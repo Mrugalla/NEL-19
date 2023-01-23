@@ -9,7 +9,10 @@ namespace modSys6
 	static constexpr float piQuart = .785398163397f;
 	static constexpr float piInv = 1.f / pi;
 
-	inline juce::String toID(const juce::String& name) { return name.toLowerCase().removeCharacters(" "); }
+	inline juce::String toID(const juce::String& name)
+	{
+		return name.toLowerCase().removeCharacters(" ");
+	}
 
 	enum class PID
 	{
@@ -31,13 +34,14 @@ namespace modSys6
 		Pitchbend1Smooth,
 		LFO1FreeSync, LFO1RateFree, LFO1RateSync, LFO1Waveform, LFO1Phase, LFO1Width,
 
-		Depth, ModsMix, DryWetMix, WetGain, StereoConfig,
+		Depth, ModsMix, DryWetMix, WetGain, StereoConfig, Seed,
 
 		NumParams
 	};
 	static constexpr int NumMSParams = static_cast<int>(PID::MSMacro3) + 1;
 	static constexpr int NumParamsPerMod = static_cast<int>(PID::Perlin1FreqHz) - NumMSParams;
 	static constexpr int NumParams = static_cast<int>(PID::NumParams);
+	
 	inline juce::String toString(PID pID)
 	{
 		switch (pID)
@@ -112,13 +116,19 @@ namespace modSys6
 		case PID::DryWetMix: return "DryWet Mix";
 		case PID::WetGain: return "Gain Wet";
 		case PID::StereoConfig: return "Stereo Config";
+		case PID::Seed: return "Seed";
 
 		default: return "";
 		}
 	}
-	inline int withOffset(PID p, int o) noexcept { return static_cast<int>(p) + o; }
+	
+	inline int withOffset(PID p, int o) noexcept
+	{
+		return static_cast<int>(p) + o;
+	}
 
 	enum class Unit { Percent, Hz, Beats, Degree, Octaves, Semi, Fine, Ms, Decibel, NumUnits };
+	
 	inline juce::String toString(Unit pID)
 	{
 		switch (pID)
@@ -425,7 +435,7 @@ namespace modSys6
 					},
 					[steps, stepsInv = 1.f / steps](float, float, float val)
 					{
-						return std::rint(val * stepsInv) * steps;
+						return std::round(val * stepsInv) * steps;
 					}
 			};
 		}
@@ -456,6 +466,7 @@ namespace modSys6
 			valNormMod(0.f), valNormSum(0.f)
 		{
 		}
+		
 		Param(const int pID, const juce::NormalisableRange<float>& _range, const float _valDenormDefault,
 			const ValToStrFunc& _valToStr, const StrToValFunc& _strToVal,
 			const Unit _unit, const ModTypeContext _attachedMod = ModTypeContext(ModType::None, -1)) :
@@ -613,6 +624,14 @@ namespace modSys6
 			const auto valToStrMs = [](float v) { return juce::String(std::floor(v * 10.f) * .1f) + " " + toString(Unit::Ms); };
 			const auto valToStrDb = [](float v) { return juce::String(std::floor(v * 100.f) * .01f) + " " + toString(Unit::Decibel); };
 			const auto valToStrEmpty = [](float) { return juce::String(""); };
+			const auto valToStrSeed = [](float)
+			{
+				juce::String str("abcde");
+				juce::Random rnd;
+				for(auto i = 0; i < str.length(); ++i)
+					str = str.replaceCharacter('a' + i, static_cast<juce::juce_wchar>(rnd.nextInt(26) + 'a'));
+				return str;
+			};
 
 			const auto strToValPercent = [strToValDivision](const juce::String& txt)
 			{
@@ -646,6 +665,7 @@ namespace modSys6
 			const auto strToValPolarity = [](const juce::String& txt) { return txt[0] == '0' ? 0.f : 1.f; };
 			const auto strToValMs = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Ms)).getFloatValue(); };
 			const auto strToValDb = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Decibel)).getFloatValue(); };
+			const auto strToValSeed = [](const juce::String& str) { return str.getFloatValue(); };
 
 			for (auto p = 0; p < NumMSParams; ++p)
 			{
@@ -781,6 +801,7 @@ namespace modSys6
 			params.push_back(new Param(PID::DryWetMix, makeRange::biasXL(0.f, 1.f, 0.f), 1.f, valToStrRatio, strToValRatio));
 			params.push_back(new Param(PID::WetGain, makeRange::biasXL(-120.f, 4.5f, .9f), 0.f, valToStrDb, strToValDb));
 			params.push_back(new Param(PID::StereoConfig, makeRange::toggle(), 1.f, valToStrLRMS, strToValLRMS));
+			params.push_back(new Param(PID::Seed, makeRange::biasXL(0.f, 1.f, 0.f), 0.f, valToStrSeed, strToValSeed, Unit::NumUnits));
 
 			for (auto param : params)
 				audioProcessor.addParameter(param);
@@ -809,6 +830,7 @@ namespace modSys6
 				}
 			}
 		}
+		
 		void savePatch(juce::ValueTree state)
 		{
 			const StateIDs ids;
@@ -839,6 +861,7 @@ namespace modSys6
 			for (auto p : params)
 				p->processBlockInit();
 		}
+		
 		void processBlockFinish()
 		{
 			for (auto p : params)
@@ -871,10 +894,12 @@ namespace modSys6
 			params(),
 			val(0.f)
 		{}
+		
 		bool operator==(ModTypeContext other) const noexcept
 		{
 			return other.type == mtc.type && other.idx == mtc.idx;
 		}
+		
 		void dbg()
 		{
 			juce::String txt(toString(mtc) + "\n");
@@ -933,6 +958,7 @@ namespace modSys6
 				}
 			}
 		}
+		
 		void dbg()
 		{
 			for (auto& m : mods)
@@ -960,7 +986,9 @@ namespace modSys6
 			pIdx(0), mIdx(0)
 		{
 		}
+		
 		void disable() noexcept { enabled = 0.f; }
+		
 		void enable(int _mIdx, int _pIdx, float _depth) noexcept
 		{
 			disable();
@@ -969,20 +997,28 @@ namespace modSys6
 			depth = _depth;
 			enabled = 1.f;
 		}
+		
 		void setDepth(float d) noexcept { depth = d; }
+		
 		float getDepth() const noexcept { return depth; }
+		
 		int getPIdx() const noexcept { return pIdx; }
+		
 		int getMIdx() const noexcept { return mIdx; }
+		
 		void processBlock(Params& params, const Mods& mods) noexcept
 		{
 			const auto val = mods[mIdx].val * depth * enabled;
 			params[pIdx]->processBlockModulate(val);
 		}
+		
 		bool has(int _mIdx, int _pIdx) const noexcept
 		{
 			return isEnabled() && pIdx == _pIdx && mIdx == _mIdx;
 		}
+		
 		bool isEnabled() const noexcept { return enabled > 0.f; }
+		
 		juce::String toString() const
 		{
 			if (enabled != 1.f) return "disabled";
@@ -997,15 +1033,18 @@ namespace modSys6
 			state.setProperty(ids.value, depth, nullptr);
 			connexState.appendChild(state, nullptr);
 		}
+		
 	protected:
 		float depth, enabled;
 		int pIdx, mIdx;
 	};
+	
 	struct Connex
 	{
 		Connex() :
 			connex()
 		{}
+		
 		bool enableConnection(int mIdx, int pIdx, float depth) noexcept
 		{
 			for (auto c = 0; c < connex.size(); ++c)
@@ -1016,6 +1055,7 @@ namespace modSys6
 				}
 			return false;
 		}
+		
 		int getConnecIdxWith(int mIdx, int pIdx) const noexcept
 		{
 			for (auto c = 0; c < connex.size(); ++c)
@@ -1023,6 +1063,7 @@ namespace modSys6
 					return c;
 			return -1;
 		}
+		
 		void processBlock(Params& params, const Mods& mods) noexcept
 		{
 			for (auto& connec : connex)
@@ -1030,6 +1071,7 @@ namespace modSys6
 		}
 
 		Connec& operator[](int c) noexcept { return connex[c]; }
+		
 		const Connec& operator[](int c) const noexcept { return connex[c]; }
 
 		void loadPatch(juce::ValueTree& state)
@@ -1049,6 +1091,7 @@ namespace modSys6
 			for (; c < connex.size(); ++c)
 				connex[c].disable();
 		}
+		
 		void savePatch(juce::ValueTree& state)
 		{
 			StateIDs ids;
@@ -1105,6 +1148,7 @@ namespace modSys6
 			state = state.fromXml(xmlString);
 			wannaUpdatePatch.store(true);
 		}
+		
 		void triggerUpdatePatch(const juce::ValueTree& newState)
 		{
 			state = newState;
@@ -1116,6 +1160,7 @@ namespace modSys6
 			connex.loadPatch(state);
 			params.loadPatch(state);
 		}
+		
 		void savePatch()
 		{
 			params.savePatch(state);
@@ -1152,7 +1197,10 @@ namespace modSys6
 			return -1;
 		}
 
-		const BeatsData& getBeatsData() const noexcept { return beatsData; }
+		const BeatsData& getBeatsData() const noexcept
+		{
+			return beatsData;
+		}
 
 		int getModIdx(ModTypeContext mtc) const noexcept {
 			for (auto m = 0; m < mods.numMods(); ++m)
@@ -1160,10 +1208,14 @@ namespace modSys6
 					return m;
 			return -1;
 		}
-		int getConnecIdxWith(int mIdx, PID pID) const noexcept {
+		
+		int getConnecIdxWith(int mIdx, PID pID) const noexcept
+		{
 			return connex.getConnecIdxWith(mIdx, getParamIdx(pID));
 		}
-		int getConnecIdxWith(int mIdx, int pIdx) const noexcept {
+		
+		int getConnecIdxWith(int mIdx, int pIdx) const noexcept
+		{
 			return connex.getConnecIdxWith(mIdx, pIdx);
 		}
 
@@ -1204,24 +1256,32 @@ namespace modSys6
 
 			return connex.enableConnection(mIdx, pIdx, depth);
 		}
+		
 		bool disableConnection(int cIdx) noexcept
 		{
-			const auto param = params[connex[cIdx].getPIdx()];
+			//const auto param = params[connex[cIdx].getPIdx()];
 			connex[cIdx].disable();
 			return true;	
 		}
 
 		float getConnecDepth(int cIdx) const noexcept { return connex[cIdx].getDepth(); }
+		
 		bool setConnecDepth(int cIdx, float depth) noexcept
 		{
-			const auto param = params[connex[cIdx].getPIdx()];
+			//const auto param = params[connex[cIdx].getPIdx()];
 			connex[cIdx].setDepth(depth);
 			return true;
 		}
 
-		bool getHasPlayHead() const noexcept { return hasPlayHead.load(); }
+		bool getHasPlayHead() const noexcept
+		{
+			return hasPlayHead.load();
+		}
 
-		void dbgConnex() { DBG(connex.toString()); }
+		void dbgConnex()
+		{
+			DBG(connex.toString());
+		}
 
 		juce::ValueTree state;
 	protected:

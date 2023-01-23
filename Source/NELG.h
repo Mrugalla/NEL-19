@@ -162,16 +162,25 @@ namespace nelG
                 g.drawLine(rX[0], rY[y], rX[rX.size() - 1], rY[y]);
 #endif
         }
-        void addNamedLocation(juce::String&& name, int x, int y, int width, int height, bool isQuad = false, bool isElliptic = false, bool isVisible = true) {
 #if DebugLayout
-            namedLocs.push_back({std::move(name), x, y, width, height, isQuad, isElliptic, isVisible});
-#endif
+        void addNamedLocation(juce::String&& name, int x, int y, int width, int height, bool isQuad = false, bool isElliptic = false, bool isVisible = true)
+        {
+            namedLocs.push_back({ std::move(name), x, y, width, height, isQuad, isElliptic, isVisible });
         }
-        void mouseMove(juce::Point<float> p) {
-#if DebugLayout
+        
+        void mouseMove(juce::Point<float> p)
+        {
             pos = p;
-#endif
         }
+#else
+        void addNamedLocation(juce::String&&, int, int, int, int, bool = false, bool = false, bool = true)
+        {
+        }
+        
+        void mouseMove(juce::Point<float>)
+        {
+        }
+#endif
     private:
         std::vector<float> rXRaw, rYRaw, rX, rY;
 #if DebugLayout
@@ -212,21 +221,25 @@ namespace nelG
 #endif
     };
 
-    static void fillAndOutline(juce::Graphics& g, juce::Rectangle<float> bounds, juce::Colour bg, juce::Colour lines = juce::Colours::transparentBlack) {
+    inline void fillAndOutline(juce::Graphics& g, juce::Rectangle<float> bounds, juce::Colour bg, juce::Colour lines = juce::Colours::transparentBlack)
+    {
         const auto thicc = modSys6::gui::Shared::shared.thicc;
         g.setColour(bg);
         g.fillRoundedRectangle(bounds, thicc);
         g.setColour(lines);
         g.drawRoundedRectangle(bounds, thicc, thicc);
     }
-    static inline void fillAndOutline(juce::Graphics& g, const juce::Component& comp, juce::Colour bg, juce::Colour lines = juce::Colours::transparentBlack) {
+    
+    inline void fillAndOutline(juce::Graphics& g, const juce::Component& comp, juce::Colour bg, juce::Colour lines = juce::Colours::transparentBlack) {
         fillAndOutline(g, comp.getBounds().toFloat(), bg, lines);
     }
-    static inline void fillAndOutline(juce::Graphics& g, const Layout& layout, juce::Colour bg, juce::Colour lines = juce::Colours::transparentBlack) {
+    
+    inline void fillAndOutline(juce::Graphics& g, const Layout& layout, juce::Colour bg, juce::Colour lines = juce::Colours::transparentBlack) {
         fillAndOutline(g, layout(), bg, lines);
     }
 
-    static juce::Image load(const void* d, int s) {
+    inline juce::Image load(const void* d, int s)
+    {
         auto img = juce::ImageCache::getFromMemory(d, s);
 
         auto b = img.getBounds();
@@ -258,7 +271,9 @@ namespace nelG
             return img.createCopy();
         return img.getClippedImage(b).createCopy();
     }
-    static juce::Image load(const void* d, int s, int scale) {
+    
+    inline juce::Image load(const void* d, int s, int scale)
+    {
         const auto img = load(d, s);
         return img.rescaled(img.getWidth() * scale, img.getHeight() * scale, juce::Graphics::lowResamplingQuality).createCopy();
     }

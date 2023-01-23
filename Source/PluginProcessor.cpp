@@ -2,7 +2,7 @@
 #include "PluginEditor.h"
 #define RemoveValueTree false
 #define OversamplingEnabled true
-#define DebugModsBuffer false
+#define DebugModsBuffer true
 
 Nel19AudioProcessor::Nel19AudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -72,7 +72,6 @@ Nel19AudioProcessor::Nel19AudioProcessor()
             make("Thicc", BinaryData::Thicc_nel, BinaryData::Thicc_nelSize);
         }
     }
-    
 
     visualizerValues.resize(numChannels, 0.f);
 
@@ -136,6 +135,7 @@ const juce::String Nel19AudioProcessor::getName() const
 {
     return JucePlugin_Name;
 }
+
 bool Nel19AudioProcessor::acceptsMidi() const
 {
 #if JucePlugin_WantsMidiInput
@@ -144,6 +144,7 @@ bool Nel19AudioProcessor::acceptsMidi() const
     return false;
 #endif
 }
+
 bool Nel19AudioProcessor::producesMidi() const
 {
 #if JucePlugin_ProducesMidiOutput
@@ -152,6 +153,7 @@ bool Nel19AudioProcessor::producesMidi() const
     return false;
 #endif
 }
+
 bool Nel19AudioProcessor::isMidiEffect() const
 {
 #if JucePlugin_IsMidiEffect
@@ -160,12 +162,19 @@ bool Nel19AudioProcessor::isMidiEffect() const
     return false;
 #endif
 }
+
 double Nel19AudioProcessor::getTailLengthSeconds() const { return 0.; }
+
 int Nel19AudioProcessor::getNumPrograms() { return 1; }
+
 int Nel19AudioProcessor::getCurrentProgram() { return 0; }
+
 void Nel19AudioProcessor::setCurrentProgram (int) {}
+
 const juce::String Nel19AudioProcessor::getProgramName (int) { return {}; }
+
 void Nel19AudioProcessor::changeProgramName (int, const juce::String&){}
+
 void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize)
 {
     auto sampleRateF = static_cast<float>(sampleRate);
@@ -223,7 +232,9 @@ void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize)
 
     setLatencySamples(latency * lGate);
 }
+
 void Nel19AudioProcessor::releaseResources() {}
+
 bool Nel19AudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
     return
@@ -278,6 +289,7 @@ void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 
     dryWet.processWet(samples, modSys.getParam(modSys6::PID::WetGain)->getValSumDenorm(), numChannelsIn, numChannelsOut, numSamples);
 }
+
 void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& b, const juce::MidiBuffer& midi, int numChannelsIn, int numChannelsOut)
 {
     auto buffer = &b;
@@ -293,6 +305,9 @@ void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& b, const
     const auto numSamples = buffer->getNumSamples();
 
     auto curPlayHead = getPlayHead();
+    using namespace modSys6;
+    
+    auto seed = modSys.getParam(PID::Seed)->getValueSum();
 
     // PROCESS MODULATORS
     for(auto m = 0; m < NumActiveMods; ++m)
@@ -300,13 +315,13 @@ void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& b, const
         auto& mod = modulators[m];
         const auto type = modType[m];
         mod.setType(type);
-        const auto offset = m * modSys6::NumParamsPerMod;
+        const auto offset = m * NumParamsPerMod;
 
-        using namespace modSys6;
         switch (type)
         {
         case vibrato::ModType::AudioRate:
-            mod.setParametersAudioRate(
+            mod.setParametersAudioRate
+            (
                 modSys.getParam(withOffset(PID::AudioRate0Oct, offset))->getValSumDenorm(),
                 modSys.getParam(withOffset(PID::AudioRate0Semi, offset))->getValSumDenorm(),
                 modSys.getParam(withOffset(PID::AudioRate0Fine, offset))->getValSumDenorm(),
@@ -319,23 +334,28 @@ void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& b, const
             );
             break;
         case vibrato::ModType::Perlin:
-            mod.setParametersPerlin(
+            mod.setParametersPerlin
+            (
                 modSys.getParam(withOffset(PID::Perlin0FreqHz, offset))->getValSumDenorm(),
                 modSys.getParam(withOffset(PID::Perlin0Octaves, offset))->getValSumDenorm(),
-                modSys.getParam(withOffset(PID::Perlin0Width, offset))->getValSumDenorm()
+                modSys.getParam(withOffset(PID::Perlin0Width, offset))->getValSumDenorm(),
+                seed
             );
             break;
         case vibrato::ModType::Dropout:
-            mod.setParametersDropout(
+            mod.setParametersDropout
+            (
                 modSys.getParam(withOffset(PID::Dropout0Decay, offset))->getValSumDenorm(),
                 modSys.getParam(withOffset(PID::Dropout0Spin, offset))->getValSumDenorm(),
                 modSys.getParam(withOffset(PID::Dropout0Chance, offset))->getValSumDenorm(),
                 modSys.getParam(withOffset(PID::Dropout0Smooth, offset))->getValSumDenorm(),
-                modSys.getParam(withOffset(PID::Dropout0Width, offset))->getValueSum()
+                modSys.getParam(withOffset(PID::Dropout0Width, offset))->getValueSum(),
+                seed
             );
             break;
         case vibrato::ModType::EnvFol:
-            mod.setParametersEnvFol(
+            mod.setParametersEnvFol
+            (
                 modSys.getParam(withOffset(PID::EnvFol0Attack, offset))->getValSumDenorm(),
                 modSys.getParam(withOffset(PID::EnvFol0Release, offset))->getValSumDenorm(),
                 modSys.getParam(withOffset(PID::EnvFol0Gain, offset))->getValSumDenorm(),
@@ -343,23 +363,27 @@ void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& b, const
             );
             break;
         case vibrato::ModType::Macro:
-            mod.setParametersMacro(
+            mod.setParametersMacro
+            (
                 modSys.getParam(withOffset(PID::Macro0, offset))->getValSumDenorm()
             );
             break;
         case vibrato::ModType::Pitchwheel:
-            mod.setParametersPitchbend(
+            mod.setParametersPitchbend
+            (
                 modSys.getParam(withOffset(PID::Pitchbend0Smooth, offset))->getValSumDenorm()
             );
             break;
         case vibrato::ModType::LFO:
-            mod.setParametersLFO(
+            mod.setParametersLFO
+            (
                 modSys.getParam(withOffset(PID::LFO0FreeSync, offset))->getValueSum() > .5f,
                 modSys.getParam(withOffset(PID::LFO0RateFree, offset))->getValSumDenorm(),
                 modSys.getParam(withOffset(PID::LFO0RateSync, offset))->getValSumDenorm(),
                 modSys.getParam(withOffset(PID::LFO0Waveform, offset))->getValueSum(),
                 modSys.getParam(withOffset(PID::LFO0Phase, offset))->getValSumDenorm(),
-                modSys.getParam(withOffset(PID::LFO0Width, offset))->getValSumDenorm()
+                modSys.getParam(withOffset(PID::LFO0Width, offset))->getValSumDenorm(),
+                seed
             );
             break;
         }
@@ -427,6 +451,7 @@ void Nel19AudioProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer,
         return prepareToPlay(getSampleRate(), getBlockSize());
 }
 bool Nel19AudioProcessor::hasEditor() const { return true; }
+
 juce::AudioProcessorEditor* Nel19AudioProcessor::createEditor()
 {
     return new Nel19AudioProcessorEditor(*this);
@@ -443,6 +468,7 @@ void Nel19AudioProcessor::getStateInformation (juce::MemoryBlock& destData)
     std::unique_ptr<juce::XmlElement> xml(modSys.state.createXml());
     copyXmlToBinary(*xml, destData);
 }
+
 void Nel19AudioProcessor::savePatch()
 {
     modSys.savePatch();
@@ -485,6 +511,7 @@ void Nel19AudioProcessor::savePatch()
         modSys.state.setProperty(id, oEnabled, nullptr);
     }
 }
+
 void Nel19AudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     juce::ScopedLock lock(mutex);
@@ -498,6 +525,7 @@ void Nel19AudioProcessor::setStateInformation (const void* data, int sizeInBytes
     modSys.state.removeAllProperties(nullptr);
 #endif
 }
+
 void Nel19AudioProcessor::loadPatch()
 {
     modSys.loadPatch();

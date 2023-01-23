@@ -79,8 +79,7 @@
   <EXPORTFORMATS>
     <VS2019 targetFolder="Builds/VisualStudio2019">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="NEL" enablePluginBinaryCopyStep="1"
-                       useRuntimeLibDLL="0"/>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="NEL" enablePluginBinaryCopyStep="1"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="NEL" enablePluginBinaryCopyStep="1"
                        useRuntimeLibDLL="0"/>
       </CONFIGURATIONS>

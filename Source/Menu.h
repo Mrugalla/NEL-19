@@ -182,8 +182,9 @@ namespace menu2
 					paintMenuButton(g, b, utils, isEnabled(j));
 				};
 
-				buttons.push_back(std::make_unique<ButtonM>(
-					u, std::move(tooltp), onClick, onPaint
+				buttons.push_back(std::make_unique<ButtonM>
+				(
+					u, tooltp, onClick, onPaint
 				));
 				buttons[i]->setName(options[i].toString());
 				addAndMakeVisible(buttons[i].get());
@@ -789,7 +790,7 @@ namespace menu2
 				addSwitchButton(id, child, i, onSwitch, buttonName, onIsEnabled);
 			}
 		}
-		void addTextBox(const std::array<juce::Identifier, NumIDs>& id, juce::ValueTree child, const int i)
+		void addTextBox(const std::array<juce::Identifier, NumIDs>& id, juce::ValueTree child, const int)
 		{
 			const auto buttonName = child.getProperty(id[ID]).toString();
 			// buttonName must match id in menu.xml
@@ -869,7 +870,7 @@ namespace menu2
 				addAndMakeVisible(entries.back().get());
 			}
 		}
-		void addImgStrip(const std::array<juce::Identifier, NumIDs>& id, juce::ValueTree child, const int i)
+		void addImgStrip(const std::array<juce::Identifier, NumIDs>& id, juce::ValueTree child, const int)
 		{
 			const auto stripName = child.getProperty(id[ID]).toString();
 			if (stripName == "logos")
@@ -890,14 +891,14 @@ namespace menu2
 				addAndMakeVisible(entries.back().get());
 			}
 		}
-		void addText(const std::array<juce::Identifier, NumIDs>& id, juce::ValueTree child, const int i)
+		void addText(const std::array<juce::Identifier, NumIDs>&, juce::ValueTree child, const int)
 		{
 			entries.push_back(std::make_unique<TextComp>(
 				this->utils, child.getProperty("text").toString()
 				));
 			addAndMakeVisible(entries.back().get());
 		}
-		void addLink(const std::array<juce::Identifier, NumIDs>& id, juce::ValueTree child, const int i)
+		void addLink(const std::array<juce::Identifier, NumIDs>&, juce::ValueTree child, const int)
 		{
 			entries.push_back(std::make_unique<Link>(
 				this->utils,
@@ -907,8 +908,8 @@ namespace menu2
 			));
 			addAndMakeVisible(entries.back().get());
 		}
-		void addLinkStrip(const std::array<juce::Identifier, NumIDs>& id,
-			juce::ValueTree child, const int i)
+		void addLinkStrip(const std::array<juce::Identifier, NumIDs>&,
+			juce::ValueTree child, const int)
 		{
 			entries.push_back(std::make_unique<LinkStrip>(this->utils));
 

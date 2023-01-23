@@ -70,6 +70,16 @@ private:
 
 /*
 
+todo:
+
+fix interpolation types
+better oversampler
+update parameter smoother
+implement seed parameter
+more wavetables
+bigger wavetables
+
+
 graphics / visualizer fps
 
 debugger:

@@ -67,6 +67,7 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     dryWetMix(utils, "Mix", "Define the dry/wet ratio of the effect.", modSys6::PID::DryWetMix, modulatables, modSys6::gui::ParameterType::Knob),
     gainWet(utils, "Gain", "The output gain of the wet signal.", modSys6::PID::WetGain, modulatables, modSys6::gui::ParameterType::Knob),
     stereoConfig(utils, "StereoConfig", "Configurate if effect is applied to l/r or m/s", modSys6::PID::StereoConfig, modulatables, modSys6::gui::ParameterType::Switch),
+	seed(utils, "Seed", "Makes modulators procedural if not 0.", modSys6::PID::Seed, modulatables, modSys6::gui::ParameterType::Knob),
 
     macro0Dragger(utils, modSys6::ModType::Macro, 0, modulatables),
     macro1Dragger(utils, modSys6::ModType::Macro, 1, modulatables),
@@ -81,13 +82,19 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     enterValue(utils),
 
     menu(nullptr),
-    menuButton(
+    menuButton
+    (
         utils,
         "All the extra stuff.",
-        [this]() { menu2::openMenu(menu, audioProcessor, utils, *this, layout(1, 1, 2, 3).toNearestInt(), menuButton); },
-        [this](juce::Graphics& g, menu2::ButtonM& b) { menu2::paintMenuButton(g, menuButton, utils, menu.get());
-    }),
-
+        [this]()
+        {
+            menu2::openMenu(menu, audioProcessor, utils, *this, layout(1, 1, 2, 3).toNearestInt(), menuButton);
+        },
+        [this](juce::Graphics& g, menu2::ButtonM&)
+        {
+            menu2::paintMenuButton(g, menuButton, utils, menu.get());
+        }
+    ),
     presetBrowser(utils, *p.appProperties.getUserSettings())
 {
     nelLabel.font = modSys6::gui::Shared::shared.font;
@@ -133,6 +140,7 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     addAndMakeVisible(dryWetMix);
     addAndMakeVisible(gainWet);
     addAndMakeVisible(stereoConfig);
+	addAndMakeVisible(seed);
 
     addAndMakeVisible(macro0Dragger);
     addAndMakeVisible(macro1Dragger);
@@ -207,6 +215,7 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
         setSize(w, h);
     }
 }
+
 void Nel19AudioProcessorEditor::resized()
 {
     if (getWidth() < MinEditorBounds)
@@ -250,7 +259,8 @@ void Nel19AudioProcessorEditor::resized()
     layoutMainParams.place(modsMix,      0, 1, 2, 1, thicc, true);
     layoutMainParams.place(dryWetMix,    1, 2, 1, 1, thicc, true);
     layoutMainParams.place(gainWet,      0, 2, 1, 1, thicc, true);
-    layoutMainParams.place(stereoConfig, 0, 3, 2, 1, thicc, true);
+    layoutMainParams.place(stereoConfig, 0, 3, 1, 1, thicc, true);
+	layoutMainParams.place(seed,         1, 3, 1, 1, thicc, false);
 
     layout.place(presetBrowser, 1, 1, 2, 3, thicc, false);
 
@@ -262,6 +272,7 @@ void Nel19AudioProcessorEditor::resized()
     
     layout.place(menu.get(), 1, 1, 2, 3, 0.f, false);
 }
+
 void Nel19AudioProcessorEditor::paint(juce::Graphics& g)
 {
     g.fillAll(utils.colour(modSys6::gui::ColourID::Bg));
@@ -281,10 +292,12 @@ void Nel19AudioProcessorEditor::paint(juce::Graphics& g)
         false, false
     );
 }
+
 void Nel19AudioProcessorEditor::mouseEnter(const juce::MouseEvent&)
 {
     utils.setTooltip(nullptr);
 }
+
 void Nel19AudioProcessorEditor::mouseDown(const juce::MouseEvent&)
 {
     utils.killEnterValue();
