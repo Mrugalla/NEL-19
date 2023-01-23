@@ -1047,6 +1047,7 @@ namespace vibrato
 
 		struct EnvFol
 		{
+			
 			EnvFol(int _numChannels) :
 				gainSmooth(), widthSmooth(),
 
@@ -1061,6 +1062,7 @@ namespace vibrato
 
 				numChannels(_numChannels)
 			{}
+			
 			void prepare(float sampleRate)
 			{
 				Fs = sampleRate;
@@ -1080,6 +1082,7 @@ namespace vibrato
 				}
 				updateAutogainV();
 			}
+			
 			void setParameters(float _attackInMs, float _releaseInMs, float _gain, float _width) noexcept
 			{
 				if (attackInMs != _attackInMs)
@@ -1103,7 +1106,8 @@ namespace vibrato
 				}
 				widthV = _width;
 			}
-			void operator()(Buffer& buffer, const float** samples, int numChannelsIn, int numChannelsOut, int numSamples) noexcept
+			
+			void operator()(Buffer& buffer, const float* const* samples, int numChannelsIn, int numChannelsOut, int numSamples) noexcept
 			{
 				auto gainBuf = buffer[2].data();
 				{ // PROCESS GAIN SMOOTH
@@ -1162,6 +1166,7 @@ namespace vibrato
 					}
 				}
 			}
+			
 		protected:
 			modSys6::Smooth gainSmooth, widthSmooth;
 
@@ -1575,7 +1580,7 @@ namespace vibrato
 			lfo.setParameters(isSync, rateFree, rateSync, waveform, phase, width);
 		}
 
-		void processBlock(const float** samples, const juce::MidiBuffer& midi,
+		void processBlock(const float* const* samples, const juce::MidiBuffer& midi,
 			juce::AudioPlayHead* playHead, int numChannelsIn, int numChannelsOut, int numSamples) noexcept
 		{
 			switch (type)

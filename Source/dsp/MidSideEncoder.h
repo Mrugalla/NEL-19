@@ -7,8 +7,10 @@ namespace midSide
 		Processor(int numChannels) :
 			enabled(numChannels == 2)
 		{}
+		
 		void setEnabled(bool e) { enabled = e; }
-		void processBlockEncode(float** samples, int numSamples) noexcept
+		
+		void processBlockEncode(float* const* samples, int numSamples) noexcept
 		{
 			for (auto s = 0; s < numSamples; ++s)
 			{
@@ -18,7 +20,8 @@ namespace midSide
 				samples[1][s] = side;
 			}
 		}
-		void processBlockDecode(float** samples, int numSamples) noexcept
+		
+		void processBlockDecode(float* const* samples, int numSamples) noexcept
 		{
 			for (auto s = 0; s < numSamples; ++s)
 			{

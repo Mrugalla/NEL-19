@@ -174,12 +174,12 @@ namespace oversampling
 			filters.resize(_numChannels, { ir });
 		}
 		int getLatency() const noexcept { return ir.latency; }
-		void processBlockDown(float** audioBuffer, int numSamples) noexcept
+		void processBlockDown(float* const* audioBuffer, int numSamples) noexcept
 		{
 			for (auto ch = 0; ch < this->numChannels; ++ch)
 				filters[ch].processBlock(audioBuffer[ch], ir, numSamples);
 		}
-		void processBlockUp(float** audioBuffer, int numSamples) noexcept
+		void processBlockUp(float* const* audioBuffer, int numSamples) noexcept
 		{
 			for (auto ch = 0; ch < this->numChannels; ++ch)
 				filters[ch].processBlockUp(audioBuffer[ch], ir, numSamples);

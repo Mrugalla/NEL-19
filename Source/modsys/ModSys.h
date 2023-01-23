@@ -1123,7 +1123,7 @@ namespace modSys6
 		}
 
 		// returns false if patch needs to be updated
-		bool processBlock(const float**, int numSamples, const juce::AudioPlayHead* playHead)
+		bool processBlock(const float* const*, int numSamples, const juce::AudioPlayHead* playHead)
 		{
 			if (wannaUpdatePatch.load())
 			{

@@ -141,7 +141,7 @@ namespace modSys6
                 int adsrViewType;
 
             protected:
-                void mouseUp(const MouseEvent& evt) override
+                void mouseUp(const juce::MouseEvent& evt) override
                 {
                     if (!evt.mouseWasDraggedSinceMouseDown())
                         if(onClick != nullptr)

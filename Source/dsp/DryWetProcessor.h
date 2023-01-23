@@ -81,7 +81,7 @@ namespace drywet
 			for (auto ch = 0; ch < numChannels; ++ch)
 				dryDelay[ch].resize(latency);
 		}
-		bool processBypass(float** samples, int numChannelsIn, int numChannelsOut, int numSamples) noexcept
+		bool processBypass(float* const* samples, int numChannelsIn, int numChannelsOut, int numSamples) noexcept
 		{
 			{ // CHECK IF LOOKAHEAD STATE CHANGED
 				const auto e = lookaheadEnabled.load();
@@ -119,7 +119,7 @@ namespace drywet
 			}
 			return true;
 		}
-		bool saveDry(const float** samples, float mixVal, int numChannelsIn, int numChannelsOut, int numSamples) noexcept
+		bool saveDry(const float* const* samples, float mixVal, int numChannelsIn, int numChannelsOut, int numSamples) noexcept
 		{
 			{ // CHECK IF LOOKAHEAD STATE CHANGED
 				const auto e = lookaheadEnabled.load();
@@ -172,7 +172,7 @@ namespace drywet
 			}
 			return true;
 		}
-		void processWet(float** samples, float _gainWet, int numChannelsIn, int numChannelsOut, int numSamples) noexcept
+		void processWet(float* const* samples, float _gainWet, int numChannelsIn, int numChannelsOut, int numSamples) noexcept
 		{
 			if (gainWet != _gainWet)
 			{

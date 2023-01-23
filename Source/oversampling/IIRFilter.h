@@ -237,7 +237,7 @@ namespace oversampling
 				filter.makeChebyshev_lp_4pole_fc45_ripl5();
 		}
 		int getLatency() const noexcept { return 0; }
-		void processBlock(Float** audioBuffer, const int numSamples) noexcept
+		void processBlock(Float* const* audioBuffer, const int numSamples) noexcept
 		{
 			for (auto ch = 0; ch < numChannels; ++ch)
 				filters[ch].processBlock(audioBuffer[ch], numSamples);
