@@ -672,7 +672,7 @@ namespace vibrato
 
 			void operator()(Buffer& buffer, int numChannelsOut, int numSamples, juce::AudioPlayHead* playHead) noexcept
 			{
-				// PREPARE SEED
+				// SEEDED PHASE SYNTHESIS
 				auto phasorBuf = buffer[2].data();
 				if(seed != 0.f && playHead != nullptr)
 				{
@@ -682,19 +682,20 @@ namespace vibrato
 						const auto ppqO = posInfo->getPpqPosition();
 						if (ppqO.hasValue())
 						{
-							const auto ppq = *ppqO;
-							auto phs = ppq * (double)rate * (double)noiseSizeInv + (double)seed;
-							while (phs >= 1.)
+							const auto ppq = static_cast<float>(*ppqO);
+							auto phs = ppq * rate * noiseSizeInv + seed;
+							while (phs >= 1.f)
 								--phs;
 							
-							auto inc = 1.5 * (double)rate / (double)fs * (double)noiseSizeInv;
-							
-							for (auto s = 0; s < numSamples; ++s)
-							{
-								phasorBuf[s] = phs * (double)noiseSizeF;
-								phs += inc;
-							}
+							phasor.phase = static_cast<double>(phs);
 						}
+					}
+					phasor.setFrequencyHz(1.5 * static_cast<double>(rate * noiseSizeInv));
+
+					for (auto s = 0; s < numSamples; ++s)
+					{
+						phasor();
+						phasorBuf[s] = static_cast<float>(phasor.phase) * noiseSizeF;
 					}
 				}
 				else
