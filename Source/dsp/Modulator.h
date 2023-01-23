@@ -94,9 +94,20 @@ namespace vibrato
 			fsInv = static_cast<Float>(1) / fs;
 		}
 		
-		void setFrequencyMs(Float f) noexcept { inc = static_cast<Float>(1000) / (fs * f); }
-		void setFrequencySecs(Float f) noexcept { inc = static_cast<Float>(1) / (fs * f); }
-		void setFrequencyHz(Float f) noexcept { inc = fsInv * f; }
+		void setFrequencyMs(Float f) noexcept
+		{
+			inc = static_cast<Float>(1000) / (fs * f);
+		}
+		
+		void setFrequencySecs(Float f) noexcept
+		{
+			inc = static_cast<Float>(1) / (fs * f);
+		}
+		
+		void setFrequencyHz(Float f) noexcept
+		{
+			inc = fsInv * f;
+		}
 		
 		bool operator()() noexcept
 		{
@@ -598,9 +609,9 @@ namespace vibrato
 
 				noise(), scl(), sclInv(),
 
-				fs(0.f),
+				fs(0.f), fsInv(1.f),
 
-				rate(-1.f), width(-1.f), octaves(0.f),
+				rate(-1.f), width(-1.f), octaves(0.f), seed(0.f),
 
 				perlinizer0(), perlinizer1(),
 
@@ -647,6 +658,7 @@ namespace vibrato
 					octFloorBuf.resize(blockSize, oFloor);
 					octCeilBuf.resize(blockSize, oFloor + 1);
 					fs = sampleRate;
+					fsInv = 1.f / fs;
 					phasor.prepare(static_cast<double>(sampleRate));
 					widthSmooth.reset();
 					freqSmooth.reset();
@@ -667,7 +679,9 @@ namespace vibrato
 					static constexpr float b = 1.f / (1.f - bias);
 					widthV = std::pow(width, b);
 				}
-				seed = _seed;
+				
+				const auto numSeedWaves = 32.f;
+				seed = _seed * fsInv * numSeedWaves;
 			}
 
 			void operator()(Buffer& buffer, int numChannelsOut, int numSamples, juce::AudioPlayHead* playHead) noexcept
@@ -683,9 +697,10 @@ namespace vibrato
 						if (ppqO.hasValue())
 						{
 							const auto ppq = static_cast<float>(*ppqO);
-							auto phs = ppq * rate * noiseSizeInv + seed;
-							while (phs >= 1.f)
-								--phs;
+							
+							auto phs = seed + ppq * rate;
+							phs = std::fmod(phs, noiseSizeF);
+							phs *= noiseSizeInv;
 							
 							phasor.phase = static_cast<double>(phs);
 						}
@@ -740,7 +755,7 @@ namespace vibrato
 			std::vector<float> noise, scl, sclInv;
 			std::vector<int> octFloorBuf, octCeilBuf;
 
-			float fs;
+			float fs, fsInv;
 
 			float rate, width, octaves, seed;
 
@@ -774,14 +789,17 @@ namespace vibrato
 				Osc() :
 					phasor()
 				{}
+				
 				void prepare(float sampleRate) noexcept
 				{
 					phasor.prepare(sampleRate);
 				}
+				
 				void setFrequencyHz(float f) noexcept
 				{
 					phasor.setFrequencyHz(f);
 				}
+				
 				float operator()() noexcept
 				{
 					phasor();
@@ -796,6 +814,7 @@ namespace vibrato
 
 				Phasor<float> phasor;
 			};
+			
 		public:
 			AudioRate(int _numChannels) :
 				retuneSpeedSmooth(),
@@ -956,6 +975,7 @@ namespace vibrato
 				}
 #endif
 			}
+			
 		protected:
 			modSys6::Smooth retuneSpeedSmooth, widthSmooth;
 
@@ -977,7 +997,7 @@ namespace vibrato
 				smoothSmooth(), widthSmooth(),
 
 				phasor(),
-				decay(1.f), spin(1.f), freqChance(0.f), freqSmooth(0.f), width(0.f),
+				decay(1.f), spin(1.f), freqChance(0.f), freqSmooth(0.f), width(0.f), seed(0.f),
 				rand(),
 
 				numChannels(_numChannels),
@@ -1010,7 +1030,7 @@ namespace vibrato
 			}
 			
 			void setParameters(float _decay, float _spin,
-				float _freqChance, float _freqSmooth, float _width, float _seed)
+				float _freqChance, float _freqSmooth, float _width, float _seed) noexcept
 			{
 				if (decay != _decay)
 				{
@@ -1032,10 +1052,19 @@ namespace vibrato
 				}
 				freqSmooth = _freqSmooth;
 				width = _width;
+				seed = _seed;
 			}
 			
-			void operator()(Buffer& buffer, int numChannelsOut, int numSamples) noexcept
+			void operator()(Buffer& buffer, int numChannelsOut, int numSamples, juce::AudioPlayHead* playHead) noexcept
 			{
+				if (seed != 0.f && playHead != nullptr)
+				{
+					auto pos = playHead->getPosition();
+					if (pos.hasValue())
+					{
+						auto ppq = pos->getPpqPosition();
+					}
+				}
 				{ // FILL BUFFERS WITH IMPULSES
 					for (auto ch = 0; ch < numChannelsOut; ++ch)
 					{
@@ -1099,7 +1128,7 @@ namespace vibrato
 			modSys6::Smooth smoothSmooth, widthSmooth;
 
 			std::array<Phasor<float>, 2> phasor;
-			float decay, spin, freqChance, freqSmooth, width;
+			float decay, spin, freqChance, freqSmooth, width, seed;
 			juce::Random rand;
 
 			int numChannels;
@@ -1679,7 +1708,7 @@ namespace vibrato
 			{
 			case ModType::Perlin: return perlin(buffer, numChannelsOut, numSamples, playHead);
 			case ModType::AudioRate: return audioRate(buffer, midi, numChannelsOut, numSamples);
-			case ModType::Dropout: return dropout(buffer, numChannelsOut, numSamples);
+			case ModType::Dropout: return dropout(buffer, numChannelsOut, numSamples, playHead);
 			case ModType::EnvFol: return envFol(buffer, samples, numChannelsIn, numChannelsOut, numSamples);
 			case ModType::Macro: return macro(buffer, numChannelsOut, numSamples);
 			case ModType::Pitchwheel: return pitchbend(buffer, numChannelsOut, numSamples, midi);
