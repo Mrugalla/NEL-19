@@ -67,8 +67,7 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     dryWetMix(utils, "Mix", "Define the dry/wet ratio of the effect.", modSys6::PID::DryWetMix, modulatables, modSys6::gui::ParameterType::Knob),
     gainWet(utils, "Gain", "The output gain of the wet signal.", modSys6::PID::WetGain, modulatables, modSys6::gui::ParameterType::Knob),
     stereoConfig(utils, "StereoConfig", "Configurate if effect is applied to l/r or m/s", modSys6::PID::StereoConfig, modulatables, modSys6::gui::ParameterType::Switch),
-	seed(utils, "Seed", "If enabled perlin, dropout and lfo mod are procedural.", modSys6::PID::Seed, modulatables, modSys6::gui::ParameterType::Knob),
-
+	
     macro0Dragger(utils, modSys6::ModType::Macro, 0, modulatables),
     macro1Dragger(utils, modSys6::ModType::Macro, 1, modulatables),
     macro2Dragger(utils, modSys6::ModType::Macro, 2, modulatables),
@@ -140,7 +139,6 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     addAndMakeVisible(dryWetMix);
     addAndMakeVisible(gainWet);
     addAndMakeVisible(stereoConfig);
-	addAndMakeVisible(seed);
 
     addAndMakeVisible(macro0Dragger);
     addAndMakeVisible(macro1Dragger);
@@ -259,8 +257,7 @@ void Nel19AudioProcessorEditor::resized()
     layoutMainParams.place(modsMix,      0, 1, 2, 1, thicc, true);
     layoutMainParams.place(dryWetMix,    1, 2, 1, 1, thicc, true);
     layoutMainParams.place(gainWet,      0, 2, 1, 1, thicc, true);
-    layoutMainParams.place(stereoConfig, 0, 3, 1, 1, thicc, true);
-	layoutMainParams.place(seed,         1, 3, 1, 1, thicc, false);
+    layoutMainParams.place(stereoConfig, 0, 3, 2, 1, thicc, true);
 
     layout.place(presetBrowser, 1, 1, 2, 3, thicc, false);
 
@@ -276,14 +273,16 @@ void Nel19AudioProcessorEditor::resized()
 void Nel19AudioProcessorEditor::paint(juce::Graphics& g)
 {
     g.fillAll(utils.colour(modSys6::gui::ColourID::Bg));
-    modSys6::gui::visualizeGroup(
+    modSys6::gui::visualizeGroup
+    (
         g,
         "Mods",
         layout(1, 1, 1, 3, 0.f, false),
         utils.colour(modSys6::gui::ColourID::Hover),
         modSys6::gui::Shared::shared.thicc
     );
-    modSys6::gui::visualizeGroup(
+    modSys6::gui::visualizeGroup
+    (
         g,
         "Main",
         layout(2, 1, 1, 3, 0.f, false),
@@ -302,7 +301,6 @@ void Nel19AudioProcessorEditor::mouseDown(const juce::MouseEvent&)
 {
     utils.killEnterValue();
 }
+
 /*
-
-
 */

@@ -69,44 +69,64 @@ namespace modSys6
         };
 
         struct ModCompPerlin :
-            public Comp
+            public Comp,
+            public juce::Timer
         {
-            enum { Freq, Oct, Width, NumParams };
+            enum
+            {
+                Freq,
+                Oct,
+                Width,
+                Seed,
+                NumParams
+            };
 
             ModCompPerlin(Utils& u, std::vector<Paramtr*>& modulatables, int mOff = 0) :
                 Comp(u, "", CursorType::Default),
-                layout(
-                    { 50, 50, 50, 30 },
+                juce::Timer(),
+                layout
+                (
+                    { 50, 50, 50, 50, 30 },
                     { 20, 80 }
                 ),
-                params{
+                params
+                {
                     Paramtr(u, "Freq", "The frequency in which the modulator picks new values", withOffset(PID::Perlin0FreqHz, mOff), modulatables),
                     Paramtr(u, "Oct", "Defines the modulator's complexity / roughness", withOffset(PID::Perlin0Octaves, mOff), modulatables),
-                    Paramtr(u, "Width", "The modulator's stereo-width", withOffset(PID::Perlin0Width, mOff), modulatables)
-                }
+                    Paramtr(u, "Width", "The modulator's stereo-width", withOffset(PID::Perlin0Width, mOff), modulatables),
+                    Paramtr(u, "Seed", "If enabled the modulator is procedural.", withOffset(PID::Perlin0Seed, mOff), modulatables)
+                },
+                btmText("")
             {
                 for (auto& p : params)
                 {
                     addAndMakeVisible(p);
                 }
+
+                startTimerHz(4);
             }
+            
             void activate(ParamtrRandomizer& randomizer)
             {
                 for (auto& p : params)
                     randomizer.add(&p);
                 setVisible(true);
             }
+            
         protected:
             nelG::Layout layout;
             std::array<Paramtr, NumParams> params;
+            juce::String btmText;
 
             void mouseEnter(const juce::MouseEvent& evt) override
             {
                 Comp::mouseEnter(evt);
             }
 
-            void paint(juce::Graphics&) override
+            void paint(juce::Graphics& g) override
             {
+                g.setColour(Shared::shared.colour(ColourID::Txt));
+                g.drawFittedText(btmText, getLocalBounds(), juce::Justification::bottomRight, 1);
             }
 
             void resized() override
@@ -115,6 +135,24 @@ namespace modSys6
                 layout.place(params[Freq],  0, 1, 1, 1, 0.f, true);
                 layout.place(params[Oct],   1, 0, 1, 2, 0.f, true);
                 layout.place(params[Width], 2, 1, 1, 1, 0.f, true);
+				layout.place(params[Seed],  3, 1, 1, 1, 0.f, true);
+            }
+
+            void timerCallback() override
+            {
+                const auto seedParam = utils.getParam(params[Seed].getPID());
+                if (seedParam->getValueSum() != 0.f)
+                {
+                    if (btmText.isEmpty())
+                        btmText = "<procedrl>";
+                    repaint();
+                }
+                else
+                {
+                    if (!btmText.isEmpty())
+                        btmText = "";
+                    repaint();
+                }
             }
         };
 
@@ -651,6 +689,7 @@ namespace modSys6
                 tableView(u, "Here you can admire this LFO's current waveform.", tables),
                 wavetableBrowser(u),
                 browserButton(u, "Click here to explore the wavetable browser."),
+                btmText(""),
                 isSync(-1)
             {
                 addAndMakeVisible(tableView);
@@ -665,9 +704,11 @@ namespace modSys6
                     addChildComponent(p);
                 params[Waveform].setVisible(true);
                 params[Width].setVisible(true);
+                params[Phase].setVisible(true);
                 startTimerHz(4);
                 initWavetableBrowser();
             }
+            
             void activate(ParamtrRandomizer& randomizer)
             {
                 for (auto& p : params)
@@ -686,7 +727,9 @@ namespace modSys6
                 );
                 setVisible(true);
             }
+            
             Paramtr* getIsSyncButton() noexcept { return &params[IsSync]; }
+            
         protected:
             nelG::Layout layout;
             std::array<Paramtr, NumParams> params;
@@ -695,6 +738,7 @@ namespace modSys6
             WTView tableView;
             Browser wavetableBrowser;
             Button browserButton;
+            juce::String btmText;
             int isSync;
 
             void mouseEnter(const juce::MouseEvent& evt) override
@@ -702,8 +746,10 @@ namespace modSys6
                 Comp::mouseEnter(evt);
             }
 
-            void paint(juce::Graphics&) override
+            void paint(juce::Graphics& g) override
             {
+                g.setColour(Shared::shared.colour(ColourID::Txt));
+                g.drawFittedText(btmText, getLocalBounds(), juce::Justification::bottomRight, 1);
             }
 
             void resized() override
@@ -733,17 +779,23 @@ namespace modSys6
                     if (isSync != _isSync)
                     {
                         isSync = _isSync;
-                        if (isSync)
+                        params[RateSync].setVisible(isSync);
+                        params[RateFree].setVisible(!isSync);
+                    }
+                    else
+                    {
+                        const auto phaseParam = utils.getParam(params[Phase].getPID());
+                        if (phaseParam->getValSumDenorm() != 0.f)
                         {
-                            params[RateSync].setVisible(true);
-                            params[Phase].setVisible(true);
-                            params[RateFree].setVisible(false);
+                            if (btmText.isEmpty())
+                                btmText = "<procedrl>";
+                            repaint();
                         }
                         else
                         {
-                            params[RateSync].setVisible(false);
-                            params[Phase].setVisible(false);
-                            params[RateFree].setVisible(true);
+							if (!btmText.isEmpty())
+								btmText = "";
+                            repaint();
                         }
                     }
                 }
@@ -751,7 +803,6 @@ namespace modSys6
                 {
                     params[IsSync].setVisible(false);
                     params[RateSync].setVisible(false);
-                    params[Phase].setVisible(false);
                     params[RateFree].setVisible(true);
                     const auto isSyncParam = this->utils.getParam(params[IsSync].getPID());
                     if (isSyncParam->getValueSum() > .5f)
@@ -959,7 +1010,12 @@ namespace modSys6
 
                 startTimerHz(8);
             }
-            void updateMod() { setMod(getModType()); }
+            
+            void updateMod()
+            {
+                setMod(getModType());
+            }
+            
             void setMod(ModType t)
             {
                 if (modType == t) return;
@@ -1015,9 +1071,14 @@ namespace modSys6
 
                 onModChange(t);
             }
-            void randomizeAll() { randomizer(); }
+            
+            void randomizeAll()
+            {
+                randomizer();
+            }
 
             std::function<void(ModType)> onModChange;
+            
             void addButtonsToRandomizer(ParamtrRandomizer& randomizr)
             {
                 randomizr.add(lfo.getIsSyncButton());

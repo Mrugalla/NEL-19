@@ -88,6 +88,7 @@ namespace modSys6
         };
 
         enum class ColourID { Txt, Bg, Abort, Mod, Interact, Inactive, Darken, Hover, Transp, NumCols };
+        
         inline juce::Colour getDefault(ColourID i) noexcept
         {
             switch (i)
@@ -103,6 +104,7 @@ namespace modSys6
             default: return juce::Colour(0x00000000);
             }
         }
+        
         inline juce::String toString(ColourID i)
         {
             switch (i)
@@ -138,6 +140,7 @@ namespace modSys6
             const auto y = b.getY() + .5f * (b.getHeight() - minDimen);
             return { x, y, minDimen, minDimen };
         }
+        
         inline juce::Rectangle<float> maxQuadIn(juce::Rectangle<int> b) noexcept {
             return maxQuadIn(b.toFloat());
         }
@@ -260,7 +263,7 @@ namespace modSys6
             static Shared shared;
         };
 
-        static void visualizeGroup(juce::Graphics& g, juce::String&& txt,
+        inline void visualizeGroup(juce::Graphics& g, juce::String&& txt,
             juce::Rectangle<float> bounds, juce::Colour col, float thicc,
             bool drawLeft = true, bool drawRight = true)
         {
@@ -818,6 +821,7 @@ namespace modSys6
                 g.drawFittedText(txt, bounds.toNearestInt(), just, 1);
             };
         }
+        
         inline Button::OnPaint makeButtonOnPaintBrowse()
         {
             return [](juce::Graphics& g, Button& button)
@@ -872,6 +876,7 @@ namespace modSys6
                 }
             };
         }
+        
         inline Button::OnPaint makeButtonOnPaintSave()
         {
             return [](juce::Graphics& g, Button& button)
@@ -931,6 +936,7 @@ namespace modSys6
                 }
             };
         }
+        
         inline Button::OnPaint makeButtonOnPaintDirectory()
         {
             return [](juce::Graphics& g, Button& button)
@@ -1326,6 +1332,7 @@ namespace modSys6
             {
                 init(modulatables);
             }
+            
             Paramtr(Utils& u, juce::String&& _name, juce::String&& _tooltip, int _pID, std::vector<Paramtr*>& modulatables, ParameterType _pType = ParameterType::Knob) :
                 juce::Timer(),
                 Comp(u, makeNotify(*this, u), std::move(_tooltip)),
@@ -1346,6 +1353,7 @@ namespace modSys6
             void setAttachedModSelected(bool e) noexcept { attachedModSelected = e; }
             juce::String getValueAsText() const noexcept { return param.getText(param.getValue(), 10); }
             ModDial& getModDial() noexcept { return modDial; }
+            
             bool updateConnecDepth()
             {
                 const auto cIdx = modDial.getConnecIdx();
@@ -1362,10 +1370,12 @@ namespace modSys6
             {
                 return lockr.isLocked();
             }
+            
             void switchLock()
             {
                 lockr.switchLock();
             }
+            
         protected:
             Param& param;
             const ParameterType pType;
@@ -1396,6 +1406,7 @@ namespace modSys6
                 case ParameterType::Switch: return callbackSwitch();
                 }
             }
+            
             void callbackKnob()
             {
                 const auto vn = param.getValue();
@@ -1414,6 +1425,7 @@ namespace modSys6
                     }
                 }
             }
+            
             void callbackSwitch()
             {
                 const auto vn = param.getValue();
@@ -1439,6 +1451,7 @@ namespace modSys6
                 case ParameterType::Switch: return paintSwitch(g);
                 }
             }
+            
             void paintKnob(juce::Graphics& g)
             {
                 const auto thicc = Shared::shared.thicc;
@@ -1544,6 +1557,7 @@ namespace modSys6
                 case ParameterType::Switch: return resizedSwitch();
                 }
             }
+            
             void resizedKnob()
             {
                 const auto thicc = Shared::shared.thicc;
@@ -1565,6 +1579,7 @@ namespace modSys6
                     lockr.setBounds(juce::Rectangle<float>(x, y, w, h).toNearestInt());
                 }
             }
+            
             void resizedSwitch()
             {
                 const auto thicc = Shared::shared.thicc;
@@ -1585,11 +1600,13 @@ namespace modSys6
                 if (pType == ParameterType::Switch)
                     repaint();
             }
+            
             void mouseExit(const juce::MouseEvent&) override
             {
                 if (pType == ParameterType::Switch)
                     repaint();
             }
+            
             void mouseDown(const juce::MouseEvent& evt) override
             {
                 if(!isLocked())
@@ -1608,21 +1625,31 @@ namespace modSys6
                         return repaint();
                     }
             }
+            
             void mouseDrag(const juce::MouseEvent& evt) override
             {
-                if(!isLocked() && pType == ParameterType::Knob)
-                    if (evt.mods.isLeftButtonDown())
-                    {
-                        const auto dragYNew = evt.position.y / this->utils.getDragSpeed();
-                        auto dragOffset = dragYNew - dragY;
-                        if (evt.mods.isShiftDown())
-                            dragOffset *= SensitiveDrag;
-                        const auto newValue = juce::jlimit(0.f, 1.f, param.getValue() - dragOffset);
-                        param.setValueNotifyingHost(newValue);
-                        dragY = dragYNew;
-                        notify(NotificationType::ParameterDragged, this);
-                    }
+                if (isLocked()) 
+                    return;
+                
+                if (pType != ParameterType::Knob)
+                    return;
+                
+                if (evt.mods.isLeftButtonDown())
+                {
+                    auto mms = juce::Desktop::getInstance().getMainMouseSource();
+                    mms.enableUnboundedMouseMovement(true, false);
+                    
+                    const auto dragYNew = evt.position.y / this->utils.getDragSpeed();
+                    auto dragOffset = dragYNew - dragY;
+                    if (evt.mods.isShiftDown())
+                        dragOffset *= SensitiveDrag;
+                    const auto newValue = juce::jlimit(0.f, 1.f, param.getValue() - dragOffset);
+                    param.setValueNotifyingHost(newValue);
+                    dragY = dragYNew;
+                    notify(NotificationType::ParameterDragged, this);
+                }
             }
+            
             void mouseUp(const juce::MouseEvent& evt) override
             {
                 if(!isLocked())
@@ -1632,6 +1659,7 @@ namespace modSys6
                     case ParameterType::Switch: return mouseUpSwitch(evt);
                     }
             }
+            
             void mouseWheelMove(const juce::MouseEvent& evt, const juce::MouseWheelDetails& wheel) override
             {
                 if (isLocked() || evt.mods.isAnyMouseButtonDown()) return;
@@ -1660,26 +1688,30 @@ namespace modSys6
                 notify(NotificationType::ParameterDragged, this);
             }
 
+            void mouseDoubleClick(const juce::MouseEvent& evt) override
+            {
+                if (pType == ParameterType::Knob)
+                {
+                    param.setValueWithGesture(param.getDefaultValue());
+                    notify(NotificationType::ParameterDragged, this);
+                }
+            }
+
             void mouseUpKnob(const juce::MouseEvent& evt)
             {
                 if (evt.mods.isLeftButtonDown())
                 {
+                    auto mms = juce::Desktop::getInstance().getMainMouseSource();
+                    const juce::Point<int> centre(getWidth() / 2, getHeight() / 2);
+                    mms.setScreenPosition((getScreenPosition() + centre).toFloat());
+                    mms.enableUnboundedMouseMovement(false, true);
+                    
                     if (!evt.mouseWasDraggedSinceMouseDown())
                     {
                         if (evt.mods.isCtrlDown())
                             param.setValueNotifyingHost(param.getDefaultValue());
-                        else
-                        {
-                            juce::Point<float> centre(
-                                static_cast<float>(getWidth()) * .5f,
-                                static_cast<float>(getHeight()) * .5f
-                            );
-                            const juce::Line<float> fromCentre(centre, evt.position);
-                            const auto angle = fromCentre.getAngle();
-
-                            const auto newValue = juce::jlimit(0.f, 1.f, (angle + AngleWidth) / AngleRange);
-                            param.setValue(newValue);
-                        }
+                        else if (evt.mods.isAltDown())
+                            notify(NotificationType::EnterValue, this);
                     }
                     param.endGesture();
                     notify(NotificationType::ParameterDragged, this);
@@ -1999,14 +2031,16 @@ namespace modSys6
             {
                 setWantsKeyboardFocus(true);
             }
+            
             void enable(PID pID, juce::Point<int> pt)
             {
                 setCentrePosition(pt);
                 param = this->utils.getParam(pID);
                 initValue = param->getValue();
-                txt = param->getCurrentValueAsText();
+                txt = "";
                 enable();
             }
+            
             void enable()
             {
                 setVisible(true);
@@ -2017,12 +2051,15 @@ namespace modSys6
                 startTimerHz(FPS);
                 repaint();
             }
+            
             bool isEnabled() const noexcept { return isTimerRunning(); }
+            
             void disable()
             {
                 stopTimer();
                 setVisible(false);
             }
+            
         protected:
             juce::String txt;
             Param* param;

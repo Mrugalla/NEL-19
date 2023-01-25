@@ -72,13 +72,20 @@ private:
 
 todo:
 
-fix interpolation types
 better oversampler
+    performance
+    sound
+remove unused interpolation types
+    or fix them
 update parameter smoother
-implement seed parameter
-more wavetables
-bigger wavetables
-
+wavetables
+    more (like fm maybe?)
+    bigger
+    triangle: less random shit
+modulation destinations
+    amp
+    filter
+    
 
 graphics / visualizer fps
 

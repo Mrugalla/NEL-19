@@ -18,7 +18,7 @@ namespace modSys6
 	{
 		MSMacro0, MSMacro1, MSMacro2, MSMacro3,
 		
-		Perlin0FreqHz, Perlin0Octaves, Perlin0Width,
+		Perlin0FreqHz, Perlin0Octaves, Perlin0Width, Perlin0Seed,
 		AudioRate0Oct, AudioRate0Semi, AudioRate0Fine, AudioRate0Width, AudioRate0RetuneSpeed, AudioRate0Atk, AudioRate0Dcy, AudioRate0Sus, AudioRate0Rls,
 		Dropout0Decay, Dropout0Spin, Dropout0Chance, Dropout0Smooth, Dropout0Width,
 		EnvFol0Attack, EnvFol0Release, EnvFol0Gain, EnvFol0Width,
@@ -26,7 +26,7 @@ namespace modSys6
 		Pitchbend0Smooth,
 		LFO0FreeSync, LFO0RateFree, LFO0RateSync, LFO0Waveform, LFO0Phase, LFO0Width,
 
-		Perlin1FreqHz, Perlin1Octaves, Perlin1Width,
+		Perlin1FreqHz, Perlin1Octaves, Perlin1Width, Perlin1Seed,
 		AudioRate1Oct, AudioRate1Semi, AudioRate1Fine, AudioRate1Width, AudioRate1RetuneSpeed, AudioRate1Atk, AudioRate1Dcy, AudioRate1Sus, AudioRate1Rls,
 		Dropout1Decay, Dropout1Spin, Dropout1Chance, Dropout1Smooth, Dropout1Width,
 		EnvFol1Attack, EnvFol1Release, EnvFol1Gain, EnvFol1Width,
@@ -34,10 +34,11 @@ namespace modSys6
 		Pitchbend1Smooth,
 		LFO1FreeSync, LFO1RateFree, LFO1RateSync, LFO1Waveform, LFO1Phase, LFO1Width,
 
-		Depth, ModsMix, DryWetMix, WetGain, StereoConfig, Seed,
+		Depth, ModsMix, DryWetMix, WetGain, StereoConfig,
 
 		NumParams
 	};
+	
 	static constexpr int NumMSParams = static_cast<int>(PID::MSMacro3) + 1;
 	static constexpr int NumParamsPerMod = static_cast<int>(PID::Perlin1FreqHz) - NumMSParams;
 	static constexpr int NumParams = static_cast<int>(PID::NumParams);
@@ -54,6 +55,7 @@ namespace modSys6
 		case PID::Perlin0FreqHz: return "Perlin 0 Freq Hz";
 		case PID::Perlin0Octaves: return "Perlin 0 Octaves";
 		case PID::Perlin0Width: return "Perlin 0 Width";
+		case PID::Perlin0Seed: return "Perlin 0 Seed";
 		case PID::AudioRate0Oct: return "AudioRate 0 Oct";
 		case PID::AudioRate0Semi: return "AudioRate 0 Semi";
 		case PID::AudioRate0Fine: return "AudioRate 0 Fine";
@@ -84,6 +86,7 @@ namespace modSys6
 		case PID::Perlin1FreqHz: return "Perlin 1 Freq Hz";
 		case PID::Perlin1Octaves: return "Perlin 1 Octaves";
 		case PID::Perlin1Width: return "Perlin 1 Width";
+		case PID::Perlin1Seed: return "Perlin 1 Seed";
 		case PID::AudioRate1Oct: return "AudioRate 1 Oct";
 		case PID::AudioRate1Semi: return "AudioRate 1 Semi";
 		case PID::AudioRate1Fine: return "AudioRate 1 Fine";
@@ -116,7 +119,6 @@ namespace modSys6
 		case PID::DryWetMix: return "DryWet Mix";
 		case PID::WetGain: return "Gain Wet";
 		case PID::StereoConfig: return "Stereo Config";
-		case PID::Seed: return "Seed";
 
 		default: return "";
 		}
@@ -764,6 +766,7 @@ namespace modSys6
 				params.push_back(new Param(withOffset(PID::Perlin0FreqHz, offset), makeRange::biasXL(.2f, 20.f, -.8f), 6.f, valToStrHz, strToValHz, Unit::Hz));
 				params.push_back(new Param(withOffset(PID::Perlin0Octaves, offset), makeRange::biasXL(1.f, 8.f, 0.f), 4.f, valToStrOct, strToValOct, Unit::Octaves));
 				params.push_back(new Param(withOffset(PID::Perlin0Width, offset), makeRange::biasXL(0.f, 1.f, 0), 1.f, valToStrPercent, strToValPercent, Unit::Percent));
+				params.push_back(new Param(withOffset(PID::Perlin0Seed, offset), makeRange::biasXL(0.f, 1.f, 0.f), 0.f, valToStrSeed, strToValSeed, Unit::NumUnits));
 
 				params.push_back(new Param(withOffset(PID::AudioRate0Oct, offset), makeRange::stepped(-3.f * 12.f, 3.f * 12.f, 12.f), 0.f, valToStrOct2, strToValOct2, Unit::Octaves));
 				params.push_back(new Param(withOffset(PID::AudioRate0Semi, offset), makeRange::stepped(-12.f, 12.f, 1.f), 0.f, valToStrSemi, strToValSemi, Unit::Semi));
@@ -799,12 +802,11 @@ namespace modSys6
 				params.push_back(new Param(withOffset(PID::LFO0Width, offset), makeRange::stepped(0.f, .5f, LFOPhaseStep), 0.f, valToStrPhase360, strToValPhase, Unit::Degree));
 			}
 
-			params.push_back(new Param(PID::Depth, makeRange::biasXL(0.f, 1.f, 0.f), .95f, valToStrPercent, strToValPercent));
+			params.push_back(new Param(PID::Depth, makeRange::biasXL(0.f, 1.f, 0.f), 1.f, valToStrPercent, strToValPercent));
 			params.push_back(new Param(PID::ModsMix, makeRange::biasXL(0.f, 1.f, 0.f), 0.f, valToStrRatio, strToValRatio));
 			params.push_back(new Param(PID::DryWetMix, makeRange::biasXL(0.f, 1.f, 0.f), 1.f, valToStrRatio, strToValRatio));
 			params.push_back(new Param(PID::WetGain, makeRange::biasXL(-120.f, 4.5f, .9f), 0.f, valToStrDb, strToValDb));
 			params.push_back(new Param(PID::StereoConfig, makeRange::toggle(), 1.f, valToStrLRMS, strToValLRMS));
-			params.push_back(new Param(PID::Seed, makeRange::biasXL(0.f, 1.f, 0.f), 0.f, valToStrSeed, strToValSeed, Unit::NumUnits));
 
 			for (auto param : params)
 				audioProcessor.addParameter(param);
@@ -885,7 +887,9 @@ namespace modSys6
 		size_t numParams() const noexcept { return params.size(); }
 
 		Param* operator[](int i) noexcept { return params[i]; }
+		
 		const Param* operator[](int i) const noexcept { return params[i]; }
+		
 	protected:
 		std::vector<Param*> params;
 	};

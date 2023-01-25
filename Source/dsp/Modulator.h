@@ -680,8 +680,8 @@ namespace vibrato
 					widthV = std::pow(width, b);
 				}
 				
-				const auto numSeedWaves = 32.f;
-				seed = _seed * fsInv * numSeedWaves;
+				const auto numSeedWaves = 16.f;
+				seed = _seed * numSeedWaves;
 			}
 
 			void operator()(Buffer& buffer, int numChannelsOut, int numSamples, juce::AudioPlayHead* playHead) noexcept
@@ -699,7 +699,12 @@ namespace vibrato
 							const auto ppq = static_cast<float>(*ppqO);
 							
 							auto phs = seed + ppq * rate;
-							phs = std::fmod(phs, noiseSizeF);
+
+							const auto phsFrac = phs - std::floor(phs);
+							auto phsInt = static_cast<int>(phs);
+							phsInt %= noiseSize;
+							phs = static_cast<float>(phsInt) + phsFrac;
+
 							phs *= noiseSizeInv;
 							
 							phasor.phase = static_cast<double>(phs);
@@ -995,9 +1000,9 @@ namespace vibrato
 		public:
 			Dropout(int _numChannels) :
 				smoothSmooth(), widthSmooth(),
-
+				
 				phasor(),
-				decay(1.f), spin(1.f), freqChance(0.f), freqSmooth(0.f), width(0.f), seed(0.f),
+				decay(1.f), spin(1.f), freqChance(0.f), freqSmooth(0.f), width(0.f),
 				rand(),
 
 				numChannels(_numChannels),
@@ -1013,16 +1018,20 @@ namespace vibrato
 			void prepare(float sampleRate)
 			{
 				fs = sampleRate;
+
 				for (auto& p : phasor)
 				{
 					p.prepare(fs);
 					p.setFrequencyMs(freqChance);
 				}
+				
 				dcy = 1.f - 1.f / (decay * fs * .001f);
 				for (auto& p : phasor)
 					p.setFrequencyMs(freqChance);
+				
 				for (auto& s : smooth)
 					modSys6::Smooth::makeFromDecayInHz(s, freqSmooth, fs);
+				
 				spinV = 1.f / (fs * FreqCoeff / (spin * spin));
 
 				modSys6::Smooth::makeFromDecayInMs(smoothSmooth, 40.f, fs);
@@ -1030,7 +1039,7 @@ namespace vibrato
 			}
 			
 			void setParameters(float _decay, float _spin,
-				float _freqChance, float _freqSmooth, float _width, float _seed) noexcept
+				float _freqChance, float _freqSmooth, float _width) noexcept
 			{
 				if (decay != _decay)
 				{
@@ -1052,19 +1061,10 @@ namespace vibrato
 				}
 				freqSmooth = _freqSmooth;
 				width = _width;
-				seed = _seed;
 			}
 			
-			void operator()(Buffer& buffer, int numChannelsOut, int numSamples, juce::AudioPlayHead* playHead) noexcept
+			void operator()(Buffer& buffer, int numChannelsOut, int numSamples) noexcept
 			{
-				if (seed != 0.f && playHead != nullptr)
-				{
-					auto pos = playHead->getPosition();
-					if (pos.hasValue())
-					{
-						auto ppq = pos->getPpqPosition();
-					}
-				}
 				{ // FILL BUFFERS WITH IMPULSES
 					for (auto ch = 0; ch < numChannelsOut; ++ch)
 					{
@@ -1077,12 +1077,12 @@ namespace vibrato
 								
 					}
 				}
+				
 				auto smoothBuf = buffer[2].data();
-				{ // PROCESS SMOOTH SMOOTH
+				{ // SYNTHESIZE MOD
 					for (auto s = 0; s < numSamples; ++s)
 						smoothBuf[s] = smoothSmooth(freqSmooth);
-				}
-				{ // SYNTHESIZE MOD
+					
 					for (auto ch = 0; ch < numChannelsOut; ++ch)
 					{
 						auto buf = buffer[ch].data();
@@ -1112,15 +1112,15 @@ namespace vibrato
 							modSys6::Smooth::makeFromDecayInHz(smooth[ch], smoothBuf[s], fs);
 
 							smpl = smooth[ch](smpl);
+							smpl = approx::tanh(4.f * smpl);
 						}
 					}
 				}
+				
 				{ // PROCESS WIDTH
 					if (numChannelsOut == 2)
-					{
 						for (auto s = 0; s < numSamples; ++s)
 							buffer[1][s] = buffer[0][s] + widthSmooth(width) * (buffer[1][s] - buffer[0][s]);
-					}
 				}
 			}
 			
@@ -1128,7 +1128,7 @@ namespace vibrato
 			modSys6::Smooth smoothSmooth, widthSmooth;
 
 			std::array<Phasor<float>, 2> phasor;
-			float decay, spin, freqChance, freqSmooth, width, seed;
+			float decay, spin, freqChance, freqSmooth, width;
 			juce::Random rand;
 
 			int numChannels;
@@ -1494,9 +1494,9 @@ namespace vibrato
 					}
 				}
 			
-			protected:
 				PhaseSyncronizer<double> syncer;
 				modSys6::Smooth phaseSmooth;
+			protected:
 				juce::AudioPlayHead::CurrentPositionInfo transport;
 				const BeatsData& beatsData;
 				double fs, extLatency, phasor, inc;
@@ -1534,7 +1534,7 @@ namespace vibrato
 				modSys6::Smooth::makeFromDecayInMs(rateSmooth, 12.f, fs);
 			}
 			
-			void setParameters(bool _isSync, float _rateFree, float _rateSync, float _waveform, float _phase, float _width, float _seed) noexcept
+			void setParameters(bool _isSync, float _rateFree, float _rateSync, float _waveform, float _phase, float _width) noexcept
 			{
 				isSync = _isSync;
 				rateSync = _rateSync;
@@ -1548,22 +1548,62 @@ namespace vibrato
 			{
 				bool canBeSync = playHead != nullptr;
 				{ // SYNTHESIZE PHASOR
+					auto buf = buffer[0].data();
+
 					if (isSync && canBeSync)
-					{
-						auto buf = buffer[0].data();
 						tempoSync.processTempoSyncStuff(buf, rateSync, phaseV, numSamples, playHead);
-					}
 					else
 					{
-						auto buf = buffer[0].data();
-						for (auto s = 0; s < numSamples; ++s)
+						if (phaseV != 0.f && playHead != nullptr)
 						{
-							phasor.inc = rateSmooth(rateFree) * fsInv;
-							buf[s] = static_cast<float>(phasor.process());
+							const auto pos = playHead->getPosition();
+							if (pos.hasValue())
+							{
+								const auto ppqO = pos->getPpqPosition();
+								const auto bpmO = pos->getBpm();
+								if (ppqO.hasValue() && bpmO.hasValue())
+								{
+									const auto ppq = *ppqO;
+									const auto bpm = *bpmO;
+									const auto bps = bpm / 60.;
+
+									const auto inc = rateFree * fsInv;
+									const auto phase = ppq / bps * rateFree;
+
+									phasor.inc = inc;
+									phasor.phase = phase - std::floor(phase);
+									
+									for (auto s = 0; s < numSamples; ++s)
+									{
+										buf[s] = phasor.phase + tempoSync.phaseSmooth(phaseV);
+										if (buf[s] < 0.f)
+											++buf[s];
+										else if (buf[s] >= 1.f)
+											--buf[s];
+										phasor();
+									}
+								}
+								else
+								{
+									for (auto s = 0; s < numSamples; ++s)
+									{
+										phasor.inc = rateSmooth(rateFree) * fsInv;
+										buf[s] = static_cast<float>(phasor.process());
+									}
+								}
+							}
 						}
-							
+						else
+						{
+							for (auto s = 0; s < numSamples; ++s)
+							{
+								phasor.inc = rateSmooth(rateFree) * fsInv;
+								buf[s] = static_cast<float>(phasor.process());
+							}
+						}
 					}
 				}
+
 				{ // PROCESS WIDTH
 					if (numChannelsOut == 2)
 					{
@@ -1578,6 +1618,7 @@ namespace vibrato
 						}
 					}
 				}
+
 				{ // PROCESS WAVEFORM
 					for (auto ch = 0; ch < numChannelsOut; ++ch)
 					{
@@ -1682,9 +1723,9 @@ namespace vibrato
 			audioRate.setParameters(noteOffset, width, retuneSpeed, attack, decay, sustain, release);
 		}
 		
-		void setParametersDropout(float decay, float spin, float freqChance, float freqSmooth, float width, float seed) noexcept
+		void setParametersDropout(float decay, float spin, float freqChance, float freqSmooth, float width) noexcept
 		{
-			dropout.setParameters(decay, spin, freqChance, freqSmooth, width, seed);
+			dropout.setParameters(decay, spin, freqChance, freqSmooth, width);
 		}
 		
 		void setParametersEnvFol(float atk, float rls, float gain, float width) noexcept
@@ -1692,13 +1733,19 @@ namespace vibrato
 			envFol.setParameters(atk, rls, gain, width);
 		}
 		
-		void setParametersMacro(float m) noexcept { macro.setParameters(m); }
-		
-		void setParametersPitchbend(float rate) noexcept { pitchbend.setParameters(rate); }
-		
-		void setParametersLFO(bool isSync, float rateFree, float rateSync, float waveform, float phase, float width, float seed) noexcept
+		void setParametersMacro(float m) noexcept
 		{
-			lfo.setParameters(isSync, rateFree, rateSync, waveform, phase, width, seed);
+			macro.setParameters(m);
+		}
+		
+		void setParametersPitchbend(float rate) noexcept
+		{
+			pitchbend.setParameters(rate);
+		}
+		
+		void setParametersLFO(bool isSync, float rateFree, float rateSync, float waveform, float phase, float width) noexcept
+		{
+			lfo.setParameters(isSync, rateFree, rateSync, waveform, phase, width);
 		}
 
 		void processBlock(const float* const* samples, const juce::MidiBuffer& midi,
@@ -1708,7 +1755,7 @@ namespace vibrato
 			{
 			case ModType::Perlin: return perlin(buffer, numChannelsOut, numSamples, playHead);
 			case ModType::AudioRate: return audioRate(buffer, midi, numChannelsOut, numSamples);
-			case ModType::Dropout: return dropout(buffer, numChannelsOut, numSamples, playHead);
+			case ModType::Dropout: return dropout(buffer, numChannelsOut, numSamples);
 			case ModType::EnvFol: return envFol(buffer, samples, numChannelsIn, numChannelsOut, numSamples);
 			case ModType::Macro: return macro(buffer, numChannelsOut, numSamples);
 			case ModType::Pitchwheel: return pitchbend(buffer, numChannelsOut, numSamples, midi);
@@ -1716,8 +1763,15 @@ namespace vibrato
 			}
 		}
 		
-		Tables& getTables() noexcept { return tables; }
-		const Tables& getTables() const noexcept { return tables; }
+		Tables& getTables() noexcept
+		{
+			return tables;
+		}
+		
+		const Tables& getTables() const noexcept
+		{
+			return tables;
+		}
 
 		Buffer buffer;
 	protected:

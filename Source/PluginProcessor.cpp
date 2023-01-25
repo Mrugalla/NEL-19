@@ -2,7 +2,7 @@
 #include "PluginEditor.h"
 #define RemoveValueTree false
 #define OversamplingEnabled true
-#define DebugModsBuffer true
+#define DebugModsBuffer false
 
 Nel19AudioProcessor::Nel19AudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -80,11 +80,11 @@ Nel19AudioProcessor::Nel19AudioProcessor()
 
     {
         const auto id = oversampling::getOversamplingOrderID();
-        const auto enabled = user->getIntValue(id, 0) == 0 ? false : true;
+        const auto enabled = user->getIntValue(id, 1) == 0 ? false : true;
         oversampling.setEnabled(enabled);
     }
     {
-        const auto defVal = vibrato::toString(vibrato::InterpolationType::Spline);
+        const auto defVal = vibrato::toString(vibrato::InterpolationType::Lerp);
         const auto id = vibrato::toString(vibrato::ObjType::InterpolationType);
         const auto idType = user->getValue(id, defVal);
         const auto type = vibrato::toType(idType);
@@ -307,8 +307,6 @@ void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& b, const
     auto curPlayHead = getPlayHead();
     using namespace modSys6;
     
-    auto seed = modSys.getParam(PID::Seed)->getValueSum();
-
     // PROCESS MODULATORS
     for(auto m = 0; m < NumActiveMods; ++m)
     {
@@ -339,7 +337,7 @@ void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& b, const
                 modSys.getParam(withOffset(PID::Perlin0FreqHz, offset))->getValSumDenorm(),
                 modSys.getParam(withOffset(PID::Perlin0Octaves, offset))->getValSumDenorm(),
                 modSys.getParam(withOffset(PID::Perlin0Width, offset))->getValSumDenorm(),
-                seed
+                modSys.getParam(withOffset(PID::Perlin0Seed, offset))->getValueSum()
             );
             break;
         case vibrato::ModType::Dropout:
@@ -349,8 +347,7 @@ void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& b, const
                 modSys.getParam(withOffset(PID::Dropout0Spin, offset))->getValSumDenorm(),
                 modSys.getParam(withOffset(PID::Dropout0Chance, offset))->getValSumDenorm(),
                 modSys.getParam(withOffset(PID::Dropout0Smooth, offset))->getValSumDenorm(),
-                modSys.getParam(withOffset(PID::Dropout0Width, offset))->getValueSum(),
-                seed
+                modSys.getParam(withOffset(PID::Dropout0Width, offset))->getValueSum()
             );
             break;
         case vibrato::ModType::EnvFol:
@@ -382,8 +379,7 @@ void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& b, const
                 modSys.getParam(withOffset(PID::LFO0RateSync, offset))->getValSumDenorm(),
                 modSys.getParam(withOffset(PID::LFO0Waveform, offset))->getValueSum(),
                 modSys.getParam(withOffset(PID::LFO0Phase, offset))->getValSumDenorm(),
-                modSys.getParam(withOffset(PID::LFO0Width, offset))->getValSumDenorm(),
-                seed
+                modSys.getParam(withOffset(PID::LFO0Width, offset))->getValSumDenorm()
             );
             break;
         }

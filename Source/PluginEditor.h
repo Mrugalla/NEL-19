@@ -32,7 +32,7 @@ private:
 
     modSys6::gui::Visualizer visualizer;
 
-    modSys6::gui::Paramtr modsDepth, modsMix, dryWetMix, gainWet, stereoConfig, seed;
+    modSys6::gui::Paramtr modsDepth, modsMix, dryWetMix, gainWet, stereoConfig;
 
     modSys6::gui::ModDragger macro0Dragger, macro1Dragger, macro2Dragger, macro3Dragger;
 
