@@ -186,7 +186,7 @@ void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize)
         static constexpr double defaultDlySize = 13.;
         const juce::String id(vibrato::toString(vibrato::ObjType::DelaySize));
         dSize = static_cast<float>(modSys.state.getProperty(id, -1.f));
-        if (dSize <= 0.f)
+        if (dSize <= 0.f || std::isnan(dSize) || std::isinf(dSize))
             dSize = static_cast<float>(user->getDoubleValue(id, defaultDlySize));
     }
     const auto vibSizeSamplesHalf = static_cast<int>(std::rint(sampleRateF * dSize * .001f * .5f));
