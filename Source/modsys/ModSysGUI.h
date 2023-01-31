@@ -10,6 +10,7 @@ namespace modSys6
         using Buffer = std::vector<std::vector<float>>;
 
         using Notify = std::function<bool(const int, const void*)>;
+        
         enum NotificationType
         {
             ColourChanged,
@@ -1527,6 +1528,7 @@ namespace modSys6
                     g.drawLine(tickLine.withShortenedStart(radiusInner), thicc2);
                 }
             }
+            
             void paintSwitch(juce::Graphics& g)
             {
                 const auto thicc = Shared::shared.thicc;
@@ -1617,7 +1619,7 @@ namespace modSys6
                         {
                             notify(NotificationType::KillEnterValue);
                             param.beginGesture();
-                            dragY = evt.position.y / this->utils.getDragSpeed();
+                            dragY = evt.position.y / utils.getDragSpeed();
                         }
                         return;
                     case ParameterType::Switch:
@@ -1639,7 +1641,7 @@ namespace modSys6
                     auto mms = juce::Desktop::getInstance().getMainMouseSource();
                     mms.enableUnboundedMouseMovement(true, false);
                     
-                    const auto dragYNew = evt.position.y / this->utils.getDragSpeed();
+                    const auto dragYNew = evt.position.y / utils.getDragSpeed();
                     auto dragOffset = dragYNew - dragY;
                     if (evt.mods.isShiftDown())
                         dragOffset *= SensitiveDrag;
@@ -1701,17 +1703,19 @@ namespace modSys6
             {
                 if (evt.mods.isLeftButtonDown())
                 {
-                    auto mms = juce::Desktop::getInstance().getMainMouseSource();
-                    const juce::Point<int> centre(getWidth() / 2, getHeight() / 2);
-                    mms.setScreenPosition((getScreenPosition() + centre).toFloat());
-                    mms.enableUnboundedMouseMovement(false, true);
-                    
                     if (!evt.mouseWasDraggedSinceMouseDown())
                     {
                         if (evt.mods.isCtrlDown())
                             param.setValueNotifyingHost(param.getDefaultValue());
                         else if (evt.mods.isAltDown())
                             notify(NotificationType::EnterValue, this);
+                    }
+                    else
+                    {
+                        auto mms = juce::Desktop::getInstance().getMainMouseSource();
+                        const juce::Point<int> centre(getWidth() / 2, getHeight() / 2);
+                        mms.setScreenPosition((getScreenPosition() + centre).toFloat());
+                        mms.enableUnboundedMouseMovement(false, true);
                     }
                     param.endGesture();
                     notify(NotificationType::ParameterDragged, this);
@@ -1747,7 +1751,8 @@ namespace modSys6
         struct ModDragger :
             public Comp
         {
-            inline Notify makeNotify(ModDragger& modDragger, Utils& _utils) {
+            inline Notify makeNotify(ModDragger& modDragger, Utils& _utils)
+            {
                 return [&m = modDragger, &u = _utils](int t, const void*)
                 {
                     if (t == NotificationType::ModSelectionChanged)
@@ -1771,6 +1776,7 @@ namespace modSys6
                 draggerfall(),
                 selected(mtc == u.getSelectedMod())
             {}
+            
             void setQBounds(const juce::Rectangle<float>& b)
             {
                 origin = maxQuadIn(b).toNearestInt();
@@ -1813,12 +1819,14 @@ namespace modSys6
                 this->utils.selectMod(mtc);
                 draggerfall.startDraggingComponent(this, evt);
             }
+            
             void mouseDrag(const juce::MouseEvent& evt) override
             {
                 draggerfall.dragComponent(this, evt, nullptr);
                 hoveredParameter = getHoveredParameter();
                 repaint();
             }
+            
             void mouseUp(const juce::MouseEvent&) override
             {
                 if (hoveredParameter != nullptr)
@@ -1843,6 +1851,7 @@ namespace modSys6
                                 return p;
                 return nullptr;
             }
+            
         };
 
         struct Tooltip :

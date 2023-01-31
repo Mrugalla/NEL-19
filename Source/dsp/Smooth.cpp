@@ -64,9 +64,9 @@ namespace smooth
 	}
 
 	template<typename Float>
-	Float Lowpass<Float>::getXFromHz(Float d, Float Fs) noexcept
+	Float Lowpass<Float>::getXFromHz(Float hz, Float Fs) noexcept
 	{
-		return getXFromFc(d / Fs);
+		return getXFromFc(hz / Fs);
 	}
 
 	//
@@ -76,7 +76,7 @@ namespace smooth
 	{
 		setX(std::exp(static_cast<Float>(-1) / d));
 	}
-
+	
 	template<typename Float>
 	void Lowpass<Float>::makeFromDecayInSecs(Float d, Float Fs) noexcept
 	{
@@ -90,9 +90,9 @@ namespace smooth
 	}
 
 	template<typename Float>
-	void Lowpass<Float>::makeFromDecayInHz(Float d, Float Fs) noexcept
+	void Lowpass<Float>::makeFromDecayInHz(Float hz, Float Fs) noexcept
 	{
-		getXFromHz(d, Fs);
+		setX(getXFromHz(hz, Fs));
 	}
 
 	template<typename Float>
@@ -170,6 +170,12 @@ namespace smooth
 	}
 
 	template<typename Float>
+	void Smooth<Float>::makeFromFreqInHz(Float hz, Float Fs) noexcept
+	{
+		lowpass.makeFromDecayInHz(hz, Fs);
+	}
+
+	template<typename Float>
 	Smooth<Float>::Smooth(float startVal) :
 		block(startVal),
 		lowpass(startVal),
@@ -227,6 +233,12 @@ namespace smooth
 		return smoothing;
 	}
 
+	template<typename Float>
+	Float Smooth<Float>::operator()(Float _dest) noexcept
+	{
+		return lowpass(_dest);
+	}
+	
 	template struct Smooth<float>;
 	template struct Smooth<double>;
 }

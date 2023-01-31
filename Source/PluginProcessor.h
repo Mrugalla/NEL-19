@@ -5,6 +5,7 @@
 #include "dsp/MidSideEncoder.h"
 #include "dsp/Modulator.h"
 #include "dsp/Vibrato.h"
+#include "dsp/Smooth.h"
 #include "oversampling/Oversampling.h"
 #include <JuceHeader.h>
 #include "modsys/ModSys.h"
@@ -13,6 +14,7 @@
 struct Nel19AudioProcessor :
     public juce::AudioProcessor
 {
+    using Smooth = smooth::Smooth<float>;
     static constexpr int NumActiveMods = 2;
 
     Nel19AudioProcessor();
@@ -60,7 +62,7 @@ struct Nel19AudioProcessor :
     std::vector<float> visualizerValues;
 private:
     const juce::CriticalSection mutex;
-    modSys6::Smooth depthSmooth, modsMixSmooth;
+    Smooth depthSmooth, modsMixSmooth;
     std::vector<float> depthBuf, modsMixBuf;
 
     void processBlockVibrato(juce::AudioBuffer<float>&, const juce::MidiBuffer&, int, int);
@@ -77,17 +79,20 @@ better oversampler
     sound
 remove unused interpolation types
     or fix them
-update parameter smoother
 wavetables
+    envfol (limiter mit tanh statt nur smooth)
     more (like fm maybe?)
     bigger
-    triangle: less random shit
+    triangle: less random shit (dialing in octaves?)
 modulation destinations
-    amp
-    filter
-    
-
-graphics / visualizer fps
+    +amp
+    +filter
+replace parameter range with withCentre
+    dropout
+        chance (10ms, 10sec, 420ms)
+        decay (1ms, 10sec, 40ms)
+    lfo
+        rate (0hz, 40hz, 2hz)
 
 debugger:
 

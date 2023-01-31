@@ -1,5 +1,6 @@
 #pragma once
 #include "../modsys/ModSys.h"
+#include "Smooth.h"
 
 namespace drywet
 {
@@ -62,12 +63,12 @@ namespace drywet
 		using Buffer = std::array<std::vector<float>, 3>;
 
 		Processor(int _numChannels) :
-			mixSmooth(false),
+			mixSmooth(0.f),
 			dryBuffer(), paramBuffer(),
 			numChannels(_numChannels),
 			
 			gainWet(420.f), gainWetVal(1.f),
-			gainWetSmooth(false),
+			gainWetSmooth(0.f),
 
 			lookaheadEnabled(true),
 			lookaheadState(true)
@@ -81,8 +82,8 @@ namespace drywet
 		
 		void prepare(float sampleRate, int maxBufferSize, int latency)
 		{
-			modSys6::Smooth::makeFromDecayInMs(mixSmooth, 10.f, sampleRate);
-			modSys6::Smooth::makeFromDecayInMs(gainWetSmooth, 4.f, sampleRate);
+			mixSmooth.makeFromDecayInMs(10.f, sampleRate);
+			gainWetSmooth.makeFromDecayInMs(4.f, sampleRate);
 			for (auto& b : dryBuffer)
 				b.resize(maxBufferSize, 0.f);
 			for (auto& b : paramBuffer)
@@ -101,6 +102,7 @@ namespace drywet
 					return false;
 				}
 			}
+			
 			if (lookaheadState)
 			{
 				{
@@ -111,6 +113,7 @@ namespace drywet
 					dly.processBlock(dry, smpls, numSamples);
 					juce::FloatVectorOperations::copy(smpls, dry, numSamples);
 				}
+				
 				if (numChannelsOut == 2)
 				{
 					if(numChannelsIn < numChannelsOut)
@@ -142,8 +145,9 @@ namespace drywet
 			}
 			auto mixBuf = paramBuffer[2].data();
 			{ // SMOOTHEN PARAMETER VALUE pVAL
-				for (auto s = 0; s < numSamples; ++s)
-					mixBuf[s] = mixSmooth(mixVal);
+				auto mixSmoothing = mixSmooth(mixBuf, mixVal, numSamples);
+				if(!mixSmoothing)
+					juce::FloatVectorOperations::fill(mixBuf, mixVal, numSamples);
 			}
 			{ // MAKING EQUAL LOUDNESS CURVES
 				for (auto s = 0; s < numSamples; ++s)
@@ -193,8 +197,9 @@ namespace drywet
 			}
 			auto gainBuf = paramBuffer[2].data();
 			{
-				for (auto s = 0; s < numSamples; ++s)
-					gainBuf[s] = gainWetSmooth(gainWetVal);
+				auto gainWetSmoothing = gainWetSmooth(gainBuf, gainWetVal, numSamples);
+				if (!gainWetSmoothing)
+					juce::FloatVectorOperations::fill(gainBuf, gainWetVal, numSamples);
 			}
 			const auto pBuf0 = paramBuffer[0].data();
 			const auto pBuf1 = paramBuffer[1].data();
@@ -219,13 +224,13 @@ namespace drywet
 		bool isLookaheadEnabled() const noexcept { return lookaheadEnabled.load(); }
 	
 	protected:
-		modSys6::Smooth mixSmooth;
+		smooth::Smooth<float> mixSmooth;
 		std::array<FFDelay, 2> dryDelay;
 		Buffer dryBuffer, paramBuffer;
 		const int numChannels;
 
 		float gainWet, gainWetVal;
-		modSys6::Smooth gainWetSmooth;
+		smooth::Smooth<float> gainWetSmooth;
 
 		std::atomic<bool> lookaheadEnabled;
 		bool lookaheadState;

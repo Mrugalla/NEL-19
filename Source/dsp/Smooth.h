@@ -67,8 +67,11 @@ namespace smooth
 	template<typename Float>
 	struct Smooth
 	{
-		/* smoothLenMs, Fs, */
+		/* smoothLenMs, Fs */
 		void makeFromDecayInMs(Float, Float) noexcept;
+
+		/* freqHz, Fs */
+		void makeFromFreqInHz(Float, Float) noexcept;
 
 		Smooth(float /*startVal*/ = 0.f);
 
@@ -80,6 +83,9 @@ namespace smooth
 
 		/* buffer, numSamples */
 		bool operator()(Float*, int) noexcept;
+
+		/* value (this method is not for parameters!) */
+		Float operator()(Float) noexcept;
 
 	protected:
 		Block<Float> block;

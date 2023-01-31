@@ -36,7 +36,7 @@ Nel19AudioProcessor::Nel19AudioProcessor()
     visualizerValues(),
 
     mutex(),
-    depthSmooth(), modsMixSmooth(),
+    depthSmooth(0.f), modsMixSmooth(0.f),
     depthBuf(), modsMixBuf()
 #endif
 {
@@ -205,8 +205,8 @@ void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize)
 
     sampleRateF = static_cast<float>(sampleRate);
 #endif
-    modSys6::Smooth::makeFromDecayInMs(depthSmooth, 24.f, sampleRateF);
-    modSys6::Smooth::makeFromDecayInMs(modsMixSmooth, 24.f, sampleRateF);
+    depthSmooth.makeFromDecayInMs(24.f, sampleRateF);
+    modsMixSmooth.makeFromDecayInMs(24.f, sampleRateF);
     depthBuf.resize(maxBufferSize);
     modsMixBuf.resize(maxBufferSize);
 
@@ -383,6 +383,7 @@ void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& b, const
             );
             break;
         }
+        
         mod.processBlock(samplesRead, midi, curPlayHead, numChannelsIn, numChannelsOut, numSamples);
     }
 
@@ -390,11 +391,14 @@ void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& b, const
     {
         const auto modsMix = modSys.getParam(modSys6::PID::ModsMix)->getValueSum();
         const auto depth = modSys.getParam(modSys6::PID::Depth)->getValueSum();
-        for (auto s = 0; s < numSamples; ++s)
-        {
-            depthBuf[s] = depthSmooth(depth);
-            modsMixBuf[s] = modsMixSmooth(modsMix);
-        }
+        
+        auto modsMixSmoothing = modsMixSmooth(modsMixBuf.data(), modsMix, numSamples);
+		auto depthSmoothing = depthSmooth(depthBuf.data(), depth, numSamples);
+        
+        if(!modsMixSmoothing)
+			juce::FloatVectorOperations::fill(modsMixBuf.data(), modsMix, numSamples);
+		if (!depthSmoothing)
+			juce::FloatVectorOperations::fill(depthBuf.data(), depth, numSamples);
 
         for (auto ch = 0; ch < numChannelsOut; ++ch)
         {
@@ -428,6 +432,7 @@ void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& b, const
         oversampling.downsample(&b, numChannelsOut);
 #endif
 }
+
 void Nel19AudioProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     juce::ScopedNoDenormals noDenormals;
@@ -446,6 +451,7 @@ void Nel19AudioProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer,
     if (updateStuff)
         return prepareToPlay(getSampleRate(), getBlockSize());
 }
+
 bool Nel19AudioProcessor::hasEditor() const { return true; }
 
 juce::AudioProcessorEditor* Nel19AudioProcessor::createEditor()
@@ -508,7 +514,7 @@ void Nel19AudioProcessor::savePatch()
     }
 }
 
-void Nel19AudioProcessor::setStateInformation (const void* data, int sizeInBytes)
+void Nel19AudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
     juce::ScopedLock lock(mutex);
     std::unique_ptr<juce::XmlElement> xmlState(getXmlFromBinary(data, sizeInBytes));

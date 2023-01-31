@@ -149,7 +149,9 @@ namespace modSys6
 	}
 
 	enum class ModType { None, Macro, Perlin, LFO, NumTypes };
+	
 	static constexpr int NumModTypes = static_cast<int>(ModType::NumTypes);
+	
 	inline juce::String toString(ModType t)
 	{
 		switch (t)
@@ -160,6 +162,7 @@ namespace modSys6
 		default: return "";
 		}
 	}
+	
 	struct ModTypeContext
 	{
 		ModTypeContext(ModType t = ModType::None, int _idx = -1) :
@@ -170,9 +173,13 @@ namespace modSys6
 		ModType type; int idx;
 
 		bool valid() const noexcept { return type != ModType::None; }
+		
 		bool operator==(ModTypeContext o) const noexcept { return type == o.type && idx == o.idx; }
+		
 		bool operator!=(ModTypeContext o) const noexcept { return !this->operator==(o); }
+		
 	};
+	
 	inline juce::String toString(ModTypeContext mtc)
 	{
 		return toString(mtc.type) + juce::String(mtc.idx);
@@ -182,6 +189,7 @@ namespace modSys6
 	using StrToValFunc = std::function<float(const juce::String&)>;
 
 	enum class BeatType { Whole, Triplet, Dotted, NumTypes };
+	
 	inline juce::String toString(BeatType t)
 	{
 		switch (t)
@@ -192,6 +200,7 @@ namespace modSys6
 		default: return "";
 		}
 	}
+	
 	inline juce::String toString(float whole, BeatType t)
 	{
 		if(whole >= 1.f)
@@ -213,109 +222,6 @@ namespace modSys6
 		default: return "";
 		}
 	}
-
-	struct Smooth
-	{
-		static void makeFromDecayInSamples(Smooth& s, float d) noexcept
-		{
-			const auto e = 2.71828182846f;
-			const auto x = std::pow(e, -1.f / d);
-			s.setX(x);
-		}
-		static void makeFromDecayInSecs(Smooth& s, float d, float Fs) noexcept
-		{
-			makeFromDecayInSamples(s, d * Fs);
-		}
-		static void makeFromDecayInFc(Smooth& s, float fc) noexcept
-		{
-			static constexpr float e = 2.71828182846f;
-			const auto x = std::pow(e, -tau * fc);
-			s.setX(x);
-		}
-		static void makeFromDecayInHz(Smooth& s, float d, float Fs) noexcept
-		{
-			makeFromDecayInFc(s, d / Fs);
-		}
-		static void makeFromDecayInMs(Smooth& s, float d, float Fs) noexcept
-		{
-			makeFromDecayInSamples(s, d * Fs * .001f);
-		}
-
-		Smooth(const bool _snap = true, const float startVal = 0.f) :
-			a0(1.f),
-			b1(0.f),
-			y1(startVal),
-			eps(0.f),
-			snap(_snap)
-		{}
-		void reset()
-		{
-			a0 = 1.f;
-			b1 = 0.f;
-			y1 = 0.f;
-			eps = 0.f;
-		}
-		void setX(float x) noexcept
-		{
-			a0 = 1.f - x;
-			b1 = x;
-			eps = a0 * 1.5f;
-		}
-		void operator()(float* buffer, float val, int numSamples) noexcept
-		{
-			if (buffer[0] == val)
-				return juce::FloatVectorOperations::fill(buffer, val, numSamples);
-			for (auto s = 0; s < numSamples; ++s)
-				buffer[s] = processSample(val);
-		}
-		void operator()(float* buffer, int numSamples) noexcept
-		{
-			for (auto s = 0; s < numSamples; ++s)
-				buffer[s] = processSample(buffer[s]);
-		}
-		float operator()(float sample) noexcept
-		{
-			return processSample(sample);
-		}
-	protected:
-		float a0, b1, y1, eps;
-		const bool snap;
-
-		float processSample(float x0) noexcept
-		{
-			if (snap && std::abs(y1 - x0) < eps)
-				y1 = x0;
-			else
-				y1 = x0 * a0 + y1 * b1;
-			return y1;
-		}
-	};
-	
-	struct Smooth2
-	{
-		void makeFromDecayInMs(float d, float Fs) noexcept
-		{
-			for (auto& s : smooth)
-				Smooth::makeFromDecayInMs(s, d, Fs);
-		}
-
-		Smooth2(const bool snap = true, const int order = 2) :
-			smooth(snap)
-		{
-			for (auto o = 0; o < order; ++o)
-				smooth.push_back(snap);
-		}
-		void reset() { for (auto& s : smooth) s.reset(); }
-		void setX(float x) { for (auto& s : smooth) s.setX(x); }
-		float operator()(float sample) noexcept
-		{
-			for (auto& s : smooth)
-				sample = s(sample);
-			return sample;
-		}
-	protected:
-		std::vector<Smooth> smooth;
-	};
 
 	struct StateIDs
 	{
@@ -342,6 +248,7 @@ namespace modSys6
 			const float val;
 			const juce::String str;
 		};
+		
 		inline void create(std::vector<Beat>& beats, const float min, const float max)
 		{
 			auto c = 1.f / min;
