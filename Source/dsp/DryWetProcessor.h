@@ -3,7 +3,10 @@
 
 namespace drywet
 {
-	inline juce::String getLookaheadID() { return "lookaheadEnabled"; }
+	inline juce::String getLookaheadID()
+	{
+		return "lookaheadEnabled";
+	}
 
 	struct FFDelay
 	{
@@ -11,12 +14,14 @@ namespace drywet
 			ringBuffer(),
 			wHead(0), rHead(0)
 		{}
+		
 		void resize(const int size)
 		{
 			ringBuffer.resize(size, 0.f);
 			wHead = 0;
 			rHead = 1;
 		}
+		
 		void processBlock(float* dry, const int numSamples) noexcept
 		{
 			for (auto s = 0; s < numSamples; ++s)
@@ -31,6 +36,7 @@ namespace drywet
 					rHead = 0;
 			}
 		}
+		
 		void processBlock(float* dest, const float* src, const int numSamples) noexcept
 		{
 			for (auto s = 0; s < numSamples; ++s)
@@ -45,6 +51,7 @@ namespace drywet
 					rHead = 0;
 			}
 		}
+	
 	protected:
 		std::vector<float> ringBuffer;
 		size_t wHead, rHead;
@@ -66,10 +73,12 @@ namespace drywet
 			lookaheadState(true)
 		{
 		}
+		
 		void setLookaheadEnabled(bool e) noexcept
 		{
 			lookaheadEnabled.store(e);
 		}
+		
 		void prepare(float sampleRate, int maxBufferSize, int latency)
 		{
 			modSys6::Smooth::makeFromDecayInMs(mixSmooth, 10.f, sampleRate);
@@ -81,6 +90,7 @@ namespace drywet
 			for (auto ch = 0; ch < numChannels; ++ch)
 				dryDelay[ch].resize(latency);
 		}
+		
 		bool processBypass(float* const* samples, int numChannelsIn, int numChannelsOut, int numSamples) noexcept
 		{
 			{ // CHECK IF LOOKAHEAD STATE CHANGED
@@ -119,6 +129,7 @@ namespace drywet
 			}
 			return true;
 		}
+		
 		bool saveDry(const float* const* samples, float mixVal, int numChannelsIn, int numChannelsOut, int numSamples) noexcept
 		{
 			{ // CHECK IF LOOKAHEAD STATE CHANGED
@@ -172,6 +183,7 @@ namespace drywet
 			}
 			return true;
 		}
+		
 		void processWet(float* const* samples, float _gainWet, int numChannelsIn, int numChannelsOut, int numSamples) noexcept
 		{
 			if (gainWet != _gainWet)
@@ -203,7 +215,9 @@ namespace drywet
 					smpls[s] = dry[s] * pBuf0[s] + smpls[s] * pBuf1[s] * gainBuf[s];
 			}
 		}
+		
 		bool isLookaheadEnabled() const noexcept { return lookaheadEnabled.load(); }
+	
 	protected:
 		modSys6::Smooth mixSmooth;
 		std::array<FFDelay, 2> dryDelay;

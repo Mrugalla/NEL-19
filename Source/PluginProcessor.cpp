@@ -235,7 +235,7 @@ void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize)
 
 void Nel19AudioProcessor::releaseResources() {}
 
-bool Nel19AudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
+bool Nel19AudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 {
     return
         (layouts.getMainInputChannelSet() == juce::AudioChannelSet::disabled()
