@@ -210,6 +210,7 @@ namespace modSys6
 	}
 
 	enum class WaveForm { Sine, Triangle, Saw, Square, Noise, NumWaveForms };
+	
 	inline juce::String toString(WaveForm wf)
 	{
 		switch (wf)
@@ -305,6 +306,7 @@ namespace modSys6
 			const auto a = bias * .5f + .5f;
 			const auto a2 = 2.f * a;
 			const auto aM = 1.f - a;
+
 			const auto r = end - start;
 			const auto aR = r * a;
 			if (bias != 0.f)
@@ -313,15 +315,58 @@ namespace modSys6
 					start, end,
 					[a2, aM, aR](float min, float, float x)
 					{
-						return min + aR * x / (aM - x + a2 * x);
+						const auto denom = aM - x + a2 * x;
+						if (denom == 0.f)
+							return min;
+						return min + aR * x / denom;
 					},
 					[a2, aM, aR](float min, float, float x)
 					{
-						return aM * (x - min) / (a2 * min + aR - a2 * x - min + x);
+						const auto denom = a2 * min + aR - a2 * x - min + x;
+						if (denom == 0.f)
+							return 0.f;
+						auto val = aM * (x - min) / denom;
+						return val > 1.f ? 1.f : val;
 					},
-					nullptr
+					[](float min, float max, float x)
+					{
+						return x < min ? min : x > max ? max : x;
+					}
 			};
 			else return { start, end };
+		}
+
+		inline juce::NormalisableRange<float> withCentre(float start, float end, float centre) noexcept
+		{
+			const auto r = end - start;
+			const auto v = (centre - start) / r;
+
+			return biasXL(start, end, 2.f * v - 1.f);
+		}
+
+		inline juce::NormalisableRange<float> quad(float min, float max, int numSteps) noexcept
+		{
+			return
+			{
+				min, max,
+				[numSteps, range = max - min](float start, float, float x)
+				{
+					for (auto i = 0; i < numSteps; ++i)
+						x *= x;
+					return start + x * range;
+				},
+				[numSteps, rangeInv = 1.f / (max - min)](float start, float, float x)
+				{
+					x = (x - start) * rangeInv;
+					for (auto i = 0; i < numSteps; ++i)
+						x = std::sqrt(x);
+					return x;
+				},
+				[](float start, float end, float x)
+				{
+					return juce::jlimit(start, end, x);
+				}
+			};
 		}
 
 		inline juce::NormalisableRange<float> toggle()
@@ -514,7 +559,12 @@ namespace modSys6
 			};
 
 			const auto valToStrPercent = [](float v) { return juce::String(std::floor(v * 100.f)) + " " + toString(Unit::Percent); };
-			const auto valToStrHz = [](float v) { return juce::String(v).substring(0, 4) + " " + toString(Unit::Hz); };
+			const auto valToStrHz = [](float v)
+			{
+				if(v < 0.005f)
+					return "0 " + toString(Unit::Hz);
+				return juce::String(v).substring(0, 4) + " " + toString(Unit::Hz);
+			};
 			const auto valToStrBeats = [&bts = beatsData](float v) { return bts[static_cast<int>(v)].str; };
 			const auto valToStrPhase = [](float v) { return juce::String(std::floor(v * 180.f)) + " " + toString(Unit::Degree); };
 			const auto valToStrPhase360 = [](float v) { return juce::String(std::floor(v * 360.f)) + " " + toString(Unit::Degree); };
@@ -670,7 +720,7 @@ namespace modSys6
 			for (auto m = 0; m < 2; ++m)
 			{
 				const auto offset = m * NumParamsPerMod;
-				params.push_back(new Param(withOffset(PID::Perlin0FreqHz, offset), makeRange::biasXL(.2f, 20.f, -.8f), 6.f, valToStrHz, strToValHz, Unit::Hz));
+				params.push_back(new Param(withOffset(PID::Perlin0FreqHz, offset), makeRange::withCentre(.2f, 40.f, 2.f), 6.f, valToStrHz, strToValHz, Unit::Hz));
 				params.push_back(new Param(withOffset(PID::Perlin0Octaves, offset), makeRange::biasXL(1.f, 8.f, 0.f), 4.f, valToStrOct, strToValOct, Unit::Octaves));
 				params.push_back(new Param(withOffset(PID::Perlin0Width, offset), makeRange::biasXL(0.f, 1.f, 0), 1.f, valToStrPercent, strToValPercent, Unit::Percent));
 				params.push_back(new Param(withOffset(PID::Perlin0Seed, offset), makeRange::biasXL(0.f, 1.f, 0.f), 0.f, valToStrSeed, strToValSeed, Unit::NumUnits));
@@ -685,10 +735,10 @@ namespace modSys6
 				params.push_back(new Param(withOffset(PID::AudioRate0Sus, offset), makeRange::biasXL(0.f, 1.f, 0.f), 1.f, valToStrPercent, strToValPercent, Unit::Percent));
 				params.push_back(new Param(withOffset(PID::AudioRate0Rls, offset), makeRange::biasXL(1.f, 2000.f, -.9f), 20.f, valToStrMs, strToValMs, Unit::Ms));
 
-				params.push_back(new Param(withOffset(PID::Dropout0Decay, offset), makeRange::biasXL(10.f, 8000.f, -.95f), 1000.f, valToStrMs, strToValMs, Unit::Ms));
+				params.push_back(new Param(withOffset(PID::Dropout0Decay, offset), makeRange::quad(10.f, 10000.f, 3), 1000.f, valToStrMs, strToValMs, Unit::Ms));
 				params.push_back(new Param(withOffset(PID::Dropout0Spin, offset), makeRange::biasXL(.1f, 40.f, -.6f), 4.f, valToStrHz, strToValHz, Unit::Hz));
-				params.push_back(new Param(withOffset(PID::Dropout0Chance, offset), makeRange::biasXL(10.f, 8000.f, -.95f), 1000.f, valToStrMs, strToValMs, Unit::Ms));
-				params.push_back(new Param(withOffset(PID::Dropout0Smooth, offset), makeRange::biasXL(.01f, 20.f, -.7f), 4.f, valToStrHz, strToValHz, Unit::Hz));
+				params.push_back(new Param(withOffset(PID::Dropout0Chance, offset), makeRange::quad(10.f, 10000.f, 2), 1000.f, valToStrMs, strToValMs, Unit::Ms));
+				params.push_back(new Param(withOffset(PID::Dropout0Smooth, offset), makeRange::withCentre(.01f, 20.f, 2.f), 4.f, valToStrHz, strToValHz, Unit::Hz));
 				params.push_back(new Param(withOffset(PID::Dropout0Width, offset), makeRange::biasXL(0.f, 1.f, 0.f), 0.f, valToStrPercent, strToValPercent, Unit::Percent));
 
 				params.push_back(new Param(withOffset(PID::EnvFol0Attack, offset), makeRange::biasXL(1.f, 2000.f, -.9f), 80.f, valToStrMs, strToValMs, Unit::Ms));
@@ -702,7 +752,7 @@ namespace modSys6
 				static constexpr float LFOPhaseStep = 5.f / 360.f;
 
 				params.push_back(new Param(withOffset(PID::LFO0FreeSync, offset), makeRange::toggle(), 1.f, valToStrFreeSync, strToValFreeSync, Unit::NumUnits));
-				params.push_back(new Param(withOffset(PID::LFO0RateFree, offset), makeRange::biasXL(0.f, 20.f, -.8f), 4.f, valToStrHz, strToValHz, Unit::Hz));
+				params.push_back(new Param(withOffset(PID::LFO0RateFree, offset), makeRange::quad(0.f, 40.f, 2), 4.f, valToStrHz, strToValHz, Unit::Hz));
 				params.push_back(new Param(withOffset(PID::LFO0RateSync, offset), makeRange::temposync(static_cast<int>(beatsData.size()) - 1), 9.f, valToStrBeats, strToValBeats, Unit::Beats));
 				params.push_back(new Param(withOffset(PID::LFO0Waveform, offset), makeRange::biasXL(0.f, 1.f, 0.f), 0.f, valToStrEmpty, strToValPercent, Unit::NumUnits));
 				params.push_back(new Param(withOffset(PID::LFO0Phase, offset), makeRange::stepped(-.5f, .5f, LFOPhaseStep), 0.f, valToStrPhase360, strToValPhase, Unit::Degree));
