@@ -74,6 +74,8 @@ private:
 
 todo:
 
+perlin
+    procedural not smooth
 better oversampler
     performance
     sound

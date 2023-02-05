@@ -2,7 +2,7 @@
 #include "PluginEditor.h"
 #define RemoveValueTree false
 #define OversamplingEnabled true
-#define DebugModsBuffer false
+#define DebugModsBuffer true
 
 Nel19AudioProcessor::Nel19AudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations

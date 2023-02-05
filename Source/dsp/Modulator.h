@@ -707,6 +707,14 @@ namespace vibrato
 					const auto posInfo = playHead->getPosition();
 					if (posInfo.hasValue())
 					{
+						const auto isPlaying = posInfo->getIsPlaying();
+						if (!isPlaying)
+						{
+							for (auto ch = 0; ch < numChannelsOut; ++ch)
+								juce::FloatVectorOperations::clear(buffer[ch].data(), numSamples);
+							return;
+						}
+						
 						const auto ppqO = posInfo->getPpqPosition();
 						if (ppqO.hasValue())
 						{
@@ -722,9 +730,11 @@ namespace vibrato
 							phs *= noiseSizeInv;
 							
 							phasor.phase = static_cast<double>(phs);
+							DBG(phasor.phase << "; " << noiseSizeF);
 						}
 					}
-					phasor.setFrequencyHz(1.5 * static_cast<double>(rate * noiseSizeInv));
+					//phasor.setFrequencyHz(1.935 * static_cast<double>(rate * noiseSizeInv));
+					phasor.setFrequencyHz(static_cast<double>(rate * noiseSizeInv));
 
 					for (auto s = 0; s < numSamples; ++s)
 					{
@@ -746,7 +756,6 @@ namespace vibrato
 						}
 					else
 					{
-						phasor.setFrequencyHz(static_cast<double>(rate * noiseSizeInv));
 						for (auto s = 0; s < numSamples; ++s)
 						{
 							auto phs = static_cast<float>(phasor.process());
@@ -763,20 +772,24 @@ namespace vibrato
 					{
 						const auto octV = octBuf[s];
 						const auto oFloorF = std::floor(octV);
+						const auto oFloorInt = static_cast<int>(oFloorF);
+						const auto oFloorCeil = oFloorInt + 1;
 						octBuf[s] = octV - oFloorF;
-						octFloorBuf[s] = static_cast<int>(oFloorF);
-						octCeilBuf[s] = octFloorBuf[s] + 1;
+						octFloorBuf[s] = oFloorInt;
+						octCeilBuf[s] = oFloorCeil;
 					}
 				else
 				{
 					const auto octV = octaves;
 					const auto oFloorF = std::floor(octV);
 					const auto oFloorInt = static_cast<int>(oFloorF);
+					const auto oCeilInt = oFloorInt + 1;
 					octaves = octV - oFloorF;
 					for (auto s = 0; s < numSamples; ++s)
 					{
+						octBuf[s] = octaves;
 						octFloorBuf[s] = oFloorInt;
-						octCeilBuf[s] = oFloorInt + 1;
+						octCeilBuf[s] = oCeilInt;
 					}
 				}
 
@@ -1087,7 +1100,7 @@ namespace vibrato
 		
 		public:
 			Dropout(int _numChannels) :
-				smoothSmooth(1.f), widthSmooth(0.f),
+				widthSmooth(0.f),
 				widthBuf(),
 				
 				phasor(),
@@ -1122,8 +1135,7 @@ namespace vibrato
 					s.makeFromFreqInHz(freqSmooth, fs);
 				
 				spinV = 1.f / (fs * FreqCoeff / (spin * spin));
-
-				smoothSmooth.makeFromDecayInMs(40.f, fs);
+				
 				widthSmooth.makeFromDecayInMs(10.f, fs);
 				widthBuf.resize(blockSize);
 			}
@@ -1167,13 +1179,7 @@ namespace vibrato
 					}
 				}
 				
-				//auto smoothBuf = buffer[2].data();
 				{ // SYNTHESIZE MOD
-					//auto smoothSmoothing = smoothSmooth(smoothBuf, freqSmooth, numSamples);
-					//if(!smoothSmoothing)
-						//for (auto ch = 0; ch < numChannelsOut; ++ch)
-							//juce::FloatVectorOperations::fill(smoothBuf, freqSmooth, numSamples);
-
 					for (auto ch = 0; ch < numChannelsOut; ++ch)
 					{
 						auto buf = buffer[ch].data();
@@ -1235,7 +1241,7 @@ namespace vibrato
 			}
 			
 		protected:
-			SmoothF smoothSmooth, widthSmooth;
+			SmoothF widthSmooth;
 			std::vector<float> widthBuf;
 
 			std::array<Phasor<float>, 2> phasor;
