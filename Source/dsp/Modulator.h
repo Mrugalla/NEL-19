@@ -5,6 +5,7 @@
 #include "Smooth.h"
 
 #define DebugAudioRateEnv false
+#define DebugPerlinPhase false
 
 namespace vibrato
 {
@@ -720,17 +721,13 @@ namespace vibrato
 						{
 							const auto ppq = static_cast<float>(*ppqO);
 							
-							auto phs = seed + ppq * rate;
-
-							const auto phsFrac = phs - std::floor(phs);
-							auto phsInt = static_cast<int>(phs);
-							phsInt %= noiseSize;
-							phs = static_cast<float>(phsInt) + phsFrac;
-
+							//auto phs = seed + ppq * rate;
+							auto phs = ppq * rate * .498;
+							phs = std::fmod(phs, noiseSizeF);
 							phs *= noiseSizeInv;
 							
 							phasor.phase = static_cast<double>(phs);
-							DBG(phasor.phase << "; " << noiseSizeF);
+							
 						}
 					}
 					//phasor.setFrequencyHz(1.935 * static_cast<double>(rate * noiseSizeInv));
@@ -793,9 +790,14 @@ namespace vibrato
 					}
 				}
 
+#if DebugPerlinPhase
+				for (auto ch = 0; ch < numChannelsOut; ++ch)
+					for (auto s = 0; s < numSamples; ++s)
+						buffer[ch][s] = phasorBuf[s] * noiseSizeInv;
+#else
 				// PERFORM PERLIN NOISE
 				synthesizePerlin(buffer[0].data(), phasorBuf, octBuf, 0.f, numSamples);
-
+				
 				if (numChannelsOut == 2)
 				{
 					synthesizePerlin(buffer[1].data(), phasorBuf, octBuf, noiseSizeHalf, numSamples);
@@ -808,6 +810,7 @@ namespace vibrato
 						for (auto s = 0; s < numSamples; ++s)
 							buffer[1][s] = buffer[0][s] + widthV * (buffer[1][s] - buffer[0][s]);
 				}
+#endif
 			}
 		
 		protected:
@@ -1991,3 +1994,4 @@ make konami mod
 */
 
 #undef DebugAudioRateEnv
+#undef DebugPerlinPhase
