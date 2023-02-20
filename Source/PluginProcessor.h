@@ -51,7 +51,7 @@ struct Nel19AudioProcessor :
     modSys6::ModSys modSys;
 
     midSide::Processor midSideProcessor;
-    oversampling::Processor oversampling;
+    oversampling::OversamplerWithShelf oversampling;
     
     std::array<vibrato::Modulator, NumActiveMods> modulators;
     std::array<std::vector<float>, 2> modsBuffer;

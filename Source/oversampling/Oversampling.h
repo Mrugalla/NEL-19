@@ -208,6 +208,80 @@ namespace oversampling
 
 		int numSamples1x, numSamples2x, numSamples4x;
 	};
+
+	struct OversamplerWithShelf
+	{
+		OversamplerWithShelf(juce::AudioProcessor* p) :
+			processor(p),
+			filters(),
+			coefficients(),
+			cutoff(1.f),
+			q(1.f),
+			gain(0.f)
+		{}
+
+		void prepareToPlay(const double sampleRate, const int _blockSize)
+		{
+			processor.prepareToPlay(sampleRate, _blockSize);
+
+			juce::dsp::ProcessSpec spec;
+			spec.sampleRate = sampleRate;
+			spec.maximumBlockSize = _blockSize;
+			spec.numChannels = 2;
+
+			cutoff = 20000.;
+			gain = juce::Decibels::decibelsToGain(14.436 * .5);
+			q = .229;
+			coefficients = juce::dsp::IIR::Coefficients<float>::makeHighShelf(sampleRate, cutoff, q, gain);
+
+			for (auto& filter : filters)
+			{
+				filter.reset();
+				filter.prepare(spec);
+				filter.coefficients = coefficients;
+			}
+		}
+		/* processing methods */
+		juce::AudioBuffer<float>* upsample(juce::AudioBuffer<float>& input, int numChannelsIn, int numChannelsOut)
+		{
+			return processor.upsample(input, numChannelsIn, numChannelsOut);
+		}
+		void downsample(juce::AudioBuffer<float>* outBuf, int numChannelsOut) noexcept
+		{
+			processor.downsample(outBuf, numChannelsOut);
+			for (auto ch = 0; ch < numChannelsOut; ++ch)
+			{
+				auto& filter = filters[ch];
+				juce::dsp::AudioBlock<float> block(*outBuf);
+				juce::dsp::ProcessContextReplacing<float> context(block);
+				filter.process(context);
+			}
+		}
+		bool processBlockEmpty()
+		{
+			return processor.processBlockEmpty();
+		}
+		////////////////////////////////////////
+		const double getSampleRateUpsampled() const noexcept { return processor.getSampleRateUpsampled(); }
+		const int getBlockSizeUp() const noexcept { return processor.getBlockSizeUp(); }
+		/* returns true if changing the state was successful */
+		void setEnabled(const bool e) noexcept
+		{
+			processor.setEnabled(e);
+		}
+		bool isEnabled() const noexcept { return processor.isEnabled(); }
+		int getLatency() const noexcept
+		{
+			return processor.getLatency();
+		}
+		static constexpr int getUpsamplingFactor() noexcept { return 4; }
+
+		Processor processor;
+
+		std::array<juce::dsp::IIR::Filter<float>, 2> filters;
+		juce::ReferenceCountedObjectPtr<juce::dsp::IIR::Coefficients<float>> coefficients;
+		float cutoff, q, gain;
+	};
 }
 
 /*
