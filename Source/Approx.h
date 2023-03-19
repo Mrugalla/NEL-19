@@ -35,6 +35,7 @@ namespace approx
     /* if x == -3: y = -1, if x == 3: y = 1 */
     inline float tanh(float x) noexcept
     {
-        return x * (27 + x * x) / (27 + 9 * x * x);
+        const auto xx = x * x;
+        return x * (27.f + xx) / (27.f + 9.f * xx);
     }
 }

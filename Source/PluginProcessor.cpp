@@ -272,9 +272,11 @@ void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     }
     auto samples = buffer.getArrayOfWritePointers();
 
-    if (!dryWet.saveDry(samplesRead, modSys.getParam(modSys6::PID::DryWetMix)->getValueSum(), numChannelsIn, numChannelsOut, numSamples))
+	const auto dryWetMix = modSys.getParam(modSys6::PID::DryWetMix)->getValueSum();
+    if (!dryWet.saveDry(samplesRead, dryWetMix, numChannelsIn, numChannelsOut, numSamples))
         return prepareToPlay(getSampleRate(), getBlockSize());
 
+    
 #if !DebugModsBuffer
     midSideProcessor.setEnabled(modSys.getParam(modSys6::PID::StereoConfig)->getValueSum() > .5f);
     if (midSideProcessor.enabled && numChannelsIn + numChannelsOut == 4)
@@ -290,16 +292,15 @@ void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     dryWet.processWet(samples, modSys.getParam(modSys6::PID::WetGain)->getValSumDenorm(), numChannelsIn, numChannelsOut, numSamples);
 }
 
-void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& b, const juce::MidiBuffer& midi, int numChannelsIn, int numChannelsOut)
+void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& bufferOut, const juce::MidiBuffer& midi, int numChannelsIn, int numChannelsOut)
 {
-    auto buffer = &b;
+    auto buffer = &bufferOut;
 #if OversamplingEnabled
-    buffer = oversampling.upsample(b, numChannelsIn, numChannelsOut);
-    {
-        const bool oversamplerUpdated = buffer == nullptr;
-        if (oversamplerUpdated) return;
-    }
-    const bool hasUpsampled = &b != buffer;
+    buffer = oversampling.upsample(bufferOut, numChannelsIn, numChannelsOut);
+    if (buffer == nullptr) // oversampling order changed
+        return;
+    
+    const bool hasUpsampled = &bufferOut != buffer;
 #endif
     const auto samplesRead = buffer->getArrayOfReadPointers();
     const auto numSamples = buffer->getNumSamples();
@@ -334,10 +335,14 @@ void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& b, const
         case vibrato::ModType::Perlin:
             mod.setParametersPerlin
             (
-                modSys.getParam(withOffset(PID::Perlin0FreqHz, offset))->getValSumDenorm(),
+                static_cast<double>(modSys.getParam(withOffset(PID::Perlin0RateHz, offset))->getValSumDenorm()),
+                static_cast<double>(modSys.getParam(withOffset(PID::Perlin0RateBeats, offset))->getValSumDenorm()),
                 modSys.getParam(withOffset(PID::Perlin0Octaves, offset))->getValSumDenorm(),
                 modSys.getParam(withOffset(PID::Perlin0Width, offset))->getValSumDenorm(),
-                modSys.getParam(withOffset(PID::Perlin0Seed, offset))->getValueSum()
+                modSys.getParam(withOffset(PID::Perlin0Phase, offset))->getValSumDenorm(),
+				perlin::Shape(std::round(modSys.getParam(withOffset(PID::Perlin0Shape, offset))->getValSumDenorm())),
+                modSys.getParam(withOffset(PID::Perlin0RateType, offset))->getValueSum() > .5f,
+				modSys.getParam(withOffset(PID::Perlin0RandType, offset))->getValSumDenorm() > .5f
             );
             break;
         case vibrato::ModType::Dropout:
@@ -429,7 +434,7 @@ void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& b, const
     
 #if OversamplingEnabled
     if(hasUpsampled)
-        oversampling.downsample(&b, numChannelsOut);
+        oversampling.downsample(bufferOut, numChannelsOut, numSamples);
 #endif
 }
 
@@ -464,8 +469,8 @@ void Nel19AudioProcessor::getStateInformation (juce::MemoryBlock& destData)
     juce::ScopedLock lock(mutex);
     savePatch();
 #if RemoveValueTree
-    state.removeAllChildren(nullptr);
-    state.removeAllProperties(nullptr);
+    modSys.state.removeAllChildren(nullptr);
+    modSys.state.removeAllProperties(nullptr);
 #endif
     std::unique_ptr<juce::XmlElement> xml(modSys.state.createXml());
     copyXmlToBinary(*xml, destData);

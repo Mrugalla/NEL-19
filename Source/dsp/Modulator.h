@@ -3,9 +3,9 @@
 #include "../modsys/ModSys.h"
 #include <random>
 #include "Smooth.h"
+#include "Perlin.h"
 
 #define DebugAudioRateEnv false
-#define DebugPerlinPhase false
 
 namespace vibrato
 {
@@ -545,307 +545,69 @@ namespace vibrato
 		using BeatsData = modSys6::BeatsData;
 		using Tables = LFOTables;
 
-		class Perlin
+		struct Perlin
 		{
-			struct Perlinizer
+			using PlayHeadPos = perlin::PlayHeadPos;
+			using Shape = perlin::Shape;
+
+			Perlin() :
+				perlin(),
+				playHeadPos(),
+				rateHz(1.), rateBeats(1.),
+				octaves(1.f), width(0.f), phs(0.f),
+				shape(Shape::Spline),
+				temposync(false), procedural(true)
 			{
-				Perlinizer() :
-					gainAccum(1.f),
-					octavesPL(0)
-				{}
-				
-				void setParameters(const float* sclInv, int _octaves) noexcept
-				{
-					if (octavesPL != _octaves)
-					{
-						octavesPL = _octaves;
-						gainAccum = 0.f;
-						for (auto o = 0; o < octavesPL; ++o)
-							gainAccum += sclInv[o];
-						gainAccum = 1.f / gainAccum;
-					}
-				}
-				
-				void operator()(float* buffer, const float* phasorBuf, 
-					const float* scl, const float* sclInv, const float* noise, 
-					float noiseSizeF, float phaseOffset, int numSamples, const int* octBuf) noexcept
-				{
-					for (auto s = 0; s < numSamples; ++s)
-					{
-						setParameters(sclInv, octBuf[s]);
-
-						auto smpl = 0.f;
-						for (int o = 0; o < octavesPL; ++o)
-						{
-							auto x = phasorBuf[s] * scl[o] + phaseOffset;
-							while (x >= noiseSizeF)
-								x -= noiseSizeF;
-							smpl += interpolation::cubicHermiteSpline(noise, x) * sclInv[o];
-						}
-						smpl *= gainAccum;
-						buffer[s] = smpl;
-					}
-				}
-				
-				void operator()(float* buffer, const float* phasorBuf,
-					const float* scl, const float* sclInv, const float* noise,
-					float noiseSizeF, float phaseOffset, int numSamples,
-					const int* octBuf, const float* mix) noexcept
-				{
-					for (auto s = 0; s < numSamples; ++s)
-					{
-						setParameters(sclInv, octBuf[s]);
-
-						auto smpl = 0.f;
-						for (int o = 0; o < octavesPL; ++o)
-						{
-							auto x = phasorBuf[s] * scl[o] + phaseOffset;
-							while (x >= noiseSizeF)
-								x -= noiseSizeF;
-							smpl += interpolation::cubicHermiteSpline(noise, x) * sclInv[o];
-						}
-						smpl *= gainAccum;
-						buffer[s] += mix[s] * (smpl - buffer[s]);
-					}
-				}
-			
-			protected:
-				float gainAccum;
-				int octavesPL;
-			};
-			
-		public:
-			Perlin(int _numChannels, int _maxNumOctaves) :
-				freqSmooth(false), widthSmooth(false), octSmooth(4.f),
-				freqSmoothBuf(),
-				widthBuf(),
-				
-				phasor(),
-
-				noise(), scl(), sclInv(),
-
-				fs(0.f), fsInv(1.f),
-
-				rate(-1.f), width(-1.f), octaves(0.f), seed(0.f),
-
-				perlinizer0(), perlinizer1(),
-
-				maxNumOctaves(_maxNumOctaves),
-				noiseSize(1 << maxNumOctaves),
-				noiseSizeF(static_cast<float>(noiseSize)),
-				noiseSizeInv(.5f / noiseSizeF),
-				noiseSizeHalf(noiseSizeF * .5f),
-
-				widthV(1.f),
-
-				numChannels(_numChannels)
-			{
-				scl.reserve(maxNumOctaves + 1);
-				sclInv.reserve(maxNumOctaves + 1);
-				for (auto o = 0; o < maxNumOctaves + 1; ++o)
-				{
-					scl.emplace_back(static_cast<float>(1 << o));
-					sclInv.emplace_back(1.f / scl[o]);
-				}
-
-				noise.resize(noiseSize + 4); // + splineSize
-
-				unsigned int _seed = 420 * 69 / 666 * 42;
-				std::random_device rd;
-				std::mt19937 mt(rd());
-				std::uniform_real_distribution<float> dist(-.89f, .89f); // compensate spline overshoot
-
-				for (auto s = 0; s < noiseSize; ++s, ++_seed)
-				{
-					mt.seed(_seed);
-					noise[s] = dist(mt);
-				}
-				
-				for (auto s = noiseSize; s < noise.size(); ++s)
-					noise[s] = noise[s - noiseSize];
 			}
 
-			void prepare(float sampleRate, int blockSize) noexcept
+			void prepare(float sampleRate, int blockSize)
 			{
-				if (fs != sampleRate)
-				{
-					const auto oFloor = static_cast<int>(std::floor(octaves));
-					octFloorBuf.resize(blockSize, oFloor);
-					octCeilBuf.resize(blockSize, oFloor + 1);
-					fs = sampleRate;
-					fsInv = 1.f / fs;
-					phasor.prepare(static_cast<double>(sampleRate));
-					octSmooth.makeFromDecayInMs(10.f, sampleRate);
-					widthSmooth.makeFromDecayInMs(10.f, sampleRate);
-					freqSmooth.makeFromDecayInMs(10.f, sampleRate);
-					freqSmoothBuf.resize(blockSize);
-					widthBuf.resize(blockSize);
-				}
+				perlin.prepare(sampleRate, blockSize);
 			}
 
-			void setParameters(float _rate, float _octaves, float _width, float _seed) noexcept
+			void setParameters(double _rateHz, double _rateBeats,
+				float _octaves, float _width, float _phs,
+				Shape _shape, bool _temposync, bool _procedural) noexcept
 			{
-				rate = _rate;
+				rateHz = _rateHz;
+				rateBeats = _rateBeats;
 				octaves = _octaves;
-				if (width != _width)
-				{
-					width = _width;
-					static constexpr float bias = .8f;
-					static constexpr float b = 1.f / (1.f - bias);
-					widthV = std::pow(width, b);
-				}
-				
-				const auto numSeedWaves = 16.f;
-				seed = _seed * numSeedWaves;
+				width = _width;
+				phs = _phs;
+				shape = _shape;
+				temposync = _temposync;
+				procedural = _procedural;
 			}
 
 			void operator()(Buffer& buffer, int numChannelsOut, int numSamples, juce::AudioPlayHead* playHead) noexcept
 			{
-				// SEEDED PHASE SYNTHESIS
-				auto phasorBuf = buffer[2].data();
-				if(seed != 0.f && playHead != nullptr)
-				{
-					const auto posInfo = playHead->getPosition();
-					if (posInfo.hasValue())
-					{
-						const auto isPlaying = posInfo->getIsPlaying();
-						if (!isPlaying)
-						{
-							for (auto ch = 0; ch < numChannelsOut; ++ch)
-								juce::FloatVectorOperations::clear(buffer[ch].data(), numSamples);
-							return;
-						}
-						
-						const auto ppqO = posInfo->getPpqPosition();
-						if (ppqO.hasValue())
-						{
-							const auto ppq = static_cast<float>(*ppqO);
-							
-							//auto phs = seed + ppq * rate;
-							auto phs = ppq * rate * .498;
-							phs = std::fmod(phs, noiseSizeF);
-							phs *= noiseSizeInv;
-							
-							phasor.phase = static_cast<double>(phs);
-							
-						}
-					}
-					//phasor.setFrequencyHz(1.935 * static_cast<double>(rate * noiseSizeInv));
-					phasor.setFrequencyHz(static_cast<double>(rate * noiseSizeInv));
-
-					for (auto s = 0; s < numSamples; ++s)
-					{
-						phasor();
-						phasorBuf[s] = static_cast<float>(phasor.phase) * noiseSizeF;
-					}
-				}
-				else
-				{
-					// SYNTHESIZE PHASOR
-					auto freqSmoothing = freqSmooth(freqSmoothBuf.data(), static_cast<double>(rate * noiseSizeInv), numSamples);
-					if(freqSmoothing)
-						for (auto s = 0; s < numSamples; ++s)
-						{
-							const auto freqHz = freqSmoothBuf[s];
-							phasor.setFrequencyHz(freqHz);
-							auto phs = static_cast<float>(phasor.process());
-							phasorBuf[s] = phs * noiseSizeF;
-						}
-					else
-					{
-						for (auto s = 0; s < numSamples; ++s)
-						{
-							auto phs = static_cast<float>(phasor.process());
-							phasorBuf[s] = phs * noiseSizeF;
-						}
-					}
-				}
-			
-				// SYNTHESIZE OCT BUFFERS
-				auto octBuf = buffer[3].data();
-				auto octSmoothing = octSmooth(octBuf, octaves, numSamples);
-				if(octSmoothing)
-					for (auto s = 0; s < numSamples; ++s)
-					{
-						const auto octV = octBuf[s];
-						const auto oFloorF = std::floor(octV);
-						const auto oFloorInt = static_cast<int>(oFloorF);
-						const auto oFloorCeil = oFloorInt + 1;
-						octBuf[s] = octV - oFloorF;
-						octFloorBuf[s] = oFloorInt;
-						octCeilBuf[s] = oFloorCeil;
-					}
-				else
-				{
-					const auto octV = octaves;
-					const auto oFloorF = std::floor(octV);
-					const auto oFloorInt = static_cast<int>(oFloorF);
-					const auto oCeilInt = oFloorInt + 1;
-					octaves = octV - oFloorF;
-					for (auto s = 0; s < numSamples; ++s)
-					{
-						octBuf[s] = octaves;
-						octFloorBuf[s] = oFloorInt;
-						octCeilBuf[s] = oCeilInt;
-					}
-				}
-
-#if DebugPerlinPhase
-				for (auto ch = 0; ch < numChannelsOut; ++ch)
-					for (auto s = 0; s < numSamples; ++s)
-						buffer[ch][s] = phasorBuf[s] * noiseSizeInv;
-#else
-				// PERFORM PERLIN NOISE
-				synthesizePerlin(buffer[0].data(), phasorBuf, octBuf, 0.f, numSamples);
+				float* samples[] = { buffer[0].data(), buffer[1].data() };
+				playHead->getCurrentPosition(playHeadPos);
 				
-				if (numChannelsOut == 2)
-				{
-					synthesizePerlin(buffer[1].data(), phasorBuf, octBuf, noiseSizeHalf, numSamples);
-
-					auto widthSmoothing = widthSmooth(widthBuf.data(), widthV, numSamples);
-					if(widthSmoothing)
-						for (auto s = 0; s < numSamples; ++s)
-							buffer[1][s] = buffer[0][s] + widthBuf[s] * (buffer[1][s] - buffer[0][s]);
-					else
-						for (auto s = 0; s < numSamples; ++s)
-							buffer[1][s] = buffer[0][s] + widthV * (buffer[1][s] - buffer[0][s]);
-				}
-#endif
+				perlin
+				(
+					samples,
+					numChannelsOut,
+					numSamples,
+					playHeadPos,
+					rateHz,
+					rateBeats,
+					octaves,
+					width,
+					phs,
+					shape,
+					temposync,
+					procedural
+				);
 			}
 		
 		protected:
-			SmoothD freqSmooth;
-			SmoothF widthSmooth, octSmooth;
-			std::vector<double> freqSmoothBuf;
-			std::vector<float> widthBuf;
-
-			Phasor<double> phasor;
-			std::vector<float> noise, scl, sclInv;
-			std::vector<int> octFloorBuf, octCeilBuf;
-
-			float fs, fsInv;
-
-			float rate, width, octaves, seed;
-
-			Perlinizer perlinizer0, perlinizer1;
-
-			const int maxNumOctaves;
-			const int noiseSize;
-			const float noiseSizeF, noiseSizeInv, noiseSizeHalf;
-
-			float widthV;
-
-			const int numChannels;
-
-			void synthesizePerlin(float* buffer, const float* phasorBuf, const float* octBuf,
-				float phaseOffset, int numSamples) noexcept
-			{
-				perlinizer0(buffer, phasorBuf, scl.data(), sclInv.data(),
-					noise.data(), noiseSizeF, phaseOffset, numSamples, octFloorBuf.data());
-				perlinizer1(buffer, phasorBuf, scl.data(), sclInv.data(),
-					noise.data(), noiseSizeF, phaseOffset, numSamples, octCeilBuf.data(), octBuf);
-			}
-			
+			perlin::Perlin2 perlin;
+			PlayHeadPos playHeadPos;
+			double rateHz, rateBeats;
+			float octaves, width, phs;
+			Shape shape;
+			bool temposync, procedural;
 		};
 
 		class AudioRate
@@ -903,7 +665,7 @@ namespace vibrato
 				osc.resize(numChannels);
 			}
 			
-			void prepare(float sampleRate, int blockSize) noexcept
+			void prepare(float sampleRate, int blockSize)
 			{
 				Fs = sampleRate;
 				for(auto& o: osc)
@@ -1183,6 +945,9 @@ namespace vibrato
 				}
 				
 				{ // SYNTHESIZE MOD
+					const auto freqSmoothD = static_cast<double>(freqSmooth);
+					const auto fsD = static_cast<double>(fs);
+
 					for (auto ch = 0; ch < numChannelsOut; ++ch)
 					{
 						auto buf = buffer[ch].data();
@@ -1219,11 +984,11 @@ namespace vibrato
 							smpl = approx::tanh(piHalf * smpl * smpl * smpl);
 						}
 
-						smooth[ch].makeFromFreqInHz(freqSmooth, fs);
+						smooth[ch].makeFromFreqInHz(freqSmoothD, fsD);
 						for (auto s = 0; s < numSamples; ++s)
 						{
 							auto& smpl = buf[s];
-							smpl = smooth[ch](smpl);
+							smpl = static_cast<float>(smooth[ch](static_cast<double>(smpl)));
 						}	
 					}
 				}
@@ -1712,7 +1477,7 @@ namespace vibrato
 									
 									for (auto s = 0; s < numSamples; ++s)
 									{
-										buf[s] = phasor.phase + tempoSync.phaseSmooth(phaseV);
+										buf[s] = static_cast<float>(phasor.phase) + tempoSync.phaseSmooth(phaseV);
 										if (buf[s] < 0.f)
 											++buf[s];
 										else if (buf[s] >= 1.f)
@@ -1830,7 +1595,7 @@ namespace vibrato
 
 			tables(),
 
-			perlin(numChannels, 8),
+			perlin(),
 			audioRate(numChannels),
 			dropout(numChannels),
 			envFol(numChannels),
@@ -1887,9 +1652,11 @@ namespace vibrato
 		}
 
 		// parameters
-		void setParametersPerlin(float rate, float octaves, float width, float seed) noexcept
+		void setParametersPerlin(double _rateHz, double _rateBeats,
+			float _octaves, float _width, float _phs,
+			perlin::Shape _shape, bool _temposync, bool _procedural) noexcept
 		{
-			perlin.setParameters(rate, octaves, width, seed);
+			perlin.setParameters(_rateHz, _rateBeats, _octaves, _width, _phs, _shape, _temposync, _procedural);
 		}
 		
 		void setParametersAudioRate(float oct, float semi, float fine, float width, float retuneSpeed,
@@ -1994,4 +1761,3 @@ make konami mod
 */
 
 #undef DebugAudioRateEnv
-#undef DebugPerlinPhase

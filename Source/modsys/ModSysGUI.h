@@ -1690,7 +1690,7 @@ namespace modSys6
                 notify(NotificationType::ParameterDragged, this);
             }
 
-            void mouseDoubleClick(const juce::MouseEvent& evt) override
+            void mouseDoubleClick(const juce::MouseEvent&) override
             {
                 if (pType == ParameterType::Knob)
                 {

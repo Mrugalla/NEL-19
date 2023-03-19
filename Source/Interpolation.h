@@ -6,12 +6,20 @@ namespace interpolation
 {
 	static constexpr float Pi = 3.14159265359f;
 	
-	inline float sinc(const float xPi) noexcept { return std::sin(xPi) / xPi; }
+	inline float sinc(const float xPi) noexcept
+	{
+		return std::sin(xPi) / xPi;
+	}
 
 	namespace window
 	{
-		inline float lanczos(const float xPi, const float alphaInv) noexcept { return sinc(xPi * alphaInv); }
-		inline float circular(const float x, const float alphaInv) noexcept {
+		inline float lanczos(const float xPi, const float alphaInv) noexcept
+		{
+			return sinc(xPi * alphaInv);
+		}
+		
+		inline float circular(const float x, const float alphaInv) noexcept
+		{
 			const auto a = x * alphaInv;
 			return std::sqrt(1.f - a * a);
 		}
@@ -43,7 +51,10 @@ namespace interpolation
 		return sum;
 	}
 
-	inline float lerp(float a, float b, float x) noexcept { return a + x * (b - a); }
+	inline float lerp(float a, float b, float x) noexcept
+	{
+		return a + x * (b - a);
+	}
 
 	inline float lerp(const float* buffer, const float readHead, const int size)
 	{
@@ -52,6 +63,15 @@ namespace interpolation
 		auto i1 = i0 + 1;
 		if (i1 >= size)
 			i1 -= size;
+		const auto x = readHead - iFloor;
+		return lerp(buffer[i0], buffer[i1], x);
+	}
+
+	inline float lerp(const float* buffer, const float readHead)
+	{
+		const auto iFloor = std::floor(readHead);
+		const auto i0 = static_cast<int>(iFloor);
+		const auto i1 = i0 + 1;
 		const auto x = readHead - iFloor;
 		return lerp(buffer[i0], buffer[i1], x);
 	}

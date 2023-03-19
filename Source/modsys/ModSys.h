@@ -3,6 +3,33 @@
 
 namespace modSys6
 {
+	inline float nextLowestPowTwoX(float x) noexcept
+	{
+		return std::pow(2.f, std::floor(std::log2(x)));
+	}
+
+	inline bool stringNegates(const juce::String& t)
+	{
+		return t == "off"
+			|| t == "false"
+			|| t == "no"
+			|| t == "0"
+			|| t == "disabled"
+			|| t == "none"
+			|| t == "null"
+			|| t == "nil"
+			|| t == "nada"
+			|| t == "nix"
+			|| t == "nichts"
+			|| t == "niente"
+			|| t == "nope"
+			|| t == "nay"
+			|| t == "nein"
+			|| t == "njet"
+			|| t == "nicht"
+			|| t == "nichts";
+	}
+
 	static constexpr float tau = 6.28318530718f;
 	static constexpr float pi = 3.14159265359f;
 	static constexpr float piHalf = 1.57079632679f;
@@ -18,7 +45,7 @@ namespace modSys6
 	{
 		MSMacro0, MSMacro1, MSMacro2, MSMacro3,
 		
-		Perlin0FreqHz, Perlin0Octaves, Perlin0Width, Perlin0Seed,
+		Perlin0RateHz, Perlin0RateBeats, Perlin0Octaves, Perlin0Width, Perlin0RateType, Perlin0Phase, Perlin0Shape, Perlin0RandType,
 		AudioRate0Oct, AudioRate0Semi, AudioRate0Fine, AudioRate0Width, AudioRate0RetuneSpeed, AudioRate0Atk, AudioRate0Dcy, AudioRate0Sus, AudioRate0Rls,
 		Dropout0Decay, Dropout0Spin, Dropout0Chance, Dropout0Smooth, Dropout0Width,
 		EnvFol0Attack, EnvFol0Release, EnvFol0Gain, EnvFol0Width,
@@ -26,7 +53,7 @@ namespace modSys6
 		Pitchbend0Smooth,
 		LFO0FreeSync, LFO0RateFree, LFO0RateSync, LFO0Waveform, LFO0Phase, LFO0Width,
 
-		Perlin1FreqHz, Perlin1Octaves, Perlin1Width, Perlin1Seed,
+		Perlin1RateHz, Perlin1RateBeats, Perlin1Octaves, Perlin1Width, Perlin1RateType, Perlin1Phase, Perlin1Shape, Perlin1RandType,
 		AudioRate1Oct, AudioRate1Semi, AudioRate1Fine, AudioRate1Width, AudioRate1RetuneSpeed, AudioRate1Atk, AudioRate1Dcy, AudioRate1Sus, AudioRate1Rls,
 		Dropout1Decay, Dropout1Spin, Dropout1Chance, Dropout1Smooth, Dropout1Width,
 		EnvFol1Attack, EnvFol1Release, EnvFol1Gain, EnvFol1Width,
@@ -40,7 +67,7 @@ namespace modSys6
 	};
 	
 	static constexpr int NumMSParams = static_cast<int>(PID::MSMacro3) + 1;
-	static constexpr int NumParamsPerMod = static_cast<int>(PID::Perlin1FreqHz) - NumMSParams;
+	static constexpr int NumParamsPerMod = static_cast<int>(PID::Perlin1RateHz) - NumMSParams;
 	static constexpr int NumParams = static_cast<int>(PID::NumParams);
 	
 	inline juce::String toString(PID pID)
@@ -52,10 +79,14 @@ namespace modSys6
 		case PID::MSMacro2: return "MS Macro 2";
 		case PID::MSMacro3: return "MS Macro 3";
 
-		case PID::Perlin0FreqHz: return "Perlin 0 Freq Hz";
+		case PID::Perlin0RateHz: return "Perlin 0 Rate Hz";
+		case PID::Perlin0RateBeats: return "Perlin 0 Rate Beats";
 		case PID::Perlin0Octaves: return "Perlin 0 Octaves";
 		case PID::Perlin0Width: return "Perlin 0 Width";
-		case PID::Perlin0Seed: return "Perlin 0 Seed";
+		case PID::Perlin0RateType: return "Perlin 0 Rate Type";
+		case PID::Perlin0Phase: return "Perlin 0 Phase";
+		case PID::Perlin0Shape: return "Perlin 0 Shape";
+		case PID::Perlin0RandType: return "Perlin 0 Rand Type";
 		case PID::AudioRate0Oct: return "AudioRate 0 Oct";
 		case PID::AudioRate0Semi: return "AudioRate 0 Semi";
 		case PID::AudioRate0Fine: return "AudioRate 0 Fine";
@@ -83,10 +114,14 @@ namespace modSys6
 		case PID::LFO0Phase: return "LFO 0 Phase";
 		case PID::LFO0Width: return "LFO 0 Width";
 
-		case PID::Perlin1FreqHz: return "Perlin 1 Freq Hz";
+		case PID::Perlin1RateHz: return "Perlin 1 Rate Hz";
+		case PID::Perlin1RateBeats: return "Perlin 1 Rate Beats";
 		case PID::Perlin1Octaves: return "Perlin 1 Octaves";
 		case PID::Perlin1Width: return "Perlin 1 Width";
-		case PID::Perlin1Seed: return "Perlin 1 Seed";
+		case PID::Perlin1RateType: return "Perlin 1 Rate Type";
+		case PID::Perlin1Phase: return "Perlin 1 Phase";
+		case PID::Perlin1Shape: return "Perlin 1 Shape";
+		case PID::Perlin1RandType: return "Perlin 1 Rand Type";
 		case PID::AudioRate1Oct: return "AudioRate 1 Oct";
 		case PID::AudioRate1Semi: return "AudioRate 1 Semi";
 		case PID::AudioRate1Fine: return "AudioRate 1 Fine";
@@ -129,7 +164,7 @@ namespace modSys6
 		return static_cast<int>(p) + o;
 	}
 
-	enum class Unit { Percent, Hz, Beats, Degree, Octaves, Semi, Fine, Ms, Decibel, NumUnits };
+	enum class Unit { Percent, Hz, Beats, Degree, Octaves, Semi, Fine, Ms, Decibel, Power, PerlinShape, PerlinRandType, NumUnits };
 	
 	inline juce::String toString(Unit pID)
 	{
@@ -369,34 +404,115 @@ namespace modSys6
 			};
 		}
 
-		inline juce::NormalisableRange<float> toggle()
+		inline juce::NormalisableRange<float> stepped(float start, float end, float steps = 1.f) noexcept
 		{
-			return { 0.f, 1.f, 1.f };
-		}
-
-		inline juce::NormalisableRange<float> stepped(float start, float end, float steps = 1.f)
-		{
-			return
-			{
-					start, end,
-					[range = end - start](float min, float, float normalized)
-					{
-						return min + normalized * range;
-					},
-					[rangeInv = 1.f / (end - start)](float min, float, float denormalized)
-					{
-						return (denormalized - min) * rangeInv;
-					},
-					[steps, stepsInv = 1.f / steps](float, float, float val)
-					{
-						return std::round(val * stepsInv) * steps;
-					}
-			};
+			return { start, end, steps };
 		}
 
 		inline juce::NormalisableRange<float> temposync(int numSteps)
 		{
 			return stepped(0.f, static_cast<float>(numSteps));
+		}
+
+		inline juce::NormalisableRange<float> beats(float minDenominator, float maxDenominator, bool withZero)
+		{
+			std::vector<float> table;
+
+			const auto minV = std::log2(minDenominator);
+			const auto maxV = std::log2(maxDenominator);
+
+			const auto numWholeBeatsF = static_cast<float>(minV - maxV);
+			const auto numWholeBeatsInv = 1.f / numWholeBeatsF;
+
+			const auto numWholeBeats = static_cast<int>(numWholeBeatsF);
+			const auto numValues = numWholeBeats * 3 + 1 + (withZero ? 1 : 0);
+			table.reserve(numValues);
+			if (withZero)
+				table.emplace_back(0.f);
+
+			for (auto i = 0; i < numWholeBeats; ++i)
+			{
+				const auto iF = static_cast<float>(i);
+				const auto x = iF * numWholeBeatsInv;
+
+				const auto curV = minV - x * numWholeBeatsF;
+				const auto baseVal = std::pow(2.f, curV);
+
+				const auto valWhole = 1.f / baseVal;
+				const auto valTriplet = valWhole * 1.666666666667f;
+				const auto valDotted = valWhole * 1.75f;
+
+				table.emplace_back(valWhole);
+				table.emplace_back(valTriplet);
+				table.emplace_back(valDotted);
+			}
+			table.emplace_back(1.f / maxDenominator);
+
+			static constexpr float Eps = 1.f - std::numeric_limits<float>::epsilon();
+			static constexpr float EpsInv = 1.f / Eps;
+
+			const auto numValuesF = static_cast<float>(numValues);
+			const auto numValuesInv = 1.f / numValuesF;
+			const auto numValsX = numValuesInv * EpsInv;
+			const auto normValsY = numValuesF * Eps;
+
+			juce::NormalisableRange<float> range
+			{
+				table.front(), table.back(),
+				[table, normValsY](float, float, float normalized)
+				{
+					const auto valueIdx = normalized * normValsY;
+					return table[static_cast<int>(valueIdx)];
+				},
+				[table, numValsX](float, float, float denormalized)
+				{
+					for (auto i = 0; i < table.size(); ++i)
+						if (denormalized <= table[i])
+							return static_cast<float>(i) * numValsX;
+					return 0.f;
+				},
+				[table, numValsX](float start, float end, float denormalized)
+				{
+					auto closest = table.front();
+					for (auto i = 0; i < table.size(); ++i)
+					{
+						const auto diff = std::abs(table[i] - denormalized);
+						if (diff < std::abs(closest - denormalized))
+							closest = table[i];
+					}
+					return juce::jlimit(start, end, closest);
+				}
+			};
+
+			return range;
+		}
+
+		inline juce::NormalisableRange<float> toggle() noexcept
+		{
+			return stepped(0.f, 1.f);
+		}
+
+		inline juce::NormalisableRange<float> lin(float start, float end) noexcept
+		{
+			const auto range = end - start;
+
+			return
+			{
+				start,
+				end,
+				[range](float min, float, float normalized)
+				{
+					return min + normalized * range;
+				},
+				[inv = 1.f / range](float min, float, float denormalized)
+				{
+					return (denormalized - min) * inv;
+				},
+				[](float min, float max, float x)
+				{
+					return juce::jlimit(min, max, x);
+				}
+			};
 		}
 	}
 
@@ -558,32 +674,46 @@ namespace modSys6
 				return altVal;
 			};
 
-			const auto valToStrPercent = [](float v) { return juce::String(std::floor(v * 100.f)) + " " + toString(Unit::Percent); };
-			const auto valToStrHz = [](float v)
+			const ValToStrFunc valToStrPercent = [](float v) { return juce::String(std::floor(v * 100.f)) + " " + toString(Unit::Percent); };
+			const ValToStrFunc valToStrHz = [](float v)
 			{
-				if(v < 0.005f)
-					return "0 " + toString(Unit::Hz);
-				return juce::String(v).substring(0, 4) + " " + toString(Unit::Hz);
+				if (v >= 10000.f)
+					return juce::String(v * .001).substring(0, 4) + " khz";
+				else if (v >= 1000.f)
+					return juce::String(v * .001).substring(0, 3) + " khz";
+				else if (v >= 1.f)
+					return juce::String(v).substring(0, 5) + " hz";
+				else
+				{
+					v *= 1000.f;
+
+					if (v >= 100.f)
+						return juce::String(v).substring(0, 3) + " mhz";
+					else if (v >= 10.f)
+						return juce::String(v).substring(0, 2) + " mhz";
+					else
+						return juce::String(v).substring(0, 1) + " mhz";
+				}
 			};
-			const auto valToStrBeats = [&bts = beatsData](float v) { return bts[static_cast<int>(v)].str; };
-			const auto valToStrPhase = [](float v) { return juce::String(std::floor(v * 180.f)) + " " + toString(Unit::Degree); };
-			const auto valToStrPhase360 = [](float v) { return juce::String(std::floor(v * 360.f)) + " " + toString(Unit::Degree); };
-			const auto valToStrOct = [](float v) { return juce::String(std::floor(v)) + " " + toString(Unit::Octaves); };
-			const auto valToStrOct2 = [](float v) { return juce::String(std::floor(v / 12.f)) + " " + toString(Unit::Octaves); };
-			const auto valToStrSemi = [](float v) { return juce::String(std::floor(v)) + " " + toString(Unit::Semi); };
-			const auto valToStrFine = [](float v) { return juce::String(std::floor(v * 100.f)) + " " + toString(Unit::Fine); };
-			const auto valToStrRatio = [](float v)
+			const ValToStrFunc valToStrBeats = [&bts = beatsData](float v) { return bts[static_cast<int>(v)].str; };
+			const ValToStrFunc valToStrPhase = [](float v) { return juce::String(std::floor(v * 180.f)) + " " + toString(Unit::Degree); };
+			const ValToStrFunc valToStrPhase360 = [](float v) { return juce::String(std::floor(v * 360.f)) + " " + toString(Unit::Degree); };
+			const ValToStrFunc valToStrOct = [](float v) { return juce::String(std::round(v)) + " " + toString(Unit::Octaves); };
+			const ValToStrFunc valToStrOct2 = [](float v) { return juce::String(std::floor(v / 12.f)) + " " + toString(Unit::Octaves); };
+			const ValToStrFunc valToStrSemi = [](float v) { return juce::String(std::floor(v)) + " " + toString(Unit::Semi); };
+			const ValToStrFunc valToStrFine = [](float v) { return juce::String(std::floor(v * 100.f)) + " " + toString(Unit::Fine); };
+			const ValToStrFunc valToStrRatio = [](float v)
 			{
 				const auto y = static_cast<int>(std::floor(v * 100.f));
 				return juce::String(100 - y) + " : " + juce::String(y);
 			};
-			const auto valToStrLRMS = [](float v) { return v > .5f ? juce::String("m/s") : juce::String("l/r"); };
-			const auto valToStrFreeSync = [](float v) { return v > .5f ? juce::String("sync") : juce::String("free"); };
-			const auto valToStrPolarity = [](float v) { return v > .5f ? juce::String("on") : juce::String("off"); };
-			const auto valToStrMs = [](float v) { return juce::String(std::floor(v * 10.f) * .1f) + " " + toString(Unit::Ms); };
-			const auto valToStrDb = [](float v) { return juce::String(std::floor(v * 100.f) * .01f) + " " + toString(Unit::Decibel); };
-			const auto valToStrEmpty = [](float) { return juce::String(""); };
-			const auto valToStrSeed = [](float v)
+			const ValToStrFunc valToStrLRMS = [](float v) { return v > .5f ? juce::String("m/s") : juce::String("l/r"); };
+			const ValToStrFunc valToStrFreeSync = [](float v) { return v > .5f ? juce::String("sync") : juce::String("free"); };
+			const ValToStrFunc valToStrPolarity = [](float v) { return v > .5f ? juce::String("on") : juce::String("off"); };
+			const ValToStrFunc valToStrMs = [](float v) { return juce::String(std::floor(v * 10.f) * .1f) + " " + toString(Unit::Ms); };
+			const ValToStrFunc valToStrDb = [](float v) { return juce::String(std::floor(v * 100.f) * .01f) + " " + toString(Unit::Decibel); };
+			const ValToStrFunc valToStrEmpty = [](float) { return juce::String(""); };
+			const ValToStrFunc valToStrSeed = [](float v)
 			{
 				if (v == 0.f)
 					return juce::String("off");
@@ -594,40 +724,147 @@ namespace modSys6
 					str = str.replaceCharacter('a' + i, static_cast<juce::juce_wchar>(rnd.nextInt(26) + 'a'));
 				return str;
 			};
+			const ValToStrFunc valToStrBeats2 = [](float v)
+			{
+				enum Mode { Whole, Triplet, Dotted, NumModes };
+					
+				if (v == 0.f)
+					return juce::String("0");
 
-			const auto strToValPercent = [strToValDivision](const juce::String& txt)
+				const auto denormFloor = nextLowestPowTwoX(v);
+				const auto denormFrac = v - denormFloor;
+				const auto modeVal = denormFrac / denormFloor;
+				const auto mode = modeVal < .66f ? Mode::Whole :
+					modeVal < .75f ? Mode::Triplet :
+					Mode::Dotted;
+				const auto modeStr = mode == Mode::Whole ? juce::String("") :
+					mode == Mode::Triplet ? juce::String("t") :
+					juce::String(".");
+
+				auto denominator = 1.f / denormFloor;
+				auto numerator = 1.f;
+				if (denominator < 1.f)
+				{
+					numerator = denormFloor;
+					denominator = 1.f;
+				}
+
+				return juce::String(numerator) + " / " + juce::String(denominator) + modeStr;
+			};
+			const ValToStrFunc valToStrPower = [](float v)
+			{
+				return juce::String((v > .5f ? "Enabled" : "Disabled"));
+			};
+
+			const StrToValFunc strToValPercent = [strToValDivision](const juce::String& txt)
 			{
 				const auto val = strToValDivision(txt, 0.f);
 				if (val != 0.f)
 					return val;
 				return txt.trimCharactersAtEnd(toString(Unit::Percent)).getFloatValue() * .01f;
 			};
-			const auto strToValHz = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Hz)).getFloatValue(); };
-			const auto strToValBeats = [&bts = beatsData](const juce::String& txt)
+			const StrToValFunc strToValHz = [](const juce::String& txt)
+			{
+				auto text = txt.trimCharactersAtEnd(toString(Unit::Hz));
+				auto multiplier = 1.f;
+				if (text.getLastCharacter() == 'k')
+				{
+					multiplier = 1000.f;
+					text = text.dropLastCharacters(1);
+				}
+				else if (text.getLastCharacter() == 'm')
+				{
+					multiplier = .001f;
+					text = text.dropLastCharacters(1);
+				}
+				const auto val = text.getFloatValue();
+				const auto val2 = val * multiplier;
+
+				return val2;
+			};
+			const StrToValFunc strToValBeats = [&bts = beatsData](const juce::String& txt)
 			{
 				for (auto b = 0; b < bts.size(); ++b)
 					if (bts[b].str == txt)
 						return static_cast<float>(b);
 				return 0.f;
 			};
-			const auto strToValPhase = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Degree)).getFloatValue(); };
-			const auto strToValOct = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Octaves)).getIntValue(); };
-			const auto strToValOct2 = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Octaves)).getFloatValue() / 12.f; };
-			const auto strToValSemi = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Semi)).getIntValue(); };
-			const auto strToValFine = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Fine)).getFloatValue() * .01f; };
-			const auto strToValRatio = [strToValDivision](const juce::String& txt)
+			const StrToValFunc strToValPhase = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Degree)).getFloatValue() / 180.f; };
+			const StrToValFunc strToValPhase360 = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Degree)).getFloatValue() / 360.f; };
+			const StrToValFunc strToValOct = [](const juce::String& txt) { return std::round(txt.trimCharactersAtEnd(toString(Unit::Octaves)).getFloatValue()); };
+			const StrToValFunc strToValOct2 = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Octaves)).getFloatValue() / 12.f; };
+			const StrToValFunc strToValSemi = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Semi)).getIntValue(); };
+			const StrToValFunc strToValFine = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Fine)).getFloatValue() * .01f; };
+			const StrToValFunc strToValRatio = [strToValDivision](const juce::String& txt)
 			{
 				const auto val = strToValDivision(txt, -1.f);
 				if (val != -1.f)
 					return val;
 				return juce::jlimit(0.f, 1.f, txt.getFloatValue() * .01f);
 			};
-			const auto strToValLRMS = [](const juce::String& txt) { return txt[0] == 'l' ? 0.f : 1.f; };
-			const auto strToValFreeSync = [](const juce::String& txt) { return txt[0] == 'f' ? 0.f : 1.f; };
-			const auto strToValPolarity = [](const juce::String& txt) { return txt[0] == '0' ? 0.f : 1.f; };
-			const auto strToValMs = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Ms)).getFloatValue(); };
-			const auto strToValDb = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Decibel)).getFloatValue(); };
-			const auto strToValSeed = [](const juce::String& str) { return str.getFloatValue(); };
+			const StrToValFunc strToValLRMS = [](const juce::String& txt) { return txt[0] == 'l' ? 0.f : 1.f; };
+			const StrToValFunc strToValFreeSync = [](const juce::String& txt) { return txt[0] == 'f' ? 0.f : 1.f; };
+			const StrToValFunc strToValPolarity = [](const juce::String& txt) { return txt[0] == '0' ? 0.f : 1.f; };
+			const StrToValFunc strToValMs = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Ms)).getFloatValue(); };
+			const StrToValFunc strToValDb = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Decibel)).getFloatValue(); };
+			const StrToValFunc strToValSeed = [](const juce::String& str) { return str.getFloatValue(); };
+			const StrToValFunc strToValBeats2 = [](const juce::String& txt)
+			{
+				enum Mode { Beats, Triplet, Dotted, NumModes };
+				const auto lastChr = txt[txt.length() - 1];
+				const auto mode = lastChr == 't' ? Mode::Triplet : lastChr == '.' ? Mode::Dotted : Mode::Beats;
+
+				const auto text = mode == Mode::Beats ? txt : txt.substring(0, txt.length() - 1);
+				auto val = txt.getFloatValue();
+				if (mode == Mode::Triplet)
+					val *= 1.666666666667f;
+				else if (mode == Mode::Dotted)
+					val *= 1.75f;
+				return val;
+			};
+			const StrToValFunc strToValPower = [](const juce::String& txt)
+			{
+				const auto text = txt.trimCharactersAtEnd(toString(Unit::Power));
+				if (stringNegates(text))
+					return 0.f;
+				const auto val = text.getFloatValue();
+				return val > .5f ? 1.f : 0.f;
+			};
+
+			ValToStrFunc valToStrShape = [](float v)
+			{
+				return v < .5f ? juce::String("Steppy") :
+					v < 1.5f ? juce::String("Lerp") :
+					juce::String("Round");
+			};
+			StrToValFunc strToValShape = [](const juce::String& str)
+			{
+				const auto text = str.toLowerCase();
+				if (text == "steppy" || text == "step")
+					return 0.f;
+				else if (text == "lerp" || text == "linear")
+					return 1.f;
+				else if (text == "round" || text == "smooth")
+					return 2.f;
+				
+				return str.getFloatValue();
+			};
+
+			ValToStrFunc valToStrRandType = [](float v)
+			{
+				return v < .5f ? juce::String("Random") :
+					juce::String("Procedural");
+			};
+			StrToValFunc strToValRandType = [](const juce::String& str)
+			{
+				const auto text = str.toLowerCase();
+				if (text == "rand" || text == "random" || text == "randomise" || text == "randomize")
+					return 0.f;
+				else if (text == "procedural" || text == "proc" || text == "proceduralise" || text == "proceduralize")
+					return 1.f;
+				
+				return str.getFloatValue();
+			};
 
 			for (auto p = 0; p < NumMSParams; ++p)
 			{
@@ -720,10 +957,14 @@ namespace modSys6
 			for (auto m = 0; m < 2; ++m)
 			{
 				const auto offset = m * NumParamsPerMod;
-				params.push_back(new Param(withOffset(PID::Perlin0FreqHz, offset), makeRange::withCentre(.2f, 40.f, 2.f), 6.f, valToStrHz, strToValHz, Unit::Hz));
-				params.push_back(new Param(withOffset(PID::Perlin0Octaves, offset), makeRange::biasXL(1.f, 8.f, 0.f), 4.f, valToStrOct, strToValOct, Unit::Octaves));
-				params.push_back(new Param(withOffset(PID::Perlin0Width, offset), makeRange::biasXL(0.f, 1.f, 0), 1.f, valToStrPercent, strToValPercent, Unit::Percent));
-				params.push_back(new Param(withOffset(PID::Perlin0Seed, offset), makeRange::biasXL(0.f, 1.f, 0.f), 0.f, valToStrSeed, strToValSeed, Unit::NumUnits));
+				params.push_back(new Param(withOffset(PID::Perlin0RateHz, offset), makeRange::withCentre(1.f / 1000.f, 40.f, 2.f), 6.f, valToStrHz, strToValHz, Unit::Hz));
+				params.push_back(new Param(withOffset(PID::Perlin0RateBeats, offset), makeRange::beats(32.f, .5f, false), .25f, valToStrBeats2, strToValBeats2, Unit::Beats));
+				params.push_back(new Param(withOffset(PID::Perlin0Octaves, offset), makeRange::lin(1.f, 7.f), 3.f, valToStrOct, strToValOct, Unit::Octaves));
+				params.push_back(new Param(withOffset(PID::Perlin0Width, offset), makeRange::quad(0.f, 2.f, 1), 1.f, valToStrPercent, strToValPercent, Unit::Percent));
+				params.push_back(new Param(withOffset(PID::Perlin0RateType, offset), makeRange::toggle(), 0.f, valToStrPower, strToValPower, Unit::Power));
+				params.push_back(new Param(withOffset(PID::Perlin0Phase, offset), makeRange::quad(0.f, 2.f, 1), 0.f, valToStrPhase360, strToValPhase360, Unit::Degree));
+				params.push_back(new Param(withOffset(PID::Perlin0Shape, offset), makeRange::stepped(0.f, 2.f), 0.f, valToStrShape, strToValShape, Unit::PerlinShape));
+				params.push_back(new Param(withOffset(PID::Perlin0RandType, offset), makeRange::toggle(), 1.f, valToStrRandType, strToValRandType, Unit::PerlinRandType));
 
 				params.push_back(new Param(withOffset(PID::AudioRate0Oct, offset), makeRange::stepped(-3.f * 12.f, 3.f * 12.f, 12.f), 0.f, valToStrOct2, strToValOct2, Unit::Octaves));
 				params.push_back(new Param(withOffset(PID::AudioRate0Semi, offset), makeRange::stepped(-12.f, 12.f, 1.f), 0.f, valToStrSemi, strToValSemi, Unit::Semi));

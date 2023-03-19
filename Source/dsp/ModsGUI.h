@@ -74,10 +74,14 @@ namespace modSys6
         {
             enum
             {
-                Freq,
+                RateHz,
+                RateBeats,
                 Oct,
                 Width,
-                Seed,
+                RateType,
+                Phase,
+                Shape,
+                RandType,
                 NumParams
             };
 
@@ -86,15 +90,19 @@ namespace modSys6
                 juce::Timer(),
                 layout
                 (
-                    { 50, 50, 50, 50, 30 },
-                    { 20, 80 }
+                    { 1, 13, 21, 34, 1 },
+                    { 8, 5, 3, 21 }
                 ),
                 params
                 {
-                    Paramtr(u, "Freq", "The frequency in which the modulator picks new values", withOffset(PID::Perlin0FreqHz, mOff), modulatables),
-                    Paramtr(u, "Oct", "Defines the modulator's complexity / roughness", withOffset(PID::Perlin0Octaves, mOff), modulatables),
-                    Paramtr(u, "Width", "The modulator's stereo-width", withOffset(PID::Perlin0Width, mOff), modulatables),
-                    Paramtr(u, "Seed", "If enabled the modulator is procedural.", withOffset(PID::Perlin0Seed, mOff), modulatables)
+                    Paramtr(u, "Rate", "The rate of the perlin noise mod in hz.", withOffset(PID::Perlin0RateHz, mOff), modulatables),
+					Paramtr(u, "Rate", "The rate of the perlin noise mod in beats.", withOffset(PID::Perlin0RateBeats, mOff), modulatables),
+                    Paramtr(u, "Oct", "More octaves add complexity to the signal.", withOffset(PID::Perlin0Octaves, mOff), modulatables),
+                    Paramtr(u, "Width", "This parameter adds a phase offset to the right channel.", withOffset(PID::Perlin0Width, mOff), modulatables),
+					Paramtr(u, "Temposync", "Switch between the rate units, free running (hz) or temposync (beats).", withOffset(PID::Perlin0RateType, mOff), modulatables),
+					Paramtr(u, "Phase", "Apply a phase shift to the signal.", withOffset(PID::Perlin0Phase, mOff), modulatables),
+					Paramtr(u, "Shape", "The perlin noise mod can have 3 shapes. Steppy, linear and round.", withOffset(PID::Perlin0Shape, mOff), modulatables),
+					Paramtr(u, "Proc", "Every noise segment corresponds to a distinct combination of rate, bpm and transport info.", withOffset(PID::Perlin0RandType, mOff), modulatables)
                 },
                 btmText("")
             {
@@ -132,27 +140,57 @@ namespace modSys6
             void resized() override
             {
                 layout.setBounds(getLocalBounds().toFloat());
-                layout.place(params[Freq],  0, 1, 1, 1, 0.f, true);
-                layout.place(params[Oct],   1, 0, 1, 2, 0.f, true);
-                layout.place(params[Width], 2, 1, 1, 1, 0.f, true);
-				layout.place(params[Seed],  3, 1, 1, 1, 0.f, true);
+                
+                layout.place(params[RateHz], 2, 2, 1, 2);
+                layout.place(params[RateBeats], 2, 2, 1, 2);
+                // perlin params:
+                {
+                    const auto area = layout(3, 2, 1, 1);
+                    const auto w = area.getWidth();
+                    const auto h = area.getHeight();
+                    auto x = area.getX();
+                    auto y = area.getY();
+
+                    auto buttonWidth = w / 3.f;
+                    params[Shape].setBounds(juce::Rectangle<float>(x, y, buttonWidth, h).toNearestInt());
+                    x += buttonWidth;
+                    params[Shape].setBounds(juce::Rectangle<float>(x, y, buttonWidth, h).toNearestInt());
+                    x += buttonWidth;
+                    params[Shape].setBounds(juce::Rectangle<float>(x, y, buttonWidth, h).toNearestInt());
+                }
+                {
+                    const auto area = layout(3, 2, 1, 2);
+                    const auto w = area.getWidth();
+                    const auto knobW = w / 3.f;
+                    auto x = area.getX();
+
+                    params[Oct].setBounds(juce::Rectangle<float>(x, area.getY(), knobW, area.getHeight()).toNearestInt());
+                    x += knobW;
+                    params[Phase].setBounds(juce::Rectangle<float>(x, area.getY(), knobW, area.getHeight()).toNearestInt());
+                    x += knobW;
+                    params[Width].setBounds(juce::Rectangle<float>(x, area.getY(), knobW, area.getHeight()).toNearestInt());
+                }
+                //layout.place(seed, 1, 1, 1, 1);
+                {
+                    const auto area = layout(1, 2, 1, 1);
+                    const auto w = area.getWidth();
+                    const auto h = area.getHeight();
+                    auto x = area.getX();
+                    auto y = area.getY();
+
+                    const auto buttonW = w * .5f;
+
+                    params[RateType].setBounds(maxQuadIn(juce::Rectangle<float>(x, y, w - buttonW, h)).toNearestInt());
+                    x += buttonW;
+                    params[RandType].setBounds(maxQuadIn(juce::Rectangle<float>(x, y, w - buttonW, h)).toNearestInt());
+                }
             }
 
             void timerCallback() override
             {
-                const auto seedParam = utils.getParam(params[Seed].getPID());
-                if (seedParam->getValueSum() != 0.f)
-                {
-                    if (btmText.isEmpty())
-                        btmText = "<procedrl>";
-                    repaint();
-                }
-                else
-                {
-                    if (!btmText.isEmpty())
-                        btmText = "";
-                    repaint();
-                }
+                bool isTempoSync = utils.getParam(params[RateType].getPID())->getValueSum() > .5f;
+                params[RateBeats].setVisible(isTempoSync);
+                params[RateHz].setVisible(!isTempoSync);
             }
         };
 
@@ -1165,5 +1203,7 @@ namespace modSys6
 }
 
 /*
+
+seed
 
 */

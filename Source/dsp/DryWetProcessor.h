@@ -13,7 +13,8 @@ namespace drywet
 	{
 		FFDelay() :
 			ringBuffer(),
-			wHead(0), rHead(0)
+			wHead(0),
+			rHead(0)
 		{}
 		
 		void resize(const int size)
@@ -55,7 +56,7 @@ namespace drywet
 	
 	protected:
 		std::vector<float> ringBuffer;
-		size_t wHead, rHead;
+		unsigned long long wHead, rHead;
 	};
 
 	struct Processor

@@ -31,6 +31,7 @@ namespace midSide
 				samples[1][s] = right;
 			}
 		}
+		
 		bool enabled;
 	};
 }

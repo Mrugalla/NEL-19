@@ -122,10 +122,10 @@ namespace oversampling
 			}
 			return &input;
 		}
-		void downsample(juce::AudioBuffer<float>* outBuf, int numChannelsOut) noexcept
+		void downsample(juce::AudioBuffer<float>& outBuf, int numChannelsOut) noexcept
 		{
 			auto samplesUp = buffer.getArrayOfWritePointers();
-			auto samplesOut = outBuf->getArrayOfWritePointers();
+			auto samplesOut = outBuf.getArrayOfWritePointers();
 			filterDown4.processBlockDown(samplesUp, numSamples4x);
 			for (auto ch = 0; ch < numChannels; ++ch)
 				for (auto s = 0; s < numSamples2x; ++s)
@@ -229,9 +229,9 @@ namespace oversampling
 			spec.maximumBlockSize = _blockSize;
 			spec.numChannels = 2;
 
-			cutoff = 20000.;
-			gain = juce::Decibels::decibelsToGain(14.436 * .5);
-			q = .229;
+			cutoff = 20000.f;
+			gain = juce::Decibels::decibelsToGain(14.436f * .5f);
+			q = .229f;
 			coefficients = juce::dsp::IIR::Coefficients<float>::makeHighShelf(sampleRate, cutoff, q, gain);
 
 			for (auto& filter : filters)
@@ -246,13 +246,14 @@ namespace oversampling
 		{
 			return processor.upsample(input, numChannelsIn, numChannelsOut);
 		}
-		void downsample(juce::AudioBuffer<float>* outBuf, int numChannelsOut) noexcept
+		void downsample(juce::AudioBuffer<float>& outBuf, int numChannelsOut, int numSamples) noexcept
 		{
 			processor.downsample(outBuf, numChannelsOut);
 			for (auto ch = 0; ch < numChannelsOut; ++ch)
 			{
 				auto& filter = filters[ch];
-				juce::dsp::AudioBlock<float> block(*outBuf);
+				float* samples[] = { outBuf.getWritePointer(ch) };
+				juce::dsp::AudioBlock<float> block(samples, 1, numSamples);
 				juce::dsp::ProcessContextReplacing<float> context(block);
 				filter.process(context);
 			}
