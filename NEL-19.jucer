@@ -49,6 +49,7 @@
         <FILE id="OLmX3W" name="Smooth.cpp" compile="1" resource="0" file="Source/dsp/Smooth.cpp"/>
         <FILE id="GXopIc" name="Smooth.h" compile="0" resource="0" file="Source/dsp/Smooth.h"/>
         <FILE id="NhBr3Z" name="Vibrato.h" compile="0" resource="0" file="Source/dsp/Vibrato.h"/>
+        <FILE id="mhVKy8" name="WHead.h" compile="0" resource="0" file="Source/dsp/WHead.h"/>
       </GROUP>
       <GROUP id="{DF5CA124-D2C0-471E-8D17-297CEBC9FA0F}" name="releasePool">
         <FILE id="ZsHHV2" name="ReleasePool.cpp" compile="1" resource="0" file="Source/releasePool/ReleasePool.cpp"/>

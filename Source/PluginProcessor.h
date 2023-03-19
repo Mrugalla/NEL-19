@@ -12,8 +12,13 @@
 #include <limits>
 
 struct Nel19AudioProcessor :
-    public juce::AudioProcessor
+    public juce::AudioProcessor,
+    public juce::Timer
 {
+    using ChannelSet = juce::AudioChannelSet;
+
+    static juce::String getLookaheadID();
+    
     using Smooth = smooth::Smooth<float>;
     static constexpr int NumActiveMods = 2;
 
@@ -23,7 +28,7 @@ struct Nel19AudioProcessor :
    #ifndef JucePlugin_PreferredChannelConfigurations
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
    #endif
-    void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+    void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
     void processBlockBypassed(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) override;
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override;
@@ -42,30 +47,32 @@ struct Nel19AudioProcessor :
     void savePatch();
     void loadPatch();
     juce::PropertiesFile::Options makeOptions();
+    void forcePrepare();
 
     juce::ApplicationProperties appProperties;
-    const int numChannels;
 
     drywet::Processor dryWet;
 
     modSys6::ModSys modSys;
-
-    midSide::Processor midSideProcessor;
+    
     oversampling::OversamplerWithShelf oversampling;
+	std::atomic<bool> oversamplingEnabled;
     
     std::array<vibrato::Modulator, NumActiveMods> modulators;
-    std::array<std::vector<float>, 2> modsBuffer;
+    juce::AudioBuffer<float> modsBuffer;
     std::array<vibrato::ModType, NumActiveMods> modType;
     
     vibrato::Processor vibrat;
     
     std::vector<float> visualizerValues;
+    std::atomic<bool> lookaheadEnabled;
 private:
-    const juce::CriticalSection mutex;
     Smooth depthSmooth, modsMixSmooth;
     std::vector<float> depthBuf, modsMixBuf;
 
-    void processBlockVibrato(juce::AudioBuffer<float>&, const juce::MidiBuffer&, int, int);
+    void processBlockVibrato(juce::AudioBuffer<float>&, const juce::MidiBuffer&) noexcept;
+    
+    void timerCallback() override;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Nel19AudioProcessor)
 };

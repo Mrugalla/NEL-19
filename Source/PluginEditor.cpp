@@ -41,7 +41,7 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
         { 30, 30, 30, 270, 70 },
         { 1 }
     ),
-    utils(p.modSys, *this, p.appProperties.getUserSettings()),
+    utils(p.modSys, *this, p.appProperties.getUserSettings(), p),
     notify(utils.events, makeNotify(this)),
 
     nelLabel(utils, "<< NEL >>", modSys6::gui::ColourID::Transp, modSys6::gui::ColourID::Transp, modSys6::gui::ColourID::Txt),
@@ -171,6 +171,8 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
 
     paramRandomizer.add([this](juce::Random& rand)
     {
+        audioProcessor.suspendProcessing(true);
+
         const auto numMods = static_cast<float>(vibrato::ModType::NumMods);
         for (auto m = 0; m < modComps.size(); ++m)
         {
@@ -180,21 +182,22 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
         }
         {
             const auto val = rand.nextFloat() > .5f ? true : false;
-            audioProcessor.oversampling.setEnabled(val);
+            audioProcessor.oversamplingEnabled.store(val);
         }
         {
             const auto range = modSys6::makeRange::biasXL(1.f, 10000.f, -.999f);
             const auto val = range.convertFrom0to1(rand.nextFloat());
             const juce::Identifier id(vibrato::toString(vibrato::ObjType::DelaySize));
             audioProcessor.modSys.state.setProperty(id, val, nullptr);
-            audioProcessor.vibrat.triggerUpdate();
         }
         {
             const auto numTypes = static_cast<float>(vibrato::InterpolationType::NumInterpolationTypes);
             const auto val = rand.nextFloat() * (numTypes - .1f);
             const auto type = static_cast<vibrato::InterpolationType>(val);
-            audioProcessor.vibrat.setInterpolationType(type);
+            audioProcessor.vibrat.interpolationType.store(type);
         }
+
+        audioProcessor.forcePrepare();
     });
 
     presetBrowser.savePatch = [this]()

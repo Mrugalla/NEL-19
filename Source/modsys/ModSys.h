@@ -1316,7 +1316,7 @@ namespace modSys6
 					return;
 		}
 
-		std::array<Connec, 256> connex;
+		std::array<Connec, 32> connex;
 
 		juce::String toString() const
 		{
@@ -1339,8 +1339,7 @@ namespace modSys6
 			mods(params),
 			connex(),
 			hasPlayHead(true),
-			wannaUpdatePatch(false),
-			updatePatch(_updatePatch)
+			updatePatchFunc(_updatePatch)
 		{
 			{
 				StateIDs ids;
@@ -1348,16 +1347,16 @@ namespace modSys6
 			}
 		}
 
-		void triggerUpdatePatch(const juce::String& xmlString)
+		void updatePatch(const juce::String& xmlString)
 		{
 			state = state.fromXml(xmlString);
-			wannaUpdatePatch.store(true);
+			updatePatchFunc();
 		}
 		
-		void triggerUpdatePatch(const juce::ValueTree& newState)
+		void updatePatch(const juce::ValueTree& newState)
 		{
 			state = newState;
-			wannaUpdatePatch.store(true);
+			updatePatchFunc();
 		}
 
 		void loadPatch()
@@ -1372,21 +1371,13 @@ namespace modSys6
 			connex.savePatch(state);
 		}
 
-		// returns false if patch needs to be updated
-		bool processBlock(const float* const*, int numSamples, const juce::AudioPlayHead* playHead)
+		void processBlock(int numSamples, const juce::AudioPlayHead* playHead) noexcept
 		{
-			if (wannaUpdatePatch.load())
-			{
-				updatePatch();
-				wannaUpdatePatch.store(false);
-				return false;
-			}
 			hasPlayHead.store(playHead != nullptr);
 			params.processBlockInit();
 			mods.processBlock(numSamples);
 			connex.processBlock(params, mods);
 			params.processBlockFinish();
-			return true;
 		}
 
 		const Param* getParam(PID p) const noexcept { return params[static_cast<int>(p)]; }
@@ -1407,7 +1398,8 @@ namespace modSys6
 			return beatsData;
 		}
 
-		int getModIdx(ModTypeContext mtc) const noexcept {
+		int getModIdx(ModTypeContext mtc) const noexcept
+		{
 			for (auto m = 0; m < mods.numMods(); ++m)
 				if (mods[m].mtc == mtc)
 					return m;
@@ -1469,7 +1461,10 @@ namespace modSys6
 			return true;	
 		}
 
-		float getConnecDepth(int cIdx) const noexcept { return connex[cIdx].getDepth(); }
+		float getConnecDepth(int cIdx) const noexcept
+		{
+			return connex[cIdx].getDepth();
+		}
 		
 		bool setConnecDepth(int cIdx, float depth) noexcept
 		{
@@ -1494,8 +1489,8 @@ namespace modSys6
 		Params params;
 		Mods mods;
 		Connex connex;
-		std::atomic<bool> hasPlayHead, wannaUpdatePatch;
-		std::function<void()> updatePatch;
+		std::atomic<bool> hasPlayHead;
+		std::function<void()> updatePatchFunc;
 	};
 }
 

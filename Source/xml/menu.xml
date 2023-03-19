@@ -4,8 +4,6 @@
     <switch id="interpolation" tooltip="select the method that is used to interpolate the vibrato's delay.">
       <option id="lerp"/>
       <option id="spline"/>
-      <option id="lagrange"/>
-      <option id="sinc"/>
     </switch>
     <switch id="oversampling" tooltip="turn on oversampling to get lower sidelobes on strong modulation.">
       <option id="1x"/>
@@ -37,8 +35,6 @@
       <switch id="interpolation def" tooltip="select the method that is used to interpolate the vibrato's delay.">
         <option id="lerp"/>
         <option id="spline"/>
-        <option id="lagrange"/>
-        <option id="sinc"/>
       </switch>
       <switch id="oversampling def" tooltip="turn on oversampling to get lower sidelobes on strong modulation.">
         <option id="1x"/>

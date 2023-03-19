@@ -1,5 +1,5 @@
 #pragma once
-//#include "windows.h"
+#include "../PluginProcessor.h"
 #include "ModSys.h"
 #include <array>
 
@@ -123,7 +123,10 @@ namespace modSys6
             }
         }
 
-        inline juce::String toStringProps(ColourID i) { return "colour" + toString(i); }
+        inline juce::String toStringProps(ColourID i)
+        {
+            return "colour" + toString(i);
+        }
 
         enum class CursorType { Default, Interact, Mod, Cross, NumCursors };
 
@@ -135,14 +138,16 @@ namespace modSys6
             return rows;
         }
 
-        inline juce::Rectangle<float> maxQuadIn(const juce::Rectangle<float>& b) noexcept {
+        inline juce::Rectangle<float> maxQuadIn(const juce::Rectangle<float>& b) noexcept
+        {
             const auto minDimen = std::min(b.getWidth(), b.getHeight());
             const auto x = b.getX() + .5f * (b.getWidth() - minDimen);
             const auto y = b.getY() + .5f * (b.getHeight() - minDimen);
             return { x, y, minDimen, minDimen };
         }
         
-        inline juce::Rectangle<float> maxQuadIn(juce::Rectangle<int> b) noexcept {
+        inline juce::Rectangle<float> maxQuadIn(juce::Rectangle<int> b) noexcept
+        {
             return maxQuadIn(b.toFloat());
         }
 
@@ -178,6 +183,7 @@ namespace modSys6
                     BinaryData::nel19_ttfSize)))
             {
             }
+            
             void init(juce::PropertiesFile* p)
             {
                 props = p;
@@ -204,7 +210,9 @@ namespace modSys6
                         return setColour(c, col);
                 return false;
             }
+            
             bool setColour(ColourID i, juce::Colour col) noexcept { return setColour(static_cast<int>(i), col); }
+            
             bool setColour(int i, juce::Colour col) noexcept
             {
                 if (props->isValidFile())
@@ -220,10 +228,13 @@ namespace modSys6
                 }
                 return false;
             }
+            
             juce::Colour colour(ColourID i) const noexcept { return colour(static_cast<int>(i)); }
+            
             juce::Colour colour(int i) const noexcept { return colours[i]; }
 
             juce::String getTooltipsEnabledID() const { return "tooltips"; }
+            
             bool setTooltipsEnabled(bool e)
             {
                 if (props->isValidFile())
@@ -239,6 +250,7 @@ namespace modSys6
                 }
                 return false;
             }
+            
             bool updateProperty(juce::String&& pID, const juce::var& var)
             {
                 if (props->isValidFile())
@@ -339,9 +351,11 @@ namespace modSys6
 
         struct Utils
         {
-            Utils(ModSys& _modSys, juce::Component& _pluginTop, juce::PropertiesFile* props) :
+            Utils(ModSys& _modSys, juce::Component& _pluginTop, juce::PropertiesFile* props,
+                Nel19AudioProcessor& _processor) :
                 events(),
                 pluginTop(_pluginTop),
+                audioProcessor(_processor),
                 modSys(_modSys),
                 tooltip(&Shared::shared.tooltipDefault),
                 selectedMod({ ModType::Macro, 0 }),
@@ -349,6 +363,7 @@ namespace modSys6
             {
                 Shared::shared.init(props);
             }
+            
             void init()
             {
                 notify(NotificationType::ModSelectionChanged);
@@ -362,13 +377,18 @@ namespace modSys6
                 return speed;
             }
 
-            void triggerUpdatePatch(const juce::String& xmlString)
+            void updatePatch(const juce::String& xmlString)
             {
-                modSys.triggerUpdatePatch(xmlString);
+                audioProcessor.suspendProcessing(true);
+                modSys.updatePatch(xmlString);
+                audioProcessor.suspendProcessing(false);
             }
-            void triggerUpdatePatch(const juce::ValueTree& state)
+            
+            void updatePatch(const juce::ValueTree& state)
             {
-                modSys.triggerUpdatePatch(state);
+                audioProcessor.suspendProcessing(true);
+                modSys.updatePatch(state);
+                audioProcessor.suspendProcessing(false);
             }
 
             juce::Colour colour(ColourID c) const noexcept { return Shared::shared.colour(c); }
@@ -381,6 +401,7 @@ namespace modSys6
                     notify(NotificationType::ModSelectionChanged);
                 }
             }
+            
             ModTypeContext getSelectedMod() const noexcept { return selectedMod; }
 
             void killEnterValue()
@@ -459,7 +480,8 @@ namespace modSys6
             }
             juce::Point<int> getWindowCentre(const juce::Component& comp) noexcept
             {
-                const juce::Point<int> centre(
+                const juce::Point<int> centre
+                (
                     comp.getWidth() / 2,
                     comp.getHeight() / 2
                 );
@@ -487,6 +509,7 @@ namespace modSys6
 
             Events events;
             juce::Component& pluginTop;
+            Nel19AudioProcessor& audioProcessor;
         protected:
             ModSys& modSys;
             juce::String* tooltip;
@@ -2889,12 +2912,13 @@ namespace modSys6
                     const auto file = it.getFile();
                     const auto fileName = file.getFileName();
                     const auto nameLen = fileName.length() - extension.length();
-                    browser.addEntry(
+                    browser.addEntry
+                    (
                         fileName.substring(0, nameLen),
                         "Click here to choose this preset.",
                         [this, file]()
                         {
-                            utils.triggerUpdatePatch(file.loadFileAsString());
+                            utils.updatePatch(file.loadFileAsString());
                             notify(NotificationType::PatchUpdated);
                             //setBrowserOpen(false);
                         },

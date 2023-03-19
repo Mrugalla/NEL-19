@@ -665,13 +665,13 @@ namespace menu2
 				{
 					const auto id = vibrato::toString(vibrato::ObjType::InterpolationType);
 					const auto type = static_cast<vibrato::InterpolationType>(e);
-					processor.vibrat.setInterpolationType(type);
+					processor.vibrat.interpolationType.store(type);
 					const auto idType = vibrato::toString(type);
 					processor.modSys.state.setProperty(id, idType, nullptr);
 				};
 				const auto onIsEnabled = [this](int i)
 				{
-					return static_cast<int>(processor.vibrat.getInterpolationType()) == i;
+					return static_cast<int>(processor.vibrat.interpolationType.load()) == i;
 				};
 				addSwitchButton(id, child, i, onSwitch, buttonName, onIsEnabled);
 			}
@@ -730,9 +730,10 @@ namespace menu2
 			{
 				const auto onSwitch = [this](int e)
 				{
-					processor.oversampling.setEnabled(e != 0);
-					juce::Identifier id(oversampling::getOversamplingOrderID());
+					const auto idStr = oversampling::getID();
+					juce::Identifier id(idStr);
 					processor.modSys.state.setProperty(id, e, nullptr);
+					processor.oversamplingEnabled.store(!processor.oversampling.isEnabled());
 				};
 				const auto onIsEnabled = [this](int i)
 				{
@@ -745,14 +746,16 @@ namespace menu2
 			{
 				const auto onSwitch = [this](int e)
 				{
-					juce::Identifier id(oversampling::getOversamplingOrderID());
+					const auto idStr = oversampling::getID();
+					juce::Identifier id(idStr);
 					auto user = processor.appProperties.getUserSettings();
 					user->setValue(id, e);
 				};
 				const auto onIsEnabled = [this](int i)
 				{
+					const auto idStr = oversampling::getID();
 					const auto user = processor.appProperties.getUserSettings();
-					juce::Identifier id(oversampling::getOversamplingOrderID());
+					juce::Identifier id(idStr);
 					return user->getIntValue(id, 0) == i;
 				};
 				addSwitchButton(id, child, i, onSwitch, buttonName, onIsEnabled);
@@ -761,14 +764,16 @@ namespace menu2
 			{
 				const auto onSwitch = [this](int e)
 				{
-					bool enabled = e == 1 ? true : false;
-					processor.dryWet.setLookaheadEnabled(enabled);
-					const juce::Identifier id(drywet::getLookaheadID());
+					bool enabled = e == 1;
+					processor.suspendProcessing(true);
+					processor.lookaheadEnabled.store(enabled);
+					utils.audioProcessor.forcePrepare();
+					const juce::Identifier id(processor.getLookaheadID());
 					processor.modSys.state.setProperty(id, e, nullptr);
 				};
 				const auto onIsEnabled = [this](int i)
 				{
-					const bool e = processor.dryWet.isLookaheadEnabled();
+					const bool e = processor.lookaheadEnabled.load();
 					return (e ? 1 : 0) == i;
 				};
 				addSwitchButton(id, child, i, onSwitch, buttonName, onIsEnabled);
@@ -777,14 +782,14 @@ namespace menu2
 			{
 				const auto onSwitch = [this](int e)
 				{
-					const juce::Identifier id(drywet::getLookaheadID());
+					const juce::Identifier id(processor.getLookaheadID());
 					auto user = processor.appProperties.getUserSettings();
 					user->setValue(id, e);
 				};
 				const auto onIsEnabled = [this](int i)
 				{
 					const auto user = processor.appProperties.getUserSettings();
-					const juce::Identifier id(drywet::getLookaheadID());
+					const juce::Identifier id(processor.getLookaheadID());
 					return user->getIntValue(id, 1) == i;
 				};
 				addSwitchButton(id, child, i, onSwitch, buttonName, onIsEnabled);
@@ -827,7 +832,7 @@ namespace menu2
 						return false; // delay can't be longer than 10 sec
 					juce::Identifier vibDelaySizeID(vibrato::toString(vibrato::ObjType::DelaySize));
 					processor.modSys.state.setProperty(vibDelaySizeID, newDelaySize, nullptr);
-					processor.vibrat.triggerUpdate();
+					processor.forcePrepare();
 					return true;
 				};
 				const auto onDefaultStr = [this]()
@@ -837,7 +842,8 @@ namespace menu2
 					return juce::String(dly).substring(0, 4);
 				};
 				const auto tooltp = child.getProperty(id[TOOLTIP]);
-				entries.push_back(std::make_unique<TextBox>(
+				entries.push_back(std::make_unique<TextBox>
+				(
 					utils, tooltp.toString(), buttonName, onUpdate, onDefaultStr, " ms"
 				));
 				addAndMakeVisible(entries.back().get());

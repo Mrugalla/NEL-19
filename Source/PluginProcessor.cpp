@@ -6,36 +6,33 @@
 
 Nel19AudioProcessor::Nel19AudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
-     : AudioProcessor (BusesProperties()
+     :
+    AudioProcessor
+    (
+        BusesProperties()
                      #if ! JucePlugin_IsMidiEffect
                       #if ! JucePlugin_IsSynth
                        .withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
-                       ),
+    ),
+    Timer(),
     appProperties(),
-    numChannels(getMainBusNumOutputChannels() == 1 ? 1 : 2),
-
-    dryWet(numChannels),
-
+    dryWet(),
     modSys(*this, [this]() { loadPatch(); }),
-
-    midSideProcessor(numChannels),
-    oversampling(this),
-
+    oversampling(),
+    oversamplingEnabled(false),
     modulators
     {
-        vibrato::Modulator(numChannels, modSys.getBeatsData()),
-        vibrato::Modulator(numChannels, modSys.getBeatsData())
+        vibrato::Modulator(modSys.getBeatsData()),
+        vibrato::Modulator(modSys.getBeatsData())
     },
     modsBuffer(),
     modType(),
-
-    vibrat(modsBuffer, numChannels),
+    vibrat(),
     visualizerValues(),
-
-    mutex(),
+    lookaheadEnabled(true),
     depthSmooth(0.f), modsMixSmooth(0.f),
     depthBuf(), modsMixBuf()
 #endif
@@ -73,27 +70,21 @@ Nel19AudioProcessor::Nel19AudioProcessor()
         }
     }
 
-    visualizerValues.resize(numChannels, 0.f);
+    visualizerValues.resize(2, 0.f);
 
     modType[0] = vibrato::ModType::Perlin;
     modType[1] = vibrato::ModType::LFO;
-
-    {
-        const auto id = oversampling::getOversamplingOrderID();
-        const auto enabled = user->getIntValue(id, 1) == 0 ? false : true;
-        oversampling.setEnabled(enabled);
-    }
+    
     {
         const auto defVal = vibrato::toString(vibrato::InterpolationType::Lerp);
         const auto id = vibrato::toString(vibrato::ObjType::InterpolationType);
         const auto idType = user->getValue(id, defVal);
         const auto type = vibrato::toType(idType);
-        vibrat.setInterpolationType(type);
+        vibrat.interpolationType.store(type);
     }
     {
-        const auto id = drywet::getLookaheadID();
+        const auto id = getLookaheadID();
         const auto e = user->getBoolValue(id, true);
-        dryWet.setLookaheadEnabled(e);
     }
     {
         std::array<vibrato::ModType, NumActiveMods> defVals
@@ -112,8 +103,7 @@ Nel19AudioProcessor::Nel19AudioProcessor()
         }
     }
 
-    // juce::PluginHostType::isCubase();
-    // if daw is one with playhead draw free/sync button in lfo modulator
+    startTimerHz(4);
 }
 
 juce::PropertiesFile::Options Nel19AudioProcessor::makeOptions()
@@ -138,42 +128,45 @@ const juce::String Nel19AudioProcessor::getName() const
 
 bool Nel19AudioProcessor::acceptsMidi() const
 {
-#if JucePlugin_WantsMidiInput
     return true;
-#else
-    return false;
-#endif
 }
 
 bool Nel19AudioProcessor::producesMidi() const
 {
-#if JucePlugin_ProducesMidiOutput
-    return true;
-#else
     return false;
-#endif
 }
 
 bool Nel19AudioProcessor::isMidiEffect() const
 {
-#if JucePlugin_IsMidiEffect
-    return true;
-#else
     return false;
-#endif
 }
 
-double Nel19AudioProcessor::getTailLengthSeconds() const { return 0.; }
+double Nel19AudioProcessor::getTailLengthSeconds() const
+{
+    return 0.;
+}
 
-int Nel19AudioProcessor::getNumPrograms() { return 1; }
+int Nel19AudioProcessor::getNumPrograms()
+{
+    return 1;
+}
 
-int Nel19AudioProcessor::getCurrentProgram() { return 0; }
+int Nel19AudioProcessor::getCurrentProgram()
+{
+    return 0;
+}
 
-void Nel19AudioProcessor::setCurrentProgram (int) {}
+void Nel19AudioProcessor::setCurrentProgram(int)
+{
+}
 
-const juce::String Nel19AudioProcessor::getProgramName (int) { return {}; }
+const juce::String Nel19AudioProcessor::getProgramName(int)
+{
+    return {};
+}
 
-void Nel19AudioProcessor::changeProgramName (int, const juce::String&){}
+void Nel19AudioProcessor::changeProgramName(int, const juce::String&)
+{}
 
 void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize)
 {
@@ -193,58 +186,63 @@ void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize)
     
     dryWet.prepare(sampleRateF, maxBufferSize, vibSizeSamplesHalf);
 
-    const auto lGate = dryWet.isLookaheadEnabled() ? 1 : 0;
+    const auto lGate = lookaheadEnabled.load() ? 1 : 0;
     auto latency = vibSizeSamplesHalf;
 #if OversamplingEnabled
-    oversampling.prepareToPlay(sampleRate, maxBufferSize);
+    const auto osEnabled = oversamplingEnabled.load();
+    oversampling.prepareToPlay(sampleRate, maxBufferSize, osEnabled);
 
     sampleRate = oversampling.getSampleRateUpsampled();
     maxBufferSize = oversampling.getBlockSizeUp();
     latency += oversampling.getLatency();
-    const auto latencyUp = latency * oversampling.getUpsamplingFactor();
 
     sampleRateF = static_cast<float>(sampleRate);
 #endif
+    latency *= lGate;
     depthSmooth.makeFromDecayInMs(24.f, sampleRateF);
     modsMixSmooth.makeFromDecayInMs(24.f, sampleRateF);
     depthBuf.resize(maxBufferSize);
     modsMixBuf.resize(maxBufferSize);
 
-    for (auto ch = 0; ch < numChannels; ++ch)
-        modsBuffer[ch].resize(maxBufferSize, 0.f);
+    modsBuffer.setSize(2, maxBufferSize, false, true, false);
     
     for (auto m = 0; m < NumActiveMods; ++m)
-        modulators[m].prepare(sampleRateF, maxBufferSize, latencyUp * lGate);
+        modulators[m].prepare(sampleRateF, maxBufferSize, latency);
         
     // UPDATE LFO WAVETABLE
-    const size_t vds = static_cast<size_t>(sampleRateF * dSize * .001f);
-    vibrat.resizeDelay(vds);
+    const auto vds = static_cast<int>(sampleRateF * dSize * .001f);
+    vibrat.prepare(maxBufferSize, vds);
     {
         const auto id = vibrato::toString(vibrato::ObjType::InterpolationType);
         const auto typeStr = modSys.state.getProperty(id, "").toString();
         if (typeStr.isNotEmpty())
         {
             const auto type = vibrato::toType(typeStr);
-            vibrat.setInterpolationType(type);
+            vibrat.interpolationType.store(type);
         }
     }
-    vibrat.prepareToPlay(maxBufferSize);
 
-    setLatencySamples(latency * lGate);
+    setLatencySamples(latency);
 }
 
-void Nel19AudioProcessor::releaseResources() {}
+void Nel19AudioProcessor::releaseResources()
+{}
 
 bool Nel19AudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 {
-    return
-        (layouts.getMainInputChannelSet() == juce::AudioChannelSet::disabled()
-        && layouts.getMainOutputChannelSet() == juce::AudioChannelSet::disabled())
+    const auto mono = ChannelSet::mono();
+    const auto stereo = ChannelSet::stereo();
 
-        ||
+    const auto mainIn = layouts.getMainInputChannelSet();
+    const auto mainOut = layouts.getMainOutputChannelSet();
 
-        (layouts.getMainOutputChannelSet() == juce::AudioChannelSet::mono()
-        || layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo());
+    if (mainIn != mainOut)
+        return false;
+
+    if (mainOut != stereo && mainOut != mono)
+        return false;
+
+    return true;
 }
 
 void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
@@ -253,57 +251,53 @@ void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     const auto numSamples = buffer.getNumSamples();
     {
         const auto numChannelsIn = getTotalNumInputChannels();
-        for (auto ch = numChannelsIn; ch < getTotalNumOutputChannels(); ++ch)
+		const auto numChannelsOut = getTotalNumOutputChannels();
+        for (auto ch = numChannelsIn; ch < numChannelsOut; ++ch)
             buffer.clear(ch, 0, numSamples);
     }
-    const auto numChannelsIn = getChannelCountOfBus(true, 0);
-    const auto numChannelsOut = getChannelCountOfBus(false, 0) == 1 ? 1 : 2;
-
-    const auto samplesRead = buffer.getArrayOfReadPointers();
-    if (!modSys.processBlock(samplesRead, numSamples, getPlayHead()))
-        return;
+	const auto numChannels = buffer.getNumChannels();
+    const auto playHead = getPlayHead();
+    
+    modSys.processBlock(numSamples, playHead);
     
     if (numSamples == 0)
     {
         for (auto& v : visualizerValues)
             v = 0.f;
-        oversampling.processBlockEmpty();
         return;
     }
+
+    const auto samplesRead = buffer.getArrayOfReadPointers();
     auto samples = buffer.getArrayOfWritePointers();
 
 	const auto dryWetMix = modSys.getParam(modSys6::PID::DryWetMix)->getValueSum();
-    if (!dryWet.saveDry(samplesRead, dryWetMix, numChannelsIn, numChannelsOut, numSamples))
-        return prepareToPlay(getSampleRate(), getBlockSize());
+    dryWet.saveDry(samplesRead, dryWetMix, numChannels, numSamples);
 
     
 #if !DebugModsBuffer
-    midSideProcessor.setEnabled(modSys.getParam(modSys6::PID::StereoConfig)->getValueSum() > .5f);
-    if (midSideProcessor.enabled && numChannelsIn + numChannelsOut == 4)
+    const auto midSideEnabled = modSys.getParam(modSys6::PID::StereoConfig)->getValueSum() > .5f;
+    if (midSideEnabled && numChannels == 2)
     {
-        midSideProcessor.processBlockEncode(samples, numSamples);
-        processBlockVibrato(buffer, midi, numChannelsIn, numChannelsOut);
-        midSideProcessor.processBlockDecode(samples, numSamples);
+        midSide::encode(samples, numSamples);
+        processBlockVibrato(buffer, midi);
+        midSide::decode(samples, numSamples);
     }
     else
 #endif
-    processBlockVibrato(buffer, midi, numChannelsIn, numChannelsOut);
+    processBlockVibrato(buffer, midi);
 
-    dryWet.processWet(samples, modSys.getParam(modSys6::PID::WetGain)->getValSumDenorm(), numChannelsIn, numChannelsOut, numSamples);
+    const auto gainWet = modSys.getParam(modSys6::PID::WetGain)->getValSumDenorm();
+    dryWet.processWet(samples, gainWet, numChannels, numSamples);
 }
 
-void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& bufferOut, const juce::MidiBuffer& midi, int numChannelsIn, int numChannelsOut)
+void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& bufferOut, const juce::MidiBuffer& midi) noexcept
 {
-    auto buffer = &bufferOut;
+    const auto numChannels = bufferOut.getNumChannels();
 #if OversamplingEnabled
-    buffer = oversampling.upsample(bufferOut, numChannelsIn, numChannelsOut);
-    if (buffer == nullptr) // oversampling order changed
-        return;
-    
-    const bool hasUpsampled = &bufferOut != buffer;
+    auto& buffer = oversampling.upsample(bufferOut);
 #endif
-    const auto samplesRead = buffer->getArrayOfReadPointers();
-    const auto numSamples = buffer->getNumSamples();
+    const auto samplesRead = buffer.getArrayOfReadPointers();
+    const auto numSamples = buffer.getNumSamples();
 
     auto curPlayHead = getPlayHead();
     using namespace modSys6;
@@ -389,8 +383,10 @@ void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& bufferOu
             break;
         }
         
-        mod.processBlock(samplesRead, midi, curPlayHead, numChannelsIn, numChannelsOut, numSamples);
+        mod.processBlock(samplesRead, midi, curPlayHead, numChannels, numSamples);
     }
+
+    auto modsBuf = modsBuffer.getArrayOfWritePointers();
 
     // FILL MODBUFFER WITH MODULATORS
     {
@@ -404,12 +400,12 @@ void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& bufferOu
 			juce::FloatVectorOperations::fill(modsMixBuf.data(), modsMix, numSamples);
 		if (!depthSmoothing)
 			juce::FloatVectorOperations::fill(depthBuf.data(), depth, numSamples);
-
-        for (auto ch = 0; ch < numChannelsOut; ++ch)
+        
+        for (auto ch = 0; ch < numChannels; ++ch)
         {
             const auto m0 = modulators[0].buffer[ch].data();
             const auto m1 = modulators[1].buffer[ch].data();
-            auto mAll = modsBuffer[ch].data();
+            auto mAll = modsBuf[ch];
             for (auto s = 0; s < numSamples; ++s)
                 mAll[s] = (m0[s] + modsMixBuf[s] * (m1[s] - m0[s])) * depthBuf[s];
             visualizerValues[ch] = mAll[numSamples - 1];
@@ -427,14 +423,18 @@ void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& bufferOu
         visualizerValues[ch] = mAll[numSamples - 1];
     }
 #else
-    // PROCESS VIBRATO
-    if (!vibrat.processBlock(*buffer, this, numChannelsOut))
-        return;
+    vibrat
+    (
+        buffer.getArrayOfWritePointers(),
+        numChannels,
+        numSamples,
+        modsBuf
+    );
 #endif
     
 #if OversamplingEnabled
-    if(hasUpsampled)
-        oversampling.downsample(bufferOut, numChannelsOut, numSamples);
+    if(oversampling.isEnabled())
+        oversampling.downsample(bufferOut);
 #endif
 }
 
@@ -442,19 +442,12 @@ void Nel19AudioProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer,
 {
     juce::ScopedNoDenormals noDenormals;
     const auto numSamples = buffer.getNumSamples();
-    const auto numChannelsIn = getChannelCountOfBus(true, 0);
-    const auto numChannelsOut = getChannelCountOfBus(false, 0);
-    const auto samplesRead = buffer.getArrayOfReadPointers();
-    modSys.processBlock(samplesRead, numSamples, getPlayHead());
+    modSys.processBlock(numSamples, getPlayHead());
+    if (numSamples == 0)
+        return;
+	auto numChannels = buffer.getNumChannels();
     auto samples = buffer.getArrayOfWritePointers();
-    bool updateStuff = false;
-    if (oversampling.processBlockEmpty())
-        updateStuff = true;
-    if (!dryWet.processBypass(samples, numChannelsIn, numChannelsOut, numSamples))
-        updateStuff = true;
-    vibrat.processBlockBypassed(this, numChannelsOut);
-    if (updateStuff)
-        return prepareToPlay(getSampleRate(), getBlockSize());
+    dryWet.processBypass(samples, numChannels, numSamples);
 }
 
 bool Nel19AudioProcessor::hasEditor() const { return true; }
@@ -464,9 +457,8 @@ juce::AudioProcessorEditor* Nel19AudioProcessor::createEditor()
     return new Nel19AudioProcessorEditor(*this);
 }
 
-void Nel19AudioProcessor::getStateInformation (juce::MemoryBlock& destData)
+void Nel19AudioProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
-    juce::ScopedLock lock(mutex);
     savePatch();
 #if RemoveValueTree
     modSys.state.removeAllChildren(nullptr);
@@ -498,7 +490,7 @@ void Nel19AudioProcessor::savePatch()
         modulators[m].savePatch(modSys.state, m);
     {
         const juce::Identifier id(vibrato::toString(vibrato::ObjType::InterpolationType));
-        const auto type = vibrat.getInterpolationType();
+        const auto type = vibrat.interpolationType.load();
         const auto typeStr = vibrato::toString(type);
         modSys.state.setProperty(id, typeStr, nullptr);
     }
@@ -508,20 +500,19 @@ void Nel19AudioProcessor::savePatch()
         modSys.state.setProperty(id, bufferSize, nullptr);
     }
     {
-        const juce::Identifier id(oversampling::getOversamplingOrderID());
+        const juce::Identifier id(oversampling::getID());
         const auto oEnabled = oversampling.isEnabled() ? 1 : 0;
         modSys.state.setProperty(id, oEnabled, nullptr);
     }
     {
-        const juce::Identifier id(drywet::getLookaheadID());
-        const auto oEnabled = dryWet.isLookaheadEnabled() ? 1 : 0;
+        const juce::Identifier id(getLookaheadID());
+        const auto oEnabled = lookaheadEnabled.load() ? 1 : 0;
         modSys.state.setProperty(id, oEnabled, nullptr);
     }
 }
 
 void Nel19AudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
-    juce::ScopedLock lock(mutex);
     std::unique_ptr<juce::XmlElement> xmlState(getXmlFromBinary(data, sizeInBytes));
     if (xmlState.get() != nullptr)
         if (xmlState->hasTagName(modSys.state.getType()))
@@ -535,6 +526,7 @@ void Nel19AudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 
 void Nel19AudioProcessor::loadPatch()
 {
+    suspendProcessing(true);
     modSys.loadPatch();
     {
         const auto modTypeID = vibrato::toString(vibrato::ObjType::ModType);
@@ -562,7 +554,7 @@ void Nel19AudioProcessor::loadPatch()
         if (typeStr.isNotEmpty())
         {
             const auto type = vibrato::toType(typeStr);
-            vibrat.setInterpolationType(type);
+            vibrat.interpolationType.store(type);
         }
     }
     {
@@ -572,30 +564,55 @@ void Nel19AudioProcessor::loadPatch()
         {
             const auto bufferSize = sizeStr.getFloatValue();
             modSys.state.setProperty(id, bufferSize, nullptr);
-            vibrat.triggerUpdate();
         }
     }
     {
-        const juce::Identifier id(oversampling::getOversamplingOrderID());
+        const juce::Identifier id(oversampling::getID());
         const auto oEnabledStr = modSys.state.getProperty(id, "").toString();
         if (oEnabledStr.isNotEmpty())
         {
             const auto oEnabled = oEnabledStr.getIntValue() == 1 ? true : false;
-            oversampling.setEnabled(oEnabled);
+            oversamplingEnabled.store(oEnabled);
         }
     }
     {
-        const juce::Identifier id(drywet::getLookaheadID());
+        const juce::Identifier id(getLookaheadID());
         const auto oEnabledStr = modSys.state.getProperty(id, "").toString();
         if (oEnabledStr.isNotEmpty())
         {
             const auto oEnabled = oEnabledStr.getIntValue() == 1 ? true : false;
-            dryWet.setLookaheadEnabled(oEnabled);
+            lookaheadEnabled.store(oEnabled);
         }
+    }
+    prepareToPlay(getSampleRate(), getBlockSize());
+    suspendProcessing(false);
+}
+
+juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
+{
+    return new Nel19AudioProcessor();
+}
+
+void Nel19AudioProcessor::timerCallback()
+{
+    if (oversamplingEnabled.load() != oversampling.isEnabled() ||
+        lookaheadEnabled.load() != getLatencySamples() - oversampling.getLatency() != 0)
+    {
+        forcePrepare();
     }
 }
 
-juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new Nel19AudioProcessor(); }
+void Nel19AudioProcessor::forcePrepare()
+{
+    suspendProcessing(true);
+	prepareToPlay(getSampleRate(), getBlockSize());
+	suspendProcessing(false);
+}
+
+juce::String Nel19AudioProcessor::getLookaheadID()
+{
+    return "lookahead";
+}
 
 #undef RemoveValueTree
 #undef OversamplingEnabled

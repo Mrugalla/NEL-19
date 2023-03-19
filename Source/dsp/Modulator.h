@@ -646,12 +646,11 @@ namespace vibrato
 			};
 			
 		public:
-			AudioRate(int _numChannels) :
+			AudioRate() :
 				retuneSpeedSmooth(0.f),
 				widthSmooth(0.f),
 				widthBuf(),
-
-				numChannels(_numChannels),
+				
 				osc(),
 				env(),
 
@@ -662,7 +661,7 @@ namespace vibrato
 
 				Fs(1.f)
 			{
-				osc.resize(numChannels);
+				osc.resize(2);
 			}
 			
 			void prepare(float sampleRate, int blockSize)
@@ -696,7 +695,7 @@ namespace vibrato
 				env.sustain = sustain;
 			}
 
-			void operator()(Buffer& buffer, const juce::MidiBuffer& midi, int numChannelsOut, int numSamples) noexcept
+			void operator()(Buffer& buffer, const juce::MidiBuffer& midi, int numChannels, int numSamples) noexcept
 			{
 				auto& bufEnv = buffer[2];
 
@@ -784,59 +783,67 @@ namespace vibrato
 				}
 #else
 				{ // SYNTHESIZE OSCILLATOR
-					if (numChannelsOut == 1)
-					{
+					if(numChannels == 1)
+					{ // channel 0
+						auto& osci = osc[0];
+						auto buf = buffer[0].data();
+
 						if(retuningNow)
 							for (auto s = 0; s < numSamples; ++s)
 							{
 								const auto freq = buffer[1][s];
-								osc[0].setFrequencyHz(freq);
-								buffer[0][s] = osc[0]() * bufEnv[s];
+								osci.setFrequencyHz(freq);
+								buf[s] = osci() * bufEnv[s];
 							}
 						else
 						{
 							const auto freq = buffer[1][0];
-							osc[0].setFrequencyHz(freq);
+							osci.setFrequencyHz(freq);
 							for (auto s = 0; s < numSamples; ++s)
-								buffer[0][s] = osc[0]() * bufEnv[s];
+								buf[s] = osci() * bufEnv[s];
 						}
 					}
 					else
 					{ // PROCESS STEREO WIDTH
+						auto& osciL = osc[0];
+						auto& osciR = osc[1];
+						auto bufL = buffer[0].data();
+						auto bufR = buffer[1].data();
+						
 						auto smoothingWidth = widthSmooth(widthBuf.data(), width, numSamples);
 
 						if (retuningNow)
 							if(smoothingWidth)
 								for (auto s = 0; s < numSamples; ++s)
 								{
-									const auto freq = buffer[1][s];
-									osc[0].setFrequencyHz(freq);
-									buffer[0][s] = osc[0]() * bufEnv[s];
-									buffer[1][s] = osc[1].withPhaseOffset(osc[0], widthBuf[s] * bufEnv[s]);
+									const auto freq = bufR[s];
+									osciL.setFrequencyHz(freq);
+									bufL[s] = osciL() * bufEnv[s];
+									bufR[s] = osciR.withPhaseOffset(osciL, widthBuf[s] * bufEnv[s]);
 								}
 							else
 								for (auto s = 0; s < numSamples; ++s)
 								{
-									const auto freq = buffer[1][s];
-									osc[0].setFrequencyHz(freq);
-									buffer[0][s] = osc[0]() * bufEnv[s];
-									buffer[1][s] = osc[1].withPhaseOffset(osc[0], width * bufEnv[s]);
+									const auto freq = bufR[s];
+									osciL.setFrequencyHz(freq);
+									bufL[s] = osciL() * bufEnv[s];
+									bufR[s] = osciR.withPhaseOffset(osciL, width * bufEnv[s]);
 								}
 						else
 						{
-							const auto freq = buffer[1][0];
-							osc[0].setFrequencyHz(freq);
+							const auto freq = bufR[0];
+							osciL.setFrequencyHz(freq);
 							if (smoothingWidth)
 								for (auto s = 0; s < numSamples; ++s)
 								{
-									buffer[0][s] = osc[0]() * bufEnv[s];
-									buffer[1][s] = osc[1].withPhaseOffset(osc[0], widthSmooth(width)) * bufEnv[s];
+									bufL[s] = osciL() * bufEnv[s];
+									bufR[s] = osciR.withPhaseOffset(osciL, widthSmooth(width)) * bufEnv[s];
 								}
 							else
 								for (auto s = 0; s < numSamples; ++s)
 								{
-									buffer[0][s] = osc[0]() * bufEnv[s];
-									buffer[1][s] = osc[1].withPhaseOffset(osc[0], width) * bufEnv[s];
+									bufL[s] = osciL() * bufEnv[s];
+									bufR[s] = osciR.withPhaseOffset(osciL, width) * bufEnv[s];
 								}
 						}
 					}
@@ -847,8 +854,7 @@ namespace vibrato
 		protected:
 			SmoothF retuneSpeedSmooth, widthSmooth;
 			std::vector<float> widthBuf;
-
-			const int numChannels;
+			
 			std::vector<Osc> osc;
 			EnvGen env;
 			float noteValue, pitchbendValue;
@@ -864,15 +870,13 @@ namespace vibrato
 			static constexpr float FreqCoeff = pi * 10.f * 10.f * 10.f * 10.f * 10.f;
 		
 		public:
-			Dropout(int _numChannels) :
+			Dropout() :
 				widthSmooth(0.f),
 				widthBuf(),
 				
 				phasor(),
 				decay(1.f), spin(1.f), freqChance(0.f), freqSmooth(0.f), width(0.f),
 				rand(),
-
-				numChannels(_numChannels),
 
 				accel{ 0.f, 0.f },
 				speed{ 0.f, 0.f },
@@ -930,10 +934,10 @@ namespace vibrato
 				width = _width;
 			}
 			
-			void operator()(Buffer& buffer, int numChannelsOut, int numSamples) noexcept
+			void operator()(Buffer& buffer, int numChannels, int numSamples) noexcept
 			{
 				{ // FILL BUFFERS WITH IMPULSES
-					for (auto ch = 0; ch < numChannelsOut; ++ch)
+					for (auto ch = 0; ch < numChannels; ++ch)
 					{
 						auto& phasr = phasor[ch];
 						auto impulseBuf = buffer[ch].data();
@@ -948,7 +952,7 @@ namespace vibrato
 					const auto freqSmoothD = static_cast<double>(freqSmooth);
 					const auto fsD = static_cast<double>(fs);
 
-					for (auto ch = 0; ch < numChannelsOut; ++ch)
+					for (auto ch = 0; ch < numChannels; ++ch)
 					{
 						auto buf = buffer[ch].data();
 						
@@ -993,11 +997,9 @@ namespace vibrato
 					}
 				}
 				
-				{ // PROCESS WIDTH
-					if (numChannelsOut != 2)
-						return;
-					
-					auto widthSmoothing = widthSmooth(widthBuf.data(), width, numSamples);
+				if (numChannels == 2)
+				{
+					const auto widthSmoothing = widthSmooth(widthBuf.data(), width, numSamples);
 					
 					if(widthSmoothing)
 						for (auto s = 0; s < numSamples; ++s)
@@ -1016,8 +1018,6 @@ namespace vibrato
 			float decay, spin, freqChance, freqSmooth, width;
 			juce::Random rand;
 
-			int numChannels;
-
 			std::array<float, 2> accel, speed, dest, env;
 			std::array<SmoothD, 2> smooth;
 			float fs, dcy, spinV;
@@ -1026,7 +1026,7 @@ namespace vibrato
 		struct EnvFol
 		{
 			
-			EnvFol(int _numChannels) :
+			EnvFol() :
 				gainSmooth(0.f), widthSmooth(0.f),
 				widthBuf(),
 
@@ -1037,9 +1037,7 @@ namespace vibrato
 				attackInMs(-1.f), releaseInMs(-1.f), gain(-420.f),
 
 				attackV(1.f), releaseV(1.f), gainV(1.f), widthV(0.f),
-				autogainV(1.f),
-
-				numChannels(_numChannels)
+				autogainV(1.f)
 			{}
 			
 			void prepare(float sampleRate, int blockSize)
@@ -1048,7 +1046,7 @@ namespace vibrato
 				gainSmooth.makeFromDecayInMs(10.f, Fs);
 				widthSmooth.makeFromDecayInMs(10.f, Fs);
 				widthBuf.resize(blockSize);
-				for (auto ch = 0; ch < numChannels; ++ch)
+				for (auto ch = 0; ch < 2; ++ch)
 					envSmooth[ch].makeFromDecayInMs(20.f, Fs);
 				{
 					const auto inSamples = attackInMs * Fs * .001f;
@@ -1087,7 +1085,7 @@ namespace vibrato
 				widthV = _width;
 			}
 			
-			void operator()(Buffer& buffer, const float* const* samples, int numChannelsIn, int numChannelsOut, int numSamples) noexcept
+			void operator()(Buffer& buffer, const float* const* samples, int numChannels, int numSamples) noexcept
 			{
 				auto gainBuf = buffer[2].data();
 				{ // PROCESS GAIN SMOOTH
@@ -1112,7 +1110,7 @@ namespace vibrato
 							buf[s] = env;
 						}
 					}
-					if (numChannelsIn + numChannelsOut == 4)
+					if (numChannels == 2)
 					{
 						auto& env = envelope[1];
 						const auto smpls = samples[1];
@@ -1129,7 +1127,7 @@ namespace vibrato
 						}
 
 						{ // PROCESS WIDTH
-							if (numChannelsOut != 2)
+							if (numChannels != 2)
 								return;
 							
 							auto widthSmoothing = widthSmooth(widthBuf.data(), widthV, numSamples);
@@ -1144,7 +1142,7 @@ namespace vibrato
 					}
 				}
 				{ // PROCESS ANTI-CLIPPING
-					for (auto ch = 0; ch < numChannelsOut; ++ch)
+					for (auto ch = 0; ch < numChannels; ++ch)
 					{
 						auto buf = buffer[ch].data();
 						auto& smooth = envSmooth[ch];
@@ -1168,8 +1166,6 @@ namespace vibrato
 			float attackV, releaseV, gainV, widthV;
 			float autogainV;
 
-			int numChannels;
-
 			void updateAutogainV() noexcept
 			{
 				autogainV = attackV != 0.f ? 1.f + std::sqrt(releaseV / attackV) : 1.f;
@@ -1178,15 +1174,14 @@ namespace vibrato
 
 		struct Macro
 		{
-			Macro(int _numChannels) :
+			Macro() :
 				smooth(0.f),
-				macro(0.f),
-				numChannels(_numChannels)
+				macro(0.f)
 			{}
 			
 			void prepare(float sampleRate) noexcept
 			{
-				smooth.makeFromDecayInMs(40.f, sampleRate);
+				smooth.makeFromDecayInMs(8.f, sampleRate);
 			}
 			
 			void setParameters(float _macro) noexcept
@@ -1194,13 +1189,13 @@ namespace vibrato
 				macro = _macro;
 			}
 			
-			void operator()(Buffer& buffer, int numChannelsOut, int numSamples) noexcept
+			void operator()(Buffer& buffer, int numChannels, int numSamples) noexcept
 			{
-				auto smoothing = smooth(buffer[0].data(), macro, numSamples);
+				const auto smoothing = smooth(buffer[0].data(), macro, numSamples);
 				if(!smoothing)
 					juce::FloatVectorOperations::fill(buffer[0].data(), macro, numSamples);
 
-				if (numChannelsOut != 2)
+				if (numChannels != 2)
 					return;
 				
 				juce::FloatVectorOperations::copy(buffer[1].data(), buffer[0].data(), numSamples);
@@ -1208,20 +1203,17 @@ namespace vibrato
 			
 		protected:
 			SmoothF smooth;
-
 			float macro;
-			int numChannels;
 		};
 
 		struct Pitchbend
 		{
-			Pitchbend(int _numChannels) :
+			Pitchbend() :
 				smooth(0.f),
 				fs(1.f),
 				bendV(0.f),
 				smoothRate(0.f),
-				pitchbend(0),
-				numChannels(_numChannels)
+				pitchbend(0)
 			{}
 			
 			void prepare(float sampleRate) noexcept
@@ -1234,7 +1226,7 @@ namespace vibrato
 				smoothRate = _smoothRate;
 			}
 			
-			void operator()(Buffer& buffer, int numChannelsOut, int numSamples, const juce::MidiBuffer& midiBuffer) noexcept
+			void operator()(Buffer& buffer, int numChannels, int numSamples, const juce::MidiBuffer& midiBuffer) noexcept
 			{
 				{ // UPDATE MIDI DATA
 					auto s = 0;
@@ -1269,7 +1261,7 @@ namespace vibrato
 					for (auto s = 0; s < numSamples; ++s)
 						buffer[0][s] = smooth(buffer[0][s]);
 				}
-				if (numChannelsOut == 2)
+				if (numChannels == 2)
 					juce::FloatVectorOperations::copy(buffer[1].data(), buffer[0].data(), numSamples);
 			}
 		
@@ -1280,8 +1272,6 @@ namespace vibrato
 
 			float bendV, smoothRate;
 			int pitchbend;
-
-			int numChannels;
 		};
 		
 		class LFO
@@ -1399,7 +1389,7 @@ namespace vibrato
 			};
 		
 		public:
-			LFO(int _numChannels, const Tables& _tables, const BeatsData& _beatsData) :
+			LFO(const Tables& _tables, const BeatsData& _beatsData) :
 				tables(_tables),
 				tempoSync(_beatsData),
 
@@ -1416,9 +1406,7 @@ namespace vibrato
 
 				waveformV(0.f),
 				phaseV(0.f),
-				widthV(0.f),
-
-				numChannels(_numChannels)
+				widthV(0.f)
 			{}
 			
 			void prepare(float sampleRate, int blockSize, int latency)
@@ -1445,7 +1433,7 @@ namespace vibrato
 				widthV = _width;
 			}
 			
-			void operator()(Buffer& buffer, int numChannelsOut, int numSamples,
+			void operator()(Buffer& buffer, int numChannels, int numSamples,
 				juce::AudioPlayHead* playHead) noexcept
 			{
 				bool canBeSync = playHead != nullptr;
@@ -1525,7 +1513,7 @@ namespace vibrato
 				}
 
 				{ // PROCESS WIDTH
-					if (numChannelsOut != 2)
+					if (numChannels != 2)
 						return;
 					
 					const auto buf0 = buffer[0].data();
@@ -1549,7 +1537,7 @@ namespace vibrato
 				{ // PROCESS WAVEFORM
 					auto waveformSmoothing = waveformSmooth(waveformBuf.data(), waveformV, numSamples);
 					if(waveformSmoothing)
-						for (auto ch = 0; ch < numChannelsOut; ++ch)
+						for (auto ch = 0; ch < numChannels; ++ch)
 						{
 							auto buf = buffer[ch].data();
 							for (auto s = 0; s < numSamples; ++s)
@@ -1560,7 +1548,7 @@ namespace vibrato
 							}
 						}
 					else
-						for (auto ch = 0; ch < numChannelsOut; ++ch)
+						for (auto ch = 0; ch < numChannels; ++ch)
 						{
 							auto buf = buffer[ch].data();
 							for (auto s = 0; s < numSamples; ++s)
@@ -1584,24 +1572,19 @@ namespace vibrato
 			bool isSync;
 
 			float waveformV, phaseV, widthV;
-
-			int numChannels;
 		};
 
 	public:
-		Modulator(int _numChannels, const BeatsData& beatsData) :
+		Modulator(const BeatsData& beatsData) :
 			buffer(),
-			numChannels(_numChannels == 1 ? 1 : 2),
-
 			tables(),
-
 			perlin(),
-			audioRate(numChannels),
-			dropout(numChannels),
-			envFol(numChannels),
-			macro(numChannels),
-			pitchbend(numChannels),
-			lfo(numChannels, tables, beatsData),
+			audioRate(),
+			dropout(),
+			envFol(),
+			macro(),
+			pitchbend(),
+			lfo(tables, beatsData),
 			
 			type(ModType::Perlin)
 		{
@@ -1692,17 +1675,17 @@ namespace vibrato
 		}
 
 		void processBlock(const float* const* samples, const juce::MidiBuffer& midi,
-			juce::AudioPlayHead* playHead, int numChannelsIn, int numChannelsOut, int numSamples) noexcept
+			juce::AudioPlayHead* playHead, int numChannels, int numSamples) noexcept
 		{
 			switch (type)
 			{
-			case ModType::Perlin: return perlin(buffer, numChannelsOut, numSamples, playHead);
-			case ModType::AudioRate: return audioRate(buffer, midi, numChannelsOut, numSamples);
-			case ModType::Dropout: return dropout(buffer, numChannelsOut, numSamples);
-			case ModType::EnvFol: return envFol(buffer, samples, numChannelsIn, numChannelsOut, numSamples);
-			case ModType::Macro: return macro(buffer, numChannelsOut, numSamples);
-			case ModType::Pitchwheel: return pitchbend(buffer, numChannelsOut, numSamples, midi);
-			case ModType::LFO: return lfo(buffer, numChannelsOut, numSamples, playHead);
+			case ModType::Perlin: return perlin(buffer, numChannels, numSamples, playHead);
+			case ModType::AudioRate: return audioRate(buffer, midi, numChannels, numSamples);
+			case ModType::Dropout: return dropout(buffer, numChannels, numSamples);
+			case ModType::EnvFol: return envFol(buffer, samples, numChannels, numSamples);
+			case ModType::Macro: return macro(buffer, numChannels, numSamples);
+			case ModType::Pitchwheel: return pitchbend(buffer, numChannels, numSamples, midi);
+			case ModType::LFO: return lfo(buffer, numChannels, numSamples, playHead);
 			}
 		}
 		
@@ -1718,8 +1701,6 @@ namespace vibrato
 
 		Buffer buffer;
 	protected:
-		const int numChannels;
-
 		Tables tables;
 
 		Perlin perlin;

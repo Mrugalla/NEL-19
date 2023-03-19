@@ -1,240 +1,172 @@
 #pragma once
+#include "WHead.h"
 #include "../modsys/ModSys.h"
 #include "Smooth.h"
 
 namespace drywet
 {
-	inline juce::String getLookaheadID()
-	{
-		return "lookaheadEnabled";
-	}
+	using AudioBuffer = juce::AudioBuffer<float>;
 
 	struct FFDelay
 	{
 		FFDelay() :
+			wHead(),
 			ringBuffer(),
-			wHead(0),
 			rHead(0)
 		{}
 		
-		void resize(const int size)
+		void prepare(int blockSize, int size)
 		{
-			ringBuffer.resize(size, 0.f);
-			wHead = 0;
-			rHead = 1;
+			wHead.prepare(blockSize, size);
+			ringBuffer.setSize(2, size, false, true, false);
+			rHead.resize(blockSize);
 		}
 		
-		void processBlock(float* dry, const int numSamples) noexcept
+		void operator()(float* const* samplesDry, int numChannels, int numSamples) noexcept
 		{
-			for (auto s = 0; s < numSamples; ++s)
+			synthesizeHeads(numSamples);
+			auto ringBuf = ringBuffer.getArrayOfWritePointers();
+
+			for (auto ch = 0; ch < numChannels; ++ch)
 			{
-				ringBuffer[wHead] = dry[s];
-				dry[s] = ringBuffer[rHead];
-				++wHead;
-				if (wHead == ringBuffer.size())
-					wHead = 0;
-				rHead = wHead + 1;
-				if (rHead == ringBuffer.size())
-					rHead = 0;
+				auto dry = samplesDry[ch];
+				auto ring = ringBuf[ch];
+
+				for (auto s = 0; s < numSamples; ++s)
+				{
+					const auto w = wHead[s];
+					const auto r = rHead[s];
+
+					ring[w] = dry[s];
+					dry[s] = ring[r];
+				}
 			}
 		}
 		
-		void processBlock(float* dest, const float* src, const int numSamples) noexcept
+		void operator()(float* const* samplesDest, const float* const* samplesSrc, int numChannels, int numSamples) noexcept
 		{
-			for (auto s = 0; s < numSamples; ++s)
+			synthesizeHeads(numSamples);
+			auto ringBuf = ringBuffer.getArrayOfWritePointers();
+			
+			for (auto ch = 0; ch < numChannels; ++ch)
 			{
-				ringBuffer[wHead] = src[s];
-				dest[s] = ringBuffer[rHead];
-				++wHead;
-				if (wHead == ringBuffer.size())
-					wHead = 0;
-				rHead = wHead + 1;
-				if (rHead == ringBuffer.size())
-					rHead = 0;
+				const auto src = samplesSrc[ch];
+				auto dest = samplesDest[ch];
+				auto ring = ringBuf[ch];
+
+				for (auto s = 0; s < numSamples; ++s)
+				{
+					const auto w = wHead[s];
+					const auto r = rHead[s];
+
+					ring[w] = src[s];
+					dest[s] = ring[r];
+				}
 			}
 		}
 	
 	protected:
-		std::vector<float> ringBuffer;
-		unsigned long long wHead, rHead;
+		dsp::WHead wHead;
+		AudioBuffer ringBuffer;
+		std::vector<int> rHead;
+
+		void synthesizeHeads(int numSamples) noexcept
+		{
+			wHead(numSamples);
+			for (auto s = 0; s < numSamples; ++s)
+			{
+				rHead[s] = wHead[s] + 1;
+				if (rHead[s] >= wHead.delaySize)
+					rHead[s] -= wHead.delaySize;
+			}
+		}
 	};
 
 	struct Processor
 	{
-		using Buffer = std::array<std::vector<float>, 3>;
+		enum
+		{
+			kL,
+			kR,
+			kMix,
+			kMixDry,
+			kMixWet,
+			kGainWet,
+			kNumChannels
+		};
 
-		Processor(int _numChannels) :
+		Processor() :
 			mixSmooth(0.f),
-			dryBuffer(), paramBuffer(),
-			numChannels(_numChannels),
-			
+			delay(),
+			buffers(),
 			gainWet(420.f), gainWetVal(1.f),
-			gainWetSmooth(0.f),
-
-			lookaheadEnabled(true),
-			lookaheadState(true)
+			gainWetSmooth(0.f)
 		{
 		}
 		
-		void setLookaheadEnabled(bool e) noexcept
-		{
-			lookaheadEnabled.store(e);
-		}
-		
-		void prepare(float sampleRate, int maxBufferSize, int latency)
+		void prepare(float sampleRate, int blockSize, int latency)
 		{
 			mixSmooth.makeFromDecayInMs(10.f, sampleRate);
 			gainWetSmooth.makeFromDecayInMs(4.f, sampleRate);
-			for (auto& b : dryBuffer)
-				b.resize(maxBufferSize, 0.f);
-			for (auto& b : paramBuffer)
-				b.resize(maxBufferSize, 0.f);
-			for (auto ch = 0; ch < numChannels; ++ch)
-				dryDelay[ch].resize(latency);
+			buffers.setSize(kNumChannels, blockSize, false, true, false);
+			delay.prepare(blockSize, latency);
 		}
 		
-		bool processBypass(float* const* samples, int numChannelsIn, int numChannelsOut, int numSamples) noexcept
+		void processBypass(float* const* samples, int numChannels, int numSamples) noexcept
 		{
-			{ // CHECK IF LOOKAHEAD STATE CHANGED
-				const auto e = lookaheadEnabled.load();
-				if (lookaheadState != e)
-				{
-					lookaheadState = e;
-					return false;
-				}
-			}
-			
-			if (lookaheadState)
-			{
-				{
-					auto& dly = dryDelay[0];
-					auto dry = dryBuffer[0].data();
-					auto smpls = samples[0];
-
-					dly.processBlock(dry, smpls, numSamples);
-					juce::FloatVectorOperations::copy(smpls, dry, numSamples);
-				}
-				
-				if (numChannelsOut == 2)
-				{
-					if(numChannelsIn < numChannelsOut)
-						juce::FloatVectorOperations::copy(samples[1], samples[0], numSamples);
-					else
-					{
-						auto& dly = dryDelay[1];
-						auto dry = dryBuffer[1].data();
-						auto smpls = samples[1];
-
-						dly.processBlock(dry, smpls, numSamples);
-						juce::FloatVectorOperations::copy(smpls, dry, numSamples);
-					}
-					
-				}
-			}
-			return true;
+			delay(samples, numChannels, numSamples);
 		}
 		
-		bool saveDry(const float* const* samples, float mixVal, int numChannelsIn, int numChannelsOut, int numSamples) noexcept
+		void saveDry(const float* const* samples, float mixVal, int numChannels, int numSamples) noexcept
 		{
-			{ // CHECK IF LOOKAHEAD STATE CHANGED
-				const auto e = lookaheadEnabled.load();
-				if (lookaheadState != e)
-				{
-					lookaheadState = e;
-					return false;
-				}
-			}
-			auto mixBuf = paramBuffer[2].data();
-			{ // SMOOTHEN PARAMETER VALUE pVAL
-				auto mixSmoothing = mixSmooth(mixBuf, mixVal, numSamples);
+			auto bufs = buffers.getArrayOfWritePointers();
+
+			{ // SMOOTHEN MIX PARAMETER VALUE
+				auto mixSmoothing = mixSmooth(bufs[kMix], mixVal, numSamples);
 				if(!mixSmoothing)
-					juce::FloatVectorOperations::fill(mixBuf, mixVal, numSamples);
+					juce::FloatVectorOperations::fill(bufs[kMix], mixVal, numSamples);
 			}
 			{ // MAKING EQUAL LOUDNESS CURVES
 				for (auto s = 0; s < numSamples; ++s)
-					paramBuffer[0][s] = std::sqrt(1.f - mixBuf[s]);
+					bufs[kMixDry][s] = std::sqrt(1.f - bufs[kMix][s]);
 				for (auto s = 0; s < numSamples; ++s)
-					paramBuffer[1][s] = std::sqrt(mixBuf[s]);
+					bufs[kMixWet][s] = std::sqrt(bufs[kMix][s]);
 			}
-			{ // SAVE DRY BUFFER
-				if (lookaheadState)
-				{
-					{
-						auto& dly = dryDelay[0];
-						auto dry = dryBuffer[0].data();
-						auto smpls = samples[0];
-
-						dly.processBlock(dry, smpls, numSamples);
-					}
-					if (numChannelsOut == 2 && numChannelsIn == numChannels)
-					{
-						auto& dly = dryDelay[1];
-						auto dry = dryBuffer[1].data();
-						auto smpls = samples[1];
-
-						dly.processBlock(dry, smpls, numSamples);
-					}
-				}
-				else
-				{
-					for (auto ch = 0; ch < numChannelsIn; ++ch)
-					{
-						auto dry = dryBuffer[ch].data();
-						const auto smpls = samples[ch];
-
-						juce::FloatVectorOperations::copy(dry, smpls, numSamples);
-					}
-				}
-			}
-			return true;
+			
+			delay(bufs, numChannels, numSamples);
 		}
 		
-		void processWet(float* const* samples, float _gainWet, int numChannelsIn, int numChannelsOut, int numSamples) noexcept
+		void processWet(float* const* samples, float _gainWet, int numChannels, int numSamples) noexcept
 		{
+			auto bufs = buffers.getArrayOfWritePointers();
+
 			if (gainWet != _gainWet)
 			{
 				gainWet = _gainWet;
 				gainWetVal = juce::Decibels::decibelsToGain(gainWet);
 			}
-			auto gainBuf = paramBuffer[2].data();
 			{
-				auto gainWetSmoothing = gainWetSmooth(gainBuf, gainWetVal, numSamples);
+				auto gainWetSmoothing = gainWetSmooth(bufs[kGainWet], gainWetVal, numSamples);
 				if (!gainWetSmoothing)
-					juce::FloatVectorOperations::fill(gainBuf, gainWetVal, numSamples);
+					juce::FloatVectorOperations::fill(bufs[kGainWet], gainWetVal, numSamples);
 			}
-			const auto pBuf0 = paramBuffer[0].data();
-			const auto pBuf1 = paramBuffer[1].data();
+			
+			for (auto ch = 0; ch < numChannels; ++ch)
 			{
-				auto smpls = samples[0];
-				const auto dry = dryBuffer[0].data();
+				auto smpls = samples[ch];
+				const auto dry = bufs[kL + ch];
 
 				for (auto s = 0; s < numSamples; ++s)
-					smpls[s] = dry[s] * pBuf0[s] + smpls[s] * pBuf1[s] * gainBuf[s];
-			}
-
-			if (numChannelsOut == 2)
-			{
-				auto smpls = samples[1];
-				const auto dry = dryBuffer[1 % numChannelsIn].data();
-
-				for (auto s = 0; s < numSamples; ++s)
-					smpls[s] = dry[s] * pBuf0[s] + smpls[s] * pBuf1[s] * gainBuf[s];
+					smpls[s] = dry[s] * bufs[kMixDry][s] + smpls[s] * bufs[kMixWet][s] * bufs[kGainWet][s];
 			}
 		}
-		
-		bool isLookaheadEnabled() const noexcept { return lookaheadEnabled.load(); }
 	
 	protected:
 		smooth::Smooth<float> mixSmooth;
-		std::array<FFDelay, 2> dryDelay;
-		Buffer dryBuffer, paramBuffer;
-		const int numChannels;
-
+		FFDelay delay;
+		AudioBuffer buffers;
 		float gainWet, gainWetVal;
 		smooth::Smooth<float> gainWetSmooth;
-
-		std::atomic<bool> lookaheadEnabled;
-		bool lookaheadState;
 	};
 }
 
