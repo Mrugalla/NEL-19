@@ -29,9 +29,13 @@ Nel19AudioProcessor::Nel19AudioProcessor()
         vibrato::Modulator(modSys.getBeatsData())
     },
     modsBuffer(),
-    modType(),
+    modType
+    {
+        vibrato::ModType::Perlin,
+        vibrato::ModType::LFO
+    },
     vibrat(),
-    visualizerValues(),
+    visualizerValues{ 0.f, 0.f },
     lookaheadEnabled(true),
     depthSmooth(0.f), modsMixSmooth(0.f),
     depthBuf(), modsMixBuf()
@@ -41,8 +45,8 @@ Nel19AudioProcessor::Nel19AudioProcessor()
     auto user = appProperties.getUserSettings();
 
     { // MAKE PRESETS
-        auto file = user->getFile();
-        file = file.getParentDirectory();
+        auto& userFile = user->getFile();
+        auto file = userFile.getParentDirectory();
         file = file.getChildFile("Presets");
         if (!file.exists())
             file.createDirectory();
@@ -56,7 +60,7 @@ Nel19AudioProcessor::Nel19AudioProcessor()
                 nFile.create();
                 nFile.appendText(txt, false, false);
             };
-
+            /*
             make("AudioRate Arp (midi)", BinaryData::AudioRate_Arp_midi_nel, BinaryData::AudioRate_Arp_midi_nelSize);
             make("Broken Tape", BinaryData::Broken_Tape_nel, BinaryData::Broken_Tape_nelSize);
             make("Dream Arp EnvFol", BinaryData::Dream_Arp_EnvFol_nel, BinaryData::Dream_Arp_EnvFol_nelSize);
@@ -67,39 +71,7 @@ Nel19AudioProcessor::Nel19AudioProcessor()
             make("Shoegaze", BinaryData::Shoegaze_nel, BinaryData::Shoegaze_nelSize);
             make("Sines", BinaryData::Sines_nel, BinaryData::Sines_nelSize);
             make("Thicc", BinaryData::Thicc_nel, BinaryData::Thicc_nelSize);
-        }
-    }
-
-    visualizerValues.resize(2, 0.f);
-
-    modType[0] = vibrato::ModType::Perlin;
-    modType[1] = vibrato::ModType::LFO;
-    
-    {
-        const auto defVal = vibrato::toString(vibrato::InterpolationType::Lerp);
-        const auto id = vibrato::toString(vibrato::ObjType::InterpolationType);
-        const auto idType = user->getValue(id, defVal);
-        const auto type = vibrato::toType(idType);
-        vibrat.interpolationType.store(type);
-    }
-    {
-        const auto id = getLookaheadID();
-        const auto e = user->getBoolValue(id, true);
-    }
-    {
-        std::array<vibrato::ModType, NumActiveMods> defVals
-        {
-            vibrato::ModType::Perlin,
-            vibrato::ModType::LFO
-        };
-        const auto objType = vibrato::ObjType::ModType;
-        for (auto m = 0; m < NumActiveMods; ++m)
-        {
-            const auto objStr = vibrato::with(objType, m);
-            const juce::Identifier id(objStr);
-            const auto mID = user->getValue(id, vibrato::toString(defVals[m]));
-            const auto type = vibrato::getModType(mID);
-            modType[m] = type;
+            */
         }
     }
 
@@ -174,53 +146,51 @@ void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize)
 
     auto user = appProperties.getUserSettings();
 
-    float dSize;
+    float delaySizeMs;
     {
-        static constexpr double defaultDlySize = 13.;
+        static constexpr double defaultDelaySizeMs = 13.;
         const juce::String id(vibrato::toString(vibrato::ObjType::DelaySize));
-        dSize = static_cast<float>(modSys.state.getProperty(id, -1.f));
-        if (dSize <= 0.f || std::isnan(dSize) || std::isinf(dSize))
-            dSize = static_cast<float>(user->getDoubleValue(id, defaultDlySize));
+        delaySizeMs = static_cast<float>(modSys.state.getProperty(id, defaultDelaySizeMs));
+        if (delaySizeMs <= 0.f || std::isnan(delaySizeMs) || std::isinf(delaySizeMs))
+            delaySizeMs = static_cast<float>(user->getDoubleValue(id, defaultDelaySizeMs));
+        if (delaySizeMs <= 0.f || std::isnan(delaySizeMs) || std::isinf(delaySizeMs))
+            delaySizeMs = static_cast<float>(defaultDelaySizeMs);
     }
-    const auto vibSizeSamplesHalf = static_cast<int>(std::rint(sampleRateF * dSize * .001f * .5f));
+	auto delaySize = static_cast<int>(std::round(sampleRateF * delaySizeMs / 1000.f));
+    if (delaySize % 2 != 0)
+		delaySize += 1;
+    const auto delaySizeHalf = delaySize / 2;
     
-    dryWet.prepare(sampleRateF, maxBufferSize, vibSizeSamplesHalf);
-
-    const auto lGate = lookaheadEnabled.load() ? 1 : 0;
-    auto latency = vibSizeSamplesHalf;
+    dryWet.prepare(sampleRateF, maxBufferSize, delaySizeHalf);
+    
+	auto latency = delaySizeHalf * (lookaheadEnabled.load() ? 1 : 0);
+    
 #if OversamplingEnabled
     const auto osEnabled = oversamplingEnabled.load();
     oversampling.prepareToPlay(sampleRate, maxBufferSize, osEnabled);
 
-    sampleRate = oversampling.getSampleRateUpsampled();
-    maxBufferSize = oversampling.getBlockSizeUp();
+    const auto sampleRateUpD = oversampling.getSampleRateUpsampled();
+    const auto blockSizeUp = oversampling.getBlockSizeUp();
     latency += oversampling.getLatency();
 
-    sampleRateF = static_cast<float>(sampleRate);
+    const auto sampleRateUpF = static_cast<float>(sampleRateUpD);
 #endif
-    latency *= lGate;
-    depthSmooth.makeFromDecayInMs(24.f, sampleRateF);
-    modsMixSmooth.makeFromDecayInMs(24.f, sampleRateF);
-    depthBuf.resize(maxBufferSize);
-    modsMixBuf.resize(maxBufferSize);
+    depthSmooth.makeFromDecayInMs(24.f, sampleRateUpF);
+    modsMixSmooth.makeFromDecayInMs(24.f, sampleRateUpF);
+    depthBuf.resize(blockSizeUp);
+    modsMixBuf.resize(blockSizeUp);
 
-    modsBuffer.setSize(2, maxBufferSize, false, true, false);
+    modsBuffer.setSize(2, blockSizeUp, false, true, false);
     
     for (auto m = 0; m < NumActiveMods; ++m)
-        modulators[m].prepare(sampleRateF, maxBufferSize, latency);
+        modulators[m].prepare(sampleRateUpF, blockSizeUp, latency);
         
-    // UPDATE LFO WAVETABLE
-    const auto vds = static_cast<int>(sampleRateF * dSize * .001f);
-    vibrat.prepare(maxBufferSize, vds);
-    {
-        const auto id = vibrato::toString(vibrato::ObjType::InterpolationType);
-        const auto typeStr = modSys.state.getProperty(id, "").toString();
-        if (typeStr.isNotEmpty())
-        {
-            const auto type = vibrato::toType(typeStr);
-            vibrat.interpolationType.store(type);
-        }
-    }
+    vibrat.prepare
+    (
+        sampleRateUpF,
+        blockSizeUp,
+        delaySize * (osEnabled ? 4 : 1)
+    );
 
     setLatencySamples(latency);
 }
@@ -256,7 +226,8 @@ void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             buffer.clear(ch, 0, numSamples);
     }
 	const auto numChannels = buffer.getNumChannels();
-    const auto playHead = getPlayHead();
+    const auto _playHead = getPlayHead();
+    playHead.store(_playHead);
     
     modSys.processBlock(numSamples, playHead);
     
@@ -296,6 +267,7 @@ void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& bufferOu
 #if OversamplingEnabled
     auto& buffer = oversampling.upsample(bufferOut);
 #endif
+    const auto osEnabled = oversampling.isEnabled();
     const auto samplesRead = buffer.getArrayOfReadPointers();
     const auto numSamples = buffer.getNumSamples();
 
@@ -423,17 +395,20 @@ void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& bufferOu
         visualizerValues[ch] = mAll[numSamples - 1];
     }
 #else
+	const auto feedback = modSys.getParam(modSys6::PID::Feedback)->getValSumDenorm();
     vibrat
     (
         buffer.getArrayOfWritePointers(),
         numChannels,
         numSamples,
-        modsBuf
+        modsBuf,
+        feedback,
+		osEnabled ? vibrato::InterpolationType::Lerp : vibrato::InterpolationType::Spline
     );
 #endif
     
 #if OversamplingEnabled
-    if(oversampling.isEnabled())
+    if(osEnabled)
         oversampling.downsample(bufferOut);
 #endif
 }
@@ -485,14 +460,6 @@ void Nel19AudioProcessor::savePatch()
             const auto typeID = modTypeID + static_cast<juce::String>(m);
             modTypeState.setProperty(typeID, vibrato::toString(modType[m]), nullptr);
         }
-    }
-    for (auto m = 0; m < modulators.size(); ++m)
-        modulators[m].savePatch(modSys.state, m);
-    {
-        const juce::Identifier id(vibrato::toString(vibrato::ObjType::InterpolationType));
-        const auto type = vibrat.interpolationType.load();
-        const auto typeStr = vibrato::toString(type);
-        modSys.state.setProperty(id, typeStr, nullptr);
     }
     {
         const juce::Identifier id(vibrato::toString(vibrato::ObjType::DelaySize));
@@ -548,15 +515,7 @@ void Nel19AudioProcessor::loadPatch()
     }
     for (auto m = 0; m < modulators.size(); ++m)
         modulators[m].loadPatch(modSys.state, m);
-    {
-        const juce::Identifier id(vibrato::toString(vibrato::ObjType::InterpolationType));
-        const auto typeStr = modSys.state.getProperty(id, "").toString();
-        if (typeStr.isNotEmpty())
-        {
-            const auto type = vibrato::toType(typeStr);
-            vibrat.interpolationType.store(type);
-        }
-    }
+    
     {
         const juce::Identifier id(vibrato::toString(vibrato::ObjType::DelaySize));
         const auto sizeStr = modSys.state.getProperty(id, "").toString();
@@ -595,8 +554,13 @@ juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 
 void Nel19AudioProcessor::timerCallback()
 {
-    if (oversamplingEnabled.load() != oversampling.isEnabled() ||
-        lookaheadEnabled.load() != getLatencySamples() - oversampling.getLatency() != 0)
+    const auto curLatency = getLatencySamples();
+    const auto latencyWithoutOversampling = curLatency - oversampling.getLatency();
+    const auto hasLatency = latencyWithoutOversampling != 0;
+    const bool oversamplingChanged = oversamplingEnabled.load() != oversampling.isEnabled();
+    const bool lookaheadChanged = lookaheadEnabled.load() != hasLatency;
+    
+    if (oversamplingChanged || lookaheadChanged)
     {
         forcePrepare();
     }

@@ -15,7 +15,7 @@ public:
 private:
     Nel19AudioProcessor& audioProcessor;
     
-    nelG::Layout layout, layoutMacros, layoutMainParams, layoutBottomBar, layoutMiscs, layoutTopBar;
+    nelG::Layout layout, layoutMacros, layoutMainParams, layoutBottomBar, layoutTopBar;
     
     modSys6::gui::Utils utils;
     modSys6::gui::Events::Evt notify;
@@ -32,7 +32,7 @@ private:
 
     modSys6::gui::Visualizer visualizer;
 
-    modSys6::gui::Paramtr modsDepth, modsMix, dryWetMix, gainWet, stereoConfig;
+    modSys6::gui::Paramtr modsDepth, modsMix, dryWetMix, gainWet, stereoConfig, feedback;
 
     modSys6::gui::ModDragger macro0Dragger, macro1Dragger, macro2Dragger, macro3Dragger;
 

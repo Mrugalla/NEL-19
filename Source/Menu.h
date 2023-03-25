@@ -515,6 +515,7 @@ namespace menu2
 		{
 			g.fillAll(utils.colour(ColourID::Bg));
 		}
+		
 		void resized() override
 		{
 			const auto width = static_cast<float>(getWidth());
@@ -543,12 +544,14 @@ namespace menu2
 				entryY += entryHeight;
 			}
 		}
+		
 		void timerCallback() override
 		{
 			if (colourSelector != nullptr && colourSelector->isVisible())
 				colourSelector->update();
 		}
 	private:
+		
 		void addEntries(const std::array<juce::Identifier, NumIDs>& id)
 		{
 			for (auto i = 0; i < xml.getNumChildren(); ++i)
@@ -586,16 +589,19 @@ namespace menu2
 					subMenu->setBounds(getLocalBounds());
 				}
 			};
+			
 			const auto onPaint = [this](juce::Graphics& g, ButtonM& b)
 			{
 				paintMenuButton(g, b, utils);
 			};
+			
 			const auto tooltp = child.getProperty(id[TOOLTIP]);
 			entries.push_back(std::make_unique<ButtonM>(utils, tooltp.toString(), onClick, onPaint));
 			const auto buttonName = child.getProperty(id[ID]);
 			entries.back()->setName(buttonName.toString());
 			addAndMakeVisible(*entries.back().get());
 		}
+		
 		void addColourSelector(const std::array<juce::Identifier, NumIDs>& id, juce::ValueTree child, const int i)
 		{
 			const auto onClick = [this, idx = i]()
@@ -626,6 +632,7 @@ namespace menu2
 			entries.back()->setName(buttonName);
 			addAndMakeVisible(*entries.back().get());
 		}
+		
 		void addSwitchButton(const std::array<juce::Identifier, NumIDs>& id, juce::ValueTree child, const int,
 			std::function<void(int)> onSwitch, const juce::String& buttonName, std::function<bool(int)> onIsEnabled)
 		{
@@ -641,6 +648,7 @@ namespace menu2
 			));
 			addAndMakeVisible(*entries.back().get());
 		}
+		
 		void addSwitchButton(const std::array<juce::Identifier, NumIDs>& id,
 			juce::ValueTree child, const int i)
 		{
@@ -656,42 +664,6 @@ namespace menu2
 				const auto onIsEnabled = [this](int i)
 				{
 					return (utils.getTooltipsEnabled() ? 1 : 0) == i;
-				};
-				addSwitchButton(id, child, i, onSwitch, buttonName, onIsEnabled);
-			}
-			else if (buttonName == "interpolation")
-			{
-				const auto onSwitch = [this](int e)
-				{
-					const auto id = vibrato::toString(vibrato::ObjType::InterpolationType);
-					const auto type = static_cast<vibrato::InterpolationType>(e);
-					processor.vibrat.interpolationType.store(type);
-					const auto idType = vibrato::toString(type);
-					processor.modSys.state.setProperty(id, idType, nullptr);
-				};
-				const auto onIsEnabled = [this](int i)
-				{
-					return static_cast<int>(processor.vibrat.interpolationType.load()) == i;
-				};
-				addSwitchButton(id, child, i, onSwitch, buttonName, onIsEnabled);
-			}
-			else if (buttonName == "interpolation def")
-			{
-				const auto onSwitch = [this](int e)
-				{
-					const auto id = vibrato::toString(vibrato::ObjType::InterpolationType);
-					const auto type = static_cast<vibrato::InterpolationType>(e);
-					const auto idType = vibrato::toString(type);
-					auto user = processor.appProperties.getUserSettings();
-					user->setValue(id, idType);
-				};
-				const auto onIsEnabled = [this](int i)
-				{
-					const auto user = processor.appProperties.getUserSettings();
-					const auto id = vibrato::toString(vibrato::ObjType::InterpolationType);
-					const auto idType = user->getValue(id, vibrato::toString(vibrato::InterpolationType::Spline));
-					const auto type = vibrato::toType(idType);
-					return static_cast<int>(type) == i;
 				};
 				addSwitchButton(id, child, i, onSwitch, buttonName, onIsEnabled);
 			}
@@ -733,30 +705,12 @@ namespace menu2
 					const auto idStr = oversampling::getID();
 					juce::Identifier id(idStr);
 					processor.modSys.state.setProperty(id, e, nullptr);
-					processor.oversamplingEnabled.store(!processor.oversampling.isEnabled());
+					processor.oversamplingEnabled.store(e);
 				};
 				const auto onIsEnabled = [this](int i)
 				{
 					const auto e = processor.oversampling.isEnabled();
 					return (e ? 1 : 0) == i;
-				};
-				addSwitchButton(id, child, i, onSwitch, buttonName, onIsEnabled);
-			}
-			else if (buttonName == "oversampling def")
-			{
-				const auto onSwitch = [this](int e)
-				{
-					const auto idStr = oversampling::getID();
-					juce::Identifier id(idStr);
-					auto user = processor.appProperties.getUserSettings();
-					user->setValue(id, e);
-				};
-				const auto onIsEnabled = [this](int i)
-				{
-					const auto idStr = oversampling::getID();
-					const auto user = processor.appProperties.getUserSettings();
-					juce::Identifier id(idStr);
-					return user->getIntValue(id, 0) == i;
 				};
 				addSwitchButton(id, child, i, onSwitch, buttonName, onIsEnabled);
 			}
@@ -778,50 +732,13 @@ namespace menu2
 				};
 				addSwitchButton(id, child, i, onSwitch, buttonName, onIsEnabled);
 			}
-			else if (buttonName == "lookahead def")
-			{
-				const auto onSwitch = [this](int e)
-				{
-					const juce::Identifier id(processor.getLookaheadID());
-					auto user = processor.appProperties.getUserSettings();
-					user->setValue(id, e);
-				};
-				const auto onIsEnabled = [this](int i)
-				{
-					const auto user = processor.appProperties.getUserSettings();
-					const juce::Identifier id(processor.getLookaheadID());
-					return user->getIntValue(id, 1) == i;
-				};
-				addSwitchButton(id, child, i, onSwitch, buttonName, onIsEnabled);
-			}
 		}
+		
 		void addTextBox(const std::array<juce::Identifier, NumIDs>& id, juce::ValueTree child, const int)
 		{
 			const auto buttonName = child.getProperty(id[ID]).toString();
 			// buttonName must match id in menu.xml
-			if (buttonName == "r_depth")
-			{
-				const auto onUpdate = [this](const juce::String& txt)
-				{
-					const auto r_depth = juce::jlimit(0.f, 100.f, txt.getFloatValue());
-					auto user = processor.appProperties.getUserSettings();
-					juce::String id("r_depth");
-					user->setValue(id, r_depth);
-					Shared::shared.r_depth = r_depth * .01f;
-					return true;
-				};
-				const auto onDefaultStr = [this]()
-				{
-					const auto user = processor.appProperties.getUserSettings();
-					return user->getValue("r_depth", "100");
-				};
-				const auto tooltp = child.getProperty(id[TOOLTIP]);
-				entries.push_back(std::make_unique<TextBox>(
-					utils, tooltp.toString(), buttonName, onUpdate, onDefaultStr, " %"
-					));
-				addAndMakeVisible(entries.back().get());
-			}
-			else if (buttonName == "buffersize")
+			if (buttonName == "buffersize")
 			{
 				const auto onUpdate = [this](const juce::String& txt)
 				{
@@ -848,34 +765,8 @@ namespace menu2
 				));
 				addAndMakeVisible(entries.back().get());
 			}
-			else if (buttonName == "buffersize def")
-			{
-				const auto onUpdate = [this](const juce::String& txt)
-				{
-					const auto newDelaySize = txt.getFloatValue();
-					if (newDelaySize <= 0)
-						return false; // delay can't be below 0ms
-					else if (newDelaySize > 10000.f)
-						return false; // delay can't be longer than 10 sec
-					auto user = processor.appProperties.getUserSettings();
-					const juce::Identifier id(vibrato::toString(vibrato::ObjType::DelaySize));
-					user->setValue(id, newDelaySize);
-					return true;
-				};
-				const auto onDefaultStr = [this]()
-				{
-					const auto user = processor.appProperties.getUserSettings();
-					const juce::Identifier id(vibrato::toString(vibrato::ObjType::DelaySize));
-					const auto val = user->getValue(id, "13");
-					return val.substring(0, 4);
-				};
-				const auto tooltp = child.getProperty(id[TOOLTIP]);
-				entries.push_back(std::make_unique<TextBox>(
-					utils, tooltp.toString(), buttonName, onUpdate, onDefaultStr, " ms"
-					));
-				addAndMakeVisible(entries.back().get());
-			}
 		}
+		
 		void addImgStrip(const std::array<juce::Identifier, NumIDs>& id, juce::ValueTree child, const int)
 		{
 			const auto stripName = child.getProperty(id[ID]).toString();
@@ -897,6 +788,7 @@ namespace menu2
 				addAndMakeVisible(entries.back().get());
 			}
 		}
+		
 		void addText(const std::array<juce::Identifier, NumIDs>&, juce::ValueTree child, const int)
 		{
 			entries.push_back(std::make_unique<TextComp>(
@@ -904,6 +796,7 @@ namespace menu2
 				));
 			addAndMakeVisible(entries.back().get());
 		}
+		
 		void addLink(const std::array<juce::Identifier, NumIDs>&, juce::ValueTree child, const int)
 		{
 			entries.push_back(std::make_unique<Link>(
@@ -914,6 +807,7 @@ namespace menu2
 			));
 			addAndMakeVisible(entries.back().get());
 		}
+		
 		void addLinkStrip(const std::array<juce::Identifier, NumIDs>&,
 			juce::ValueTree child, const int)
 		{
@@ -1001,10 +895,12 @@ namespace menu2
 			g.drawLine(rotatedBump, thicc);
 		}
 	}
+	
 	inline std::unique_ptr<juce::XmlElement> loadXML(const char* data, const int sizeInBytes)
 	{
 		return juce::XmlDocument::parse(juce::String(data, sizeInBytes));
 	}
+	
 	inline void openMenu(std::unique_ptr<Menu>& menu, Nel19AudioProcessor& p,
 		Utils& utils, juce::Component& parentComp, juce::Rectangle<int> menuBounds,
 		ButtonM& openButton)

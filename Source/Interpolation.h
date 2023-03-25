@@ -51,29 +51,28 @@ namespace interpolation
 		return sum;
 	}
 
-	inline float lerp(float a, float b, float x) noexcept
+	inline float lerp(const float* buffer, const float x, const int size)
 	{
-		return a + x * (b - a);
-	}
-
-	inline float lerp(const float* buffer, const float readHead, const int size)
-	{
-		const auto iFloor = std::floor(readHead);
+		const auto iFloor = std::floor(x);
 		const auto i0 = static_cast<int>(iFloor);
 		auto i1 = i0 + 1;
 		if (i1 >= size)
 			i1 -= size;
-		const auto x = readHead - iFloor;
-		return lerp(buffer[i0], buffer[i1], x);
+		const auto xFrac = x - iFloor;
+		const auto x0 = buffer[i0];
+		const auto x1 = buffer[i1];
+		return x0 + xFrac * (x1 - x0);
 	}
 
-	inline float lerp(const float* buffer, const float readHead)
+	inline float lerp(const float* buffer, const float x)
 	{
-		const auto iFloor = std::floor(readHead);
+		const auto iFloor = std::floor(x);
 		const auto i0 = static_cast<int>(iFloor);
 		const auto i1 = i0 + 1;
-		const auto x = readHead - iFloor;
-		return lerp(buffer[i0], buffer[i1], x);
+		const auto xFrac = x - iFloor;
+		const auto x0 = buffer[i0];
+		const auto x1 = buffer[i1];
+		return x0 + xFrac * (x1 - x0);
 	}
 
 	inline float cubicHermiteSpline(const float* buffer, const float readHead, const int size) noexcept

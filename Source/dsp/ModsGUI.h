@@ -91,7 +91,7 @@ namespace modSys6
                 layout
                 (
                     { 1, 13, 21, 34, 1 },
-                    { 8, 5, 3, 21 }
+                    { 13, 21 }
                 ),
                 params
                 {
@@ -99,17 +99,60 @@ namespace modSys6
 					Paramtr(u, "Rate", "The rate of the perlin noise mod in beats.", withOffset(PID::Perlin0RateBeats, mOff), modulatables),
                     Paramtr(u, "Oct", "More octaves add complexity to the signal.", withOffset(PID::Perlin0Octaves, mOff), modulatables),
                     Paramtr(u, "Width", "This parameter adds a phase offset to the right channel.", withOffset(PID::Perlin0Width, mOff), modulatables),
-					Paramtr(u, "Temposync", "Switch between the rate units, free running (hz) or temposync (beats).", withOffset(PID::Perlin0RateType, mOff), modulatables),
+					Paramtr(u, "Temposync", "Switch between the rate units, free running (hz) or temposync (beats).", withOffset(PID::Perlin0RateType, mOff), modulatables, ParameterType::Switch),
 					Paramtr(u, "Phase", "Apply a phase shift to the signal.", withOffset(PID::Perlin0Phase, mOff), modulatables),
 					Paramtr(u, "Shape", "The perlin noise mod can have 3 shapes. Steppy, linear and round.", withOffset(PID::Perlin0Shape, mOff), modulatables),
-					Paramtr(u, "Proc", "Every noise segment corresponds to a distinct combination of rate, bpm and transport info.", withOffset(PID::Perlin0RandType, mOff), modulatables)
-                },
-                btmText("")
+					Paramtr(u, "Proc", "Every noise segment corresponds to a distinct combination of rate, bpm and transport info.", withOffset(PID::Perlin0RandType, mOff), modulatables, ParameterType::Switch)
+                }
             {
                 for (auto& p : params)
                 {
                     addAndMakeVisible(p);
                 }
+
+				using Stroke = juce::PathStrokeType;
+				using Path = juce::Path;
+
+                params[RateType].onPaint = [&](juce::Graphics& g)
+                {
+					auto thicc = Shared::shared.thicc;
+                    const auto thicc3 = thicc * 3.f;
+                    const auto bounds = maxQuadIn(params[RateType].getLocalBounds().toFloat()).reduced(thicc3);
+                    Stroke stroke(thicc, Stroke::JointStyle::beveled, Stroke::EndCapStyle::butt);
+
+                    const auto x = bounds.getX();
+                    const auto y = bounds.getY();
+                    const auto w = bounds.getWidth();
+
+                    const auto circleW = w * .2f;
+                    const auto circleX = x + w * .3f;
+                    const auto circleY = y + w - circleW;
+
+                    g.fillEllipse(circleX, circleY, circleW, circleW);
+
+                    const auto lineX = circleX + circleW - thicc * .5f;
+                    const auto lineY0 = y;
+                    const auto lineY1 = circleY + circleW * .5f;
+
+                    g.drawLine(lineX, lineY0, lineX, lineY1, thicc);
+
+                    const auto arcX0 = lineX;
+                    const auto arcY0 = lineY0;
+                    const auto arcX2 = lineX + w * .2f;
+                    const auto arcY2 = lineY0 + w * .3f;
+                    const auto arcX1 = lineX + w * .3f;
+                    const auto arcY1 = lineY0 + w * .1f;
+
+                    Path arc;
+                    arc.startNewSubPath(arcX0, arcY0);
+                    arc.cubicTo(arcX0, arcY0, arcX1, arcY1, arcX2, arcY2);
+                    g.strokePath(arc, stroke);
+                };
+
+                params[RandType].onPaint = [&](juce::Graphics& g)
+                {
+					g.drawFittedText("P", params[RandType].getLocalBounds(), juce::Justification::centred, 1);
+                };
 
                 startTimerHz(4);
             }
@@ -124,28 +167,25 @@ namespace modSys6
         protected:
             nelG::Layout layout;
             std::array<Paramtr, NumParams> params;
-            juce::String btmText;
 
             void mouseEnter(const juce::MouseEvent& evt) override
             {
                 Comp::mouseEnter(evt);
             }
 
-            void paint(juce::Graphics& g) override
+            void paint(juce::Graphics&) override
             {
-                g.setColour(Shared::shared.colour(ColourID::Txt));
-                g.drawFittedText(btmText, getLocalBounds(), juce::Justification::bottomRight, 1);
             }
 
             void resized() override
             {
                 layout.setBounds(getLocalBounds().toFloat());
                 
-                layout.place(params[RateHz], 2, 2, 1, 2);
-                layout.place(params[RateBeats], 2, 2, 1, 2);
+                layout.place(params[RateHz], 2, 0, 1, 2);
+                layout.place(params[RateBeats], 2, 0, 1, 2);
                 // perlin params:
                 {
-                    const auto area = layout(3, 2, 1, 1);
+                    const auto area = layout(3, 0, 1, 1);
                     const auto w = area.getWidth();
                     const auto h = area.getHeight();
                     auto x = area.getX();
@@ -159,7 +199,7 @@ namespace modSys6
                     params[Shape].setBounds(juce::Rectangle<float>(x, y, buttonWidth, h).toNearestInt());
                 }
                 {
-                    const auto area = layout(3, 2, 1, 2);
+                    const auto area = layout(3, 1, 1, 1);
                     const auto w = area.getWidth();
                     const auto knobW = w / 3.f;
                     auto x = area.getX();
@@ -172,7 +212,7 @@ namespace modSys6
                 }
                 //layout.place(seed, 1, 1, 1, 1);
                 {
-                    const auto area = layout(1, 2, 1, 1);
+                    const auto area = layout(1, 1, 1, 1);
                     const auto w = area.getWidth();
                     const auto h = area.getHeight();
                     auto x = area.getX();
@@ -1112,7 +1152,7 @@ namespace modSys6
             
             void randomizeAll()
             {
-                randomizer();
+                randomizer(false);
             }
 
             std::function<void(ModType)> onModChange;

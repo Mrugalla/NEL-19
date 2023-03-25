@@ -23,14 +23,29 @@ namespace oversampling
 	{
 		for (auto ch = 0; ch < numChannels; ++ch)
 		{
-			auto up = samplesDest[ch];
-			const auto in = samplesSrc[ch];
+			auto dest = samplesDest[ch];
+			const auto src = samplesSrc[ch];
 
 			for (auto s = 0; s < numSamples; ++s)
 			{
 				const auto s2 = s * 2;
-				up[s2] = in[s];
-				up[s2 + 1] = 0.f;
+				dest[s2] = src[s];
+				dest[s2 + 1] = 0.f;
+			}
+		}
+	}
+
+	inline void zeroStuff(float* const* samples, int numChannels, int numSamples) noexcept
+	{
+		for (auto ch = 0; ch < numChannels; ++ch)
+		{
+			auto smpls = samples[ch];
+
+			for (auto s = numSamples - 1; s != 0; s--)
+			{
+				const auto s2 = s * 2;
+				smpls[s2] = smpls[s];
+				smpls[s2 + 1] = 0.f;
 			}
 		}
 	}
@@ -42,15 +57,22 @@ namespace oversampling
 				samples[ch][s] = samples[ch][s * 2];
 	}
 
+	inline void decimate(float* const* samplesDest, const float* const* samplesSrc, int numChannels, int numSamples) noexcept
+	{
+		for (auto ch = 0; ch < numChannels; ++ch)
+			for (auto s = 0; s < numSamples; ++s)
+				samplesDest[ch][s] = samplesSrc[ch][s * 2];
+	}
+
 	struct Processor
 	{
 		Processor() :
 			buffer(),
 			//
-			filterUp4(NumChannels, 176400.f, 22050.f, 44100.f, true), //  17 samples
-			filterDown4(NumChannels, 176400.f, 22050.f, 44100.f),
-			filterUp2(NumChannels),
-			filterDown2(NumChannels),
+			filterUp4(176400.f, 22050.f, 44100.f, true), //  17 samples
+			filterDown4(176400.f, 22050.f, 44100.f),
+			filterUp2(),
+			filterDown2(),
 			//
 			FsUp(0.),
 			blockSizeUp(0),
@@ -69,7 +91,7 @@ namespace oversampling
 			enabled(p.enabled)
 		{
 		}
-		// prepare & params
+
 		void prepareToPlay(const double Fs, const int blockSize, bool _enabled)
 		{
 			enabled = _enabled;
@@ -83,9 +105,10 @@ namespace oversampling
 				FsUp = Fs;
 				blockSizeUp = blockSize;
 			}
-			buffer.setSize(NumChannels, blockSize * MaxOrder, false, false, false);
+			buffer.setSize(2, blockSizeUp, false, false, false);
 		}
-		/* processing methods */
+		
+		////////////////////////////////////////
 		AudioBuffer& upsample(AudioBuffer& input) noexcept
 		{
 			if (enabled)
@@ -101,10 +124,13 @@ namespace oversampling
 				
 				// 2x
 				zeroStuff(samplesUp, samplesIn, numChannels, numSamples1x);
-				filterUp2.processBlock(samplesUp, numSamples2x);
+				filterUp2.processBlock(samplesUp, numChannels, numSamples2x);
 				// 4x
-				zeroStuff(samplesUp, samplesUp, numChannels, numSamples2x);
-				filterUp4.processBlockUp(samplesUp, numSamples4x);
+				zeroStuff(samplesUp, numChannels, numSamples2x);
+				filterUp4.processBlockUp(samplesUp, numChannels, numSamples4x);
+
+				for(auto ch = 0; ch < numChannels; ++ch)
+					juce::FloatVectorOperations::multiply(samplesUp[ch], 2.f, numSamples4x);
 				
 				return buffer;
 			}
@@ -117,11 +143,11 @@ namespace oversampling
 			auto samplesOut = outBuf.getArrayOfWritePointers();
 			const auto numChannels = outBuf.getNumChannels();
 			// 4x
-			filterDown4.processBlockDown(samplesUp, numSamples4x);
+			filterDown4.processBlockDown(samplesUp, numChannels, numSamples4x);
 			decimate(samplesUp, numChannels, numSamples2x);
 			// 2x
-			filterDown2.processBlock(samplesUp, numSamples2x);
-			decimate(samplesUp, numChannels, numSamples1x);
+			filterDown2.processBlock(samplesUp, numChannels, numSamples2x);
+			decimate(samplesOut, samplesUp, numChannels, numSamples1x);
 		}
 		
 		////////////////////////////////////////

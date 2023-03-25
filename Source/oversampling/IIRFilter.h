@@ -28,6 +28,7 @@ namespace oversampling
 		{
 			
 		}
+		
 		IIR(float _a0, float _a1, float _a2, float _a3, float _a4,
 			float _b1, float _b2, float _b3, float _b4) :
 			a0(_a0), a1(_a1), a2(_a2), a3(_a3), a4(_a4),
@@ -43,6 +44,7 @@ namespace oversampling
 			for (auto s = 0; s < numSamples; ++s)
 				samples[s] = processSample(samples[s]);
 		}
+		
 		Float processSample(Float x0) noexcept
 		{
 			const auto y0 =
@@ -68,6 +70,7 @@ namespace oversampling
 
 			return y0;
 		}
+		
 	protected:
 		Float a0, a1, a2, a3, a4, b1, b2, b3, b4;
 		Float 	  x1, x2, x3, x4, y1, y2, y3, y4;
@@ -224,30 +227,30 @@ namespace oversampling
 	template<typename Float>
 	struct LowkeyChebyshevFilter
 	{
-		LowkeyChebyshevFilter(int _numChannels = 0) :
-			filters(),
-			numChannels(_numChannels)
+		LowkeyChebyshevFilter() :
+			filters()
 		{
-			filters.resize(numChannels);
-			//MakeChebyshev<Float>(filters[0], .1, 0, 0, 4);
-			//for (auto ch = 1; ch < numChannels; ++ch)
-			//	filters[ch] = filters[0];
-			
 			for (auto& filter : filters)
 				filter.makeChebyshev_lp_4pole_fc45_ripl5();
 		}
-		int getLatency() const noexcept { return 0; }
-		void processBlock(Float* const* audioBuffer, const int numSamples) noexcept
+		
+		int getLatency() const noexcept
+		{
+			return 0;
+		}
+		
+		void processBlock(Float* const* audioBuffer, int numChannels, const int numSamples) noexcept
 		{
 			for (auto ch = 0; ch < numChannels; ++ch)
 				filters[ch].processBlock(audioBuffer[ch], numSamples);
 		}
+		
 		float processSample(Float sample, int ch) noexcept
 		{
 			return filters[ch].processSample(sample);
 		}
+		
 	protected:
-		std::vector<IIR<Float>> filters;
-		int numChannels;
+		std::array<IIR<Float>, 2> filters;
 	};
 }

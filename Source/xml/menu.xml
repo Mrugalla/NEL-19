@@ -1,10 +1,6 @@
 <menu id="options">
   <menu id="audio" tooltip="adjust properties of this instance's core dsp">
     <textbox id="buffersize" tooltip="adjust the size of the vibrato's delay buffer."/>
-    <switch id="interpolation" tooltip="select the method that is used to interpolate the vibrato's delay.">
-      <option id="lerp"/>
-      <option id="spline"/>
-    </switch>
     <switch id="oversampling" tooltip="turn on oversampling to get lower sidelobes on strong modulation.">
       <option id="1x"/>
       <option id="4x"/>
@@ -14,56 +10,16 @@
       <option id="on"/>
     </switch>
   </menu>
-  <menu id="graphics" tooltip="individualize the appearance of the plugin here.">
-    <menu id="colours" tooltip="individualize the colour sheme of the plugin here.">
-      <colourselector id="txt"/>
-      <colourselector id="bg"/>
-      <colourselector id="abort"/>
-      <colourselector id="mod"/>
-      <colourselector id="interact"/>
-      <colourselector id="inactive"/>
-      <colourselector id="darken"/>
-      <colourselector id="hover"/>
-    </menu>
-  </menu>
-  <menu id="workflow" tooltip="settings that affect your workflow experience.">
-    <menu id="randomizer" tooltip="refine the functionality of the parameter randomizers.">
-      <textbox id="r_depth" tooltip="defines the depth of each randomization step."/>
-    </menu>
-    <menu id="default state" tooltip="define the default state of the plugin to fit your workflow.">
-      <textbox id="buffersize def" tooltip="adjust the size of the vibrato's delay buffer."/>
-      <switch id="interpolation def" tooltip="select the method that is used to interpolate the vibrato's delay.">
-        <option id="lerp"/>
-        <option id="spline"/>
-      </switch>
-      <switch id="oversampling def" tooltip="turn on oversampling to get lower sidelobes on strong modulation.">
-        <option id="1x"/>
-        <option id="4x"/>
-      </switch>
-      <switch id="lookahead def" tooltip="turn lookahead on to compensate for the vibrato's latency.">
-        <option id="off"/>
-        <option id="on"/>
-      </switch>
-      <switch id="modType 0 def" tooltip="choose a default modulator for this slot.">
-        <option id="Perlin"/>
-        <option id="Audiorate"/>
-        <option id="Dropout"/>
-        <option id="EnvFol"/>
-        <option id="Macro"/>
-        <option id="Pitchwheel"/>
-        <option id="LFO"/>
-      </switch>
-      <switch id="modType 1 def" tooltip="choose a default modulator for this slot.">
-        <option id="Perlin"/>
-        <option id="Audiorate"/>
-        <option id="Dropout"/>
-        <option id="EnvFol"/>
-        <option id="Macro"/>
-        <option id="Pitchwheel"/>
-        <option id="LFO"/>
-      </switch>
-    </menu>
-  </menu>
+	<menu id="colours" tooltip="individualize the colour sheme of the plugin here.">
+		<colourselector id="txt"/>
+		<colourselector id="bg"/>
+		<colourselector id="abort"/>
+		<colourselector id="mod"/>
+		<colourselector id="interact"/>
+		<colourselector id="inactive"/>
+		<colourselector id="darken"/>
+		<colourselector id="hover"/>
+	</menu>
   <menu id="help" tooltip="get help! literally.">
     <switch id="tooltips" tooltip="turn on/off tooltips here.">
       <option id="disable"/>

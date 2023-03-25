@@ -13,34 +13,28 @@ namespace oversampling
 		{
 			data.resize(1, 1.f);
 		}
+		
 		ImpulseResponse(const std::vector<float>& _data) :
 			data(_data),
 			latency(static_cast<int>(data.size()) / 2)
 		{
 		}
+		
 		float operator[](int i) const noexcept { return data[i]; }
 		const size_t size() const noexcept { return data.size(); }
 
 		std::vector<float> data;
 		int latency;
-
-		void dbg() {
-			juce::String str("IR Len: ");
-			str += juce::String(data.size());
-			str += "\n";
-			for (auto d = latency; d < data.size(); ++d)
-				str += juce::String(data[d]) + "; ";
-			DBG(str);
-		}
 	};
 
 	/*
 	* fc < Nyquist && bw < Nyquist && fc + bw < Nyquist
 	*/
-	static ImpulseResponse makeSincFilter2(float Fs, float fc, float bw, bool upsampling)
+	inline ImpulseResponse makeSincFilter2(float Fs, float fc, float bw, bool upsampling)
 	{
 		const auto nyquist = Fs * .5f;
-		if (fc > nyquist || bw > nyquist || fc + bw > nyquist) { // invalid arguments
+		if (fc > nyquist || bw > nyquist || fc + bw > nyquist)
+		{ // invalid arguments
 			std::vector<float> ir;
 			ir.resize(1, 1.f);
 			return ir;
@@ -53,13 +47,15 @@ namespace oversampling
 		const float MInv = 1.f / static_cast<float>(M);
 		const int N = M + 1;
 		
-		const auto h = [&](float i) { // sinc
+		const auto h = [&](float i) // sinc
+		{
 			i -= MHalf;
 			if (i != 0.f)
 				return std::sin(tau * fc * i) / i;
 			return tau * fc;
 		};
-		const auto w = [&](float i) { // blackman window
+		const auto w = [&](float i) // blackman window
+		{
 			i *= MInv;
 			return .42f - .5f * std::cos(tau * i) + .08f * std::cos(tau2 * i);
 		};
@@ -113,6 +109,7 @@ namespace oversampling
 				audioBuffer[s] = y;
 			}
 		}
+		
 		void processBlockUp(float* audioBuffer, const ImpulseResponse& ir, const int numSamples) noexcept
 		{
 			for (auto s = 0; s < numSamples; s += 2)
@@ -121,6 +118,7 @@ namespace oversampling
 				audioBuffer[s + 1] = processSampleUpOdd(ir);
 			}
 		}
+		
 		float processSampleUpEven(const float sample, const ImpulseResponse& ir) noexcept
 		{
 			const auto irSize = static_cast<int>(ir.size());
@@ -139,6 +137,7 @@ namespace oversampling
 				wIdx = 0;
 			return y;
 		}
+		
 		float processSampleUpOdd(const ImpulseResponse& ir) noexcept
 		{
 			const auto irSize = static_cast<int>(ir.size());
@@ -166,35 +165,41 @@ namespace oversampling
 
 	struct ConvolutionFilter
 	{
-		ConvolutionFilter(int _numChannels = 0, float _Fs = 1.f, float _cutoff = .25f, float _bandwidth = .25f, bool upsampling = false) :
-			filters(),
-			ir(_numChannels != 0 ? makeSincFilter2(_Fs, _cutoff, _bandwidth, upsampling) : ImpulseResponse()),
-			numChannels(_numChannels)
+		ConvolutionFilter(float _Fs = 1.f, float _cutoff = .25f, float _bandwidth = .25f, bool upsampling = false) :
+			ir(makeSincFilter2(_Fs, _cutoff, _bandwidth, upsampling)),
+			filters{ ir, ir }
 		{
-			filters.resize(_numChannels, { ir });
 		}
-		int getLatency() const noexcept { return ir.latency; }
-		void processBlockDown(float* const* audioBuffer, int numSamples) noexcept
+		
+		int getLatency() const noexcept
 		{
-			for (auto ch = 0; ch < this->numChannels; ++ch)
+			return ir.latency;
+		}
+		
+		void processBlockDown(float* const* audioBuffer, int numChannels, int numSamples) noexcept
+		{
+			for (auto ch = 0; ch < numChannels; ++ch)
 				filters[ch].processBlock(audioBuffer[ch], ir, numSamples);
 		}
-		void processBlockUp(float* const* audioBuffer, int numSamples) noexcept
+		
+		void processBlockUp(float* const* audioBuffer, int numChannels, int numSamples) noexcept
 		{
-			for (auto ch = 0; ch < this->numChannels; ++ch)
+			for (auto ch = 0; ch < numChannels; ++ch)
 				filters[ch].processBlockUp(audioBuffer[ch], ir, numSamples);
 		}
+		
 		float processSampleUpEven(const float sample, const int ch) noexcept
 		{
 			return filters[ch].processSampleUpEven(sample, ir);
 		}
+		
 		float processSampleUpOdd(const int ch) noexcept 
 		{
 			return filters[ch].processSampleUpOdd(ir);
 		}
+		
 	protected:
-		std::vector<Convolution> filters;
 		ImpulseResponse ir;
-		int numChannels;
+		std::array<Convolution, 2> filters;
 	};
 }

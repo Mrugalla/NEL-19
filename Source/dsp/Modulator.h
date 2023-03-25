@@ -545,6 +545,9 @@ namespace vibrato
 		using BeatsData = modSys6::BeatsData;
 		using Tables = LFOTables;
 
+		using PlayHead = juce::AudioPlayHead;
+		using PosInfo = PlayHead::CurrentPositionInfo;
+
 		struct Perlin
 		{
 			using PlayHeadPos = perlin::PlayHeadPos;
@@ -552,7 +555,6 @@ namespace vibrato
 
 			Perlin() :
 				perlin(),
-				playHeadPos(),
 				rateHz(1.), rateBeats(1.),
 				octaves(1.f), width(0.f), phs(0.f),
 				shape(Shape::Spline),
@@ -560,9 +562,9 @@ namespace vibrato
 			{
 			}
 
-			void prepare(float sampleRate, int blockSize)
+			void prepare(float sampleRate, int blockSize, int latency)
 			{
-				perlin.prepare(sampleRate, blockSize);
+				perlin.prepare(sampleRate, blockSize, latency);
 			}
 
 			void setParameters(double _rateHz, double _rateBeats,
@@ -579,17 +581,17 @@ namespace vibrato
 				procedural = _procedural;
 			}
 
-			void operator()(Buffer& buffer, int numChannelsOut, int numSamples, juce::AudioPlayHead* playHead) noexcept
+			void operator()(Buffer& buffer, int numChannelsOut, int numSamples,
+				const PosInfo& transport) noexcept
 			{
 				float* samples[] = { buffer[0].data(), buffer[1].data() };
-				playHead->getCurrentPosition(playHeadPos);
 				
 				perlin
 				(
 					samples,
 					numChannelsOut,
 					numSamples,
-					playHeadPos,
+					transport,
 					rateHz,
 					rateBeats,
 					octaves,
@@ -603,7 +605,6 @@ namespace vibrato
 		
 		protected:
 			perlin::Perlin2 perlin;
-			PlayHeadPos playHeadPos;
 			double rateHz, rateBeats;
 			float octaves, width, phs;
 			Shape shape;
@@ -1304,7 +1305,6 @@ namespace vibrato
 				TempoSync(const BeatsData& _beatsData) :
 					syncer(),
 					phaseSmooth(0.f),
-					transport(),
 					beatsData(_beatsData),
 					fs(1.), extLatency(0.),
 					phasor(0.), inc(0.)
@@ -1318,10 +1318,9 @@ namespace vibrato
 					syncer.prepare(fs, 420.f);
 				}
 				
-				void processTempoSyncStuff(float* buffer, float rateSync, float phase, int numSamples, juce::AudioPlayHead* playHead)
+				void processTempoSyncStuff(float* buffer, float rateSync, float phase, int numSamples, const PosInfo& transport)
 				{
-					const auto canBeSync = playHead->getCurrentPosition(transport) && transport.isPlaying;
-					if (canBeSync)
+					if (transport.isPlaying)
 					{
 						const auto rateSyncV = static_cast<double>(beatsData[static_cast<int>(rateSync)].val);
 						const auto rateSyncInv = 1. / rateSyncV;
@@ -1383,7 +1382,6 @@ namespace vibrato
 				PhaseSyncronizer<double> syncer;
 				SmoothF phaseSmooth;
 			protected:
-				juce::AudioPlayHead::CurrentPositionInfo transport;
 				const BeatsData& beatsData;
 				double fs, extLatency, phasor, inc;
 			};
@@ -1434,62 +1432,35 @@ namespace vibrato
 			}
 			
 			void operator()(Buffer& buffer, int numChannels, int numSamples,
-				juce::AudioPlayHead* playHead) noexcept
+				const PosInfo& transport) noexcept
 			{
-				bool canBeSync = playHead != nullptr;
 				{ // SYNTHESIZE PHASOR
 					auto buf = buffer[0].data();
 
-					if (isSync && canBeSync)
-						tempoSync.processTempoSyncStuff(buf, rateSync, phaseV, numSamples, playHead);
+					if (isSync)
+						tempoSync.processTempoSyncStuff(buf, rateSync, phaseV, numSamples, transport);
 					else
 					{
-						if (phaseV != 0.f && playHead != nullptr)
+						if (phaseV != 0.f)
 						{
-							const auto pos = playHead->getPosition();
-							if (pos.hasValue())
+							const auto ppq = transport.ppqPosition;
+							const auto bpm = transport.bpm;
+							const auto bps = bpm / 60.;
+
+							const auto inc = rateFree * fsInv;
+							const auto phase = ppq / bps * rateFree;
+
+							phasor.inc = inc;
+							phasor.phase = phase - std::floor(phase);
+
+							for (auto s = 0; s < numSamples; ++s)
 							{
-								const auto ppqO = pos->getPpqPosition();
-								const auto bpmO = pos->getBpm();
-								if (ppqO.hasValue() && bpmO.hasValue())
-								{
-									const auto ppq = *ppqO;
-									const auto bpm = *bpmO;
-									const auto bps = bpm / 60.;
-
-									const auto inc = rateFree * fsInv;
-									const auto phase = ppq / bps * rateFree;
-
-									phasor.inc = inc;
-									phasor.phase = phase - std::floor(phase);
-									
-									for (auto s = 0; s < numSamples; ++s)
-									{
-										buf[s] = static_cast<float>(phasor.phase) + tempoSync.phaseSmooth(phaseV);
-										if (buf[s] < 0.f)
-											++buf[s];
-										else if (buf[s] >= 1.f)
-											--buf[s];
-										phasor();
-									}
-								}
-								else
-								{
-									auto rateSmoothing = rateSmooth(rateBuf.data(), rateFree * fsInv, numSamples);
-
-									if(rateSmoothing)
-										for (auto s = 0; s < numSamples; ++s)
-										{
-											phasor.inc = rateBuf[s];
-											buf[s] = static_cast<float>(phasor.process());
-										}
-									else
-									{
-										phasor.inc = rateFree * fsInv;
-										for (auto s = 0; s < numSamples; ++s)
-											buf[s] = static_cast<float>(phasor.process());
-									}
-								}
+								buf[s] = static_cast<float>(phasor.phase) + tempoSync.phaseSmooth(phaseV);
+								if (buf[s] < 0.f)
+									++buf[s];
+								else if (buf[s] >= 1.f)
+									--buf[s];
+								phasor();
 							}
 						}
 						else
@@ -1577,6 +1548,7 @@ namespace vibrato
 	public:
 		Modulator(const BeatsData& beatsData) :
 			buffer(),
+			standalonePlayHead(),
 			tables(),
 			perlin(),
 			audioRate(),
@@ -1597,7 +1569,7 @@ namespace vibrato
 			const auto child = state.getChildWithName(id);
 			if (child.isValid())
 			{
-				const auto tableType = child.getProperty(id);
+				const auto tableType = child.getProperty(id).toString();
 				if (tableType == toString(TableType::Weierstrasz))
 					tables.makeTablesWeierstrasz();
 				else if (tableType == toString(TableType::Tri))
@@ -1623,9 +1595,10 @@ namespace vibrato
 		
 		void prepare(float sampleRate, int maxBlockSize, int latency)
 		{
+			standalonePlayHead.prepare(static_cast<double>(sampleRate));
 			for(auto& b: buffer)
 				b.resize(maxBlockSize + 4, 0.f); // compensate for potential spline interpolation
-			perlin.prepare(sampleRate, maxBlockSize);
+			perlin.prepare(sampleRate, maxBlockSize, latency);
 			audioRate.prepare(sampleRate, maxBlockSize);
 			dropout.prepare(sampleRate, maxBlockSize);
 			envFol.prepare(sampleRate, maxBlockSize);
@@ -1677,15 +1650,25 @@ namespace vibrato
 		void processBlock(const float* const* samples, const juce::MidiBuffer& midi,
 			juce::AudioPlayHead* playHead, int numChannels, int numSamples) noexcept
 		{
+			if (juce::JUCEApplicationBase::isStandaloneApp())
+			{
+				standalonePlayHead(numSamples);
+			}
+			else
+			{
+				if (playHead)
+					playHead->getCurrentPosition(standalonePlayHead.posInfo);
+			}
+
 			switch (type)
 			{
-			case ModType::Perlin: return perlin(buffer, numChannels, numSamples, playHead);
+			case ModType::Perlin: return perlin(buffer, numChannels, numSamples, standalonePlayHead.posInfo);
 			case ModType::AudioRate: return audioRate(buffer, midi, numChannels, numSamples);
 			case ModType::Dropout: return dropout(buffer, numChannels, numSamples);
 			case ModType::EnvFol: return envFol(buffer, samples, numChannels, numSamples);
 			case ModType::Macro: return macro(buffer, numChannels, numSamples);
 			case ModType::Pitchwheel: return pitchbend(buffer, numChannels, numSamples, midi);
-			case ModType::LFO: return lfo(buffer, numChannels, numSamples, playHead);
+			case ModType::LFO: return lfo(buffer, numChannels, numSamples, standalonePlayHead.posInfo);
 			}
 		}
 		
@@ -1701,6 +1684,7 @@ namespace vibrato
 
 		Buffer buffer;
 	protected:
+		dsp::StandalonePlayHead standalonePlayHead;
 		Tables tables;
 
 		Perlin perlin;

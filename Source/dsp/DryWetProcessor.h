@@ -133,7 +133,7 @@ namespace drywet
 					bufs[kMixWet][s] = std::sqrt(bufs[kMix][s]);
 			}
 			
-			delay(bufs, numChannels, numSamples);
+			delay(bufs, samples, numChannels, numSamples);
 		}
 		
 		void processWet(float* const* samples, float _gainWet, int numChannels, int numSamples) noexcept

@@ -46,8 +46,11 @@
         <FILE id="sWUzN7" name="ModsGUI.h" compile="0" resource="0" file="Source/dsp/ModsGUI.h"/>
         <FILE id="LZVNwr" name="Modulator.h" compile="0" resource="0" file="Source/dsp/Modulator.h"/>
         <FILE id="A464RP" name="Perlin.h" compile="0" resource="0" file="Source/dsp/Perlin.h"/>
+        <FILE id="nVcp5W" name="PRM.h" compile="0" resource="0" file="Source/dsp/PRM.h"/>
         <FILE id="OLmX3W" name="Smooth.cpp" compile="1" resource="0" file="Source/dsp/Smooth.cpp"/>
         <FILE id="GXopIc" name="Smooth.h" compile="0" resource="0" file="Source/dsp/Smooth.h"/>
+        <FILE id="dkVRrp" name="StandalonePlayHead.h" compile="0" resource="0"
+              file="Source/dsp/StandalonePlayHead.h"/>
         <FILE id="NhBr3Z" name="Vibrato.h" compile="0" resource="0" file="Source/dsp/Vibrato.h"/>
         <FILE id="mhVKy8" name="WHead.h" compile="0" resource="0" file="Source/dsp/WHead.h"/>
       </GROUP>

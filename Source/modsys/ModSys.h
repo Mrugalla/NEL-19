@@ -61,7 +61,7 @@ namespace modSys6
 		Pitchbend1Smooth,
 		LFO1FreeSync, LFO1RateFree, LFO1RateSync, LFO1Waveform, LFO1Phase, LFO1Width,
 
-		Depth, ModsMix, DryWetMix, WetGain, StereoConfig,
+		Depth, ModsMix, DryWetMix, WetGain, StereoConfig, Feedback,
 
 		NumParams
 	};
@@ -154,6 +154,7 @@ namespace modSys6
 		case PID::DryWetMix: return "DryWet Mix";
 		case PID::WetGain: return "Gain Wet";
 		case PID::StereoConfig: return "Stereo Config";
+		case PID::Feedback: return "Feedback";
 
 		default: return "";
 		}
@@ -793,7 +794,7 @@ namespace modSys6
 			const StrToValFunc strToValPhase360 = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Degree)).getFloatValue() / 360.f; };
 			const StrToValFunc strToValOct = [](const juce::String& txt) { return std::round(txt.trimCharactersAtEnd(toString(Unit::Octaves)).getFloatValue()); };
 			const StrToValFunc strToValOct2 = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Octaves)).getFloatValue() / 12.f; };
-			const StrToValFunc strToValSemi = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Semi)).getIntValue(); };
+			const StrToValFunc strToValSemi = [](const juce::String& txt) { return std::round(txt.trimCharactersAtEnd(toString(Unit::Semi)).getFloatValue()); };
 			const StrToValFunc strToValFine = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Fine)).getFloatValue() * .01f; };
 			const StrToValFunc strToValRatio = [strToValDivision](const juce::String& txt)
 			{
@@ -957,13 +958,13 @@ namespace modSys6
 			for (auto m = 0; m < 2; ++m)
 			{
 				const auto offset = m * NumParamsPerMod;
-				params.push_back(new Param(withOffset(PID::Perlin0RateHz, offset), makeRange::withCentre(1.f / 1000.f, 40.f, 2.f), 6.f, valToStrHz, strToValHz, Unit::Hz));
+				params.push_back(new Param(withOffset(PID::Perlin0RateHz, offset), makeRange::withCentre(1.f / 1000.f, 40.f, 2.f), .420f, valToStrHz, strToValHz, Unit::Hz));
 				params.push_back(new Param(withOffset(PID::Perlin0RateBeats, offset), makeRange::beats(32.f, .5f, false), .25f, valToStrBeats2, strToValBeats2, Unit::Beats));
 				params.push_back(new Param(withOffset(PID::Perlin0Octaves, offset), makeRange::lin(1.f, 7.f), 3.f, valToStrOct, strToValOct, Unit::Octaves));
-				params.push_back(new Param(withOffset(PID::Perlin0Width, offset), makeRange::quad(0.f, 2.f, 1), 1.f, valToStrPercent, strToValPercent, Unit::Percent));
+				params.push_back(new Param(withOffset(PID::Perlin0Width, offset), makeRange::quad(0.f, 2.f, 1), 0.f, valToStrPercent, strToValPercent, Unit::Percent));
 				params.push_back(new Param(withOffset(PID::Perlin0RateType, offset), makeRange::toggle(), 0.f, valToStrPower, strToValPower, Unit::Power));
 				params.push_back(new Param(withOffset(PID::Perlin0Phase, offset), makeRange::quad(0.f, 2.f, 1), 0.f, valToStrPhase360, strToValPhase360, Unit::Degree));
-				params.push_back(new Param(withOffset(PID::Perlin0Shape, offset), makeRange::stepped(0.f, 2.f), 0.f, valToStrShape, strToValShape, Unit::PerlinShape));
+				params.push_back(new Param(withOffset(PID::Perlin0Shape, offset), makeRange::stepped(0.f, 2.f), 2.f, valToStrShape, strToValShape, Unit::PerlinShape));
 				params.push_back(new Param(withOffset(PID::Perlin0RandType, offset), makeRange::toggle(), 1.f, valToStrRandType, strToValRandType, Unit::PerlinRandType));
 
 				params.push_back(new Param(withOffset(PID::AudioRate0Oct, offset), makeRange::stepped(-3.f * 12.f, 3.f * 12.f, 12.f), 0.f, valToStrOct2, strToValOct2, Unit::Octaves));
@@ -1005,6 +1006,7 @@ namespace modSys6
 			params.push_back(new Param(PID::DryWetMix, makeRange::biasXL(0.f, 1.f, 0.f), 1.f, valToStrRatio, strToValRatio));
 			params.push_back(new Param(PID::WetGain, makeRange::biasXL(-120.f, 4.5f, .9f), 0.f, valToStrDb, strToValDb));
 			params.push_back(new Param(PID::StereoConfig, makeRange::toggle(), 1.f, valToStrLRMS, strToValLRMS));
+			params.push_back(new Param(PID::Feedback, makeRange::lin(-1.f, 1.f), 0.f, valToStrPercent, strToValPercent, Unit::Percent));
 
 			for (auto param : params)
 				audioProcessor.addParameter(param);
@@ -1288,9 +1290,9 @@ namespace modSys6
 			for (; c < connexState.getNumChildren(); ++c)
 			{
 				const auto connecState = connexState.getChild(c);
-				const auto pIdx = connecState.getProperty(ids.param);
-				const auto mIdx = connecState.getProperty(ids.mod);
-				const auto depth = connecState.getProperty(ids.value);
+				const auto pIdx = static_cast<int>(connecState.getProperty(ids.param));
+				const auto mIdx = static_cast<int>(connecState.getProperty(ids.mod));
+				const auto depth = static_cast<float>(connecState.getProperty(ids.value));
 				connex[c].enable(mIdx, pIdx, depth);
 			}
 			for (; c < connex.size(); ++c)

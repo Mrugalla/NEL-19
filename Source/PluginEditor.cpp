@@ -17,28 +17,29 @@ modSys6::gui::Notify makeNotify(juce::Component* comp)
 Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     AudioProcessorEditor(&p),
     audioProcessor(p),
-    layout(
-        { 25, 150, 50 },
-        { 50, 15, 150, 150, 30 }
+    layout
+    (
+        { 3, 21, 8 },
+        { 5, 3, 34, 34, 3 }
     ),
-    layoutMacros(
+    layoutMacros
+    (
         { 1 },
-        { 25, 12, 25, 12, 25, 12, 25, 12 }
+        { 8, 3, 8, 3, 8, 3, 8, 3 }
     ),
-    layoutMainParams(
-        { 50, 80 },
-        { 90, 90, 90, 40 }
+    layoutMainParams
+    (
+        { 8, 13 },
+        { 5, 5, 5, 5, 3 }
     ),
-    layoutBottomBar(
-        { 250, 90 },
+    layoutBottomBar
+    (
+        { 21, 8 },
         { 1 }
     ),
-    layoutMiscs(
-        { 1 },
-        { 50, 200 }
-    ),
-    layoutTopBar(
-        { 30, 30, 30, 270, 70 },
+    layoutTopBar
+    (
+        { 2, 2, 2, 21, 8 },
         { 1 }
     ),
     utils(p.modSys, *this, p.appProperties.getUserSettings(), p),
@@ -67,6 +68,7 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     dryWetMix(utils, "Mix", "Define the dry/wet ratio of the effect.", modSys6::PID::DryWetMix, modulatables, modSys6::gui::ParameterType::Knob),
     gainWet(utils, "Gain", "The output gain of the wet signal.", modSys6::PID::WetGain, modulatables, modSys6::gui::ParameterType::Knob),
     stereoConfig(utils, "StereoConfig", "Configurate if effect is applied to l/r or m/s", modSys6::PID::StereoConfig, modulatables, modSys6::gui::ParameterType::Switch),
+	feedback(utils, "Feedback", "Dial in some feedback to this vibrato's delay.", modSys6::PID::Feedback, modulatables, modSys6::gui::ParameterType::Knob),
 	
     macro0Dragger(utils, modSys6::ModType::Macro, 0, modulatables),
     macro1Dragger(utils, modSys6::ModType::Macro, 1, modulatables),
@@ -139,6 +141,7 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     addAndMakeVisible(dryWetMix);
     addAndMakeVisible(gainWet);
     addAndMakeVisible(stereoConfig);
+	addAndMakeVisible(feedback);
 
     addAndMakeVisible(macro0Dragger);
     addAndMakeVisible(macro1Dragger);
@@ -181,20 +184,14 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
             modComps[m].setMod(type);
         }
         {
-            const auto val = rand.nextFloat() > .5f ? true : false;
+            const auto val = rand.nextFloat() > .5f;
             audioProcessor.oversamplingEnabled.store(val);
         }
         {
-            const auto range = modSys6::makeRange::biasXL(1.f, 10000.f, -.999f);
+            const auto range = modSys6::makeRange::withCentre(.1f, 10000.f, 4.f);
             const auto val = range.convertFrom0to1(rand.nextFloat());
             const juce::Identifier id(vibrato::toString(vibrato::ObjType::DelaySize));
             audioProcessor.modSys.state.setProperty(id, val, nullptr);
-        }
-        {
-            const auto numTypes = static_cast<float>(vibrato::InterpolationType::NumInterpolationTypes);
-            const auto val = rand.nextFloat() * (numTypes - .1f);
-            const auto type = static_cast<vibrato::InterpolationType>(val);
-            audioProcessor.vibrat.interpolationType.store(type);
         }
 
         audioProcessor.forcePrepare();
@@ -207,7 +204,6 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
         return audioProcessor.modSys.state;
     };
 
-    setBufferedToImage(true);
     setResizable(true, true);
     {
         const auto user = p.appProperties.getUserSettings();
@@ -258,9 +254,11 @@ void Nel19AudioProcessorEditor::resized()
     
     layoutMainParams.place(modsDepth,    0, 0, 2, 1, thicc, true);
     layoutMainParams.place(modsMix,      0, 1, 2, 1, thicc, true);
-    layoutMainParams.place(dryWetMix,    1, 2, 1, 1, thicc, true);
-    layoutMainParams.place(gainWet,      0, 2, 1, 1, thicc, true);
-    layoutMainParams.place(stereoConfig, 0, 3, 2, 1, thicc, true);
+    layoutMainParams.place(dryWetMix,    0, 2, 2, 1, thicc, true);
+    layoutMainParams.place(gainWet,      0, 3, 1, 1, thicc, true);
+    layoutMainParams.place(feedback,     1, 3, 1, 1, thicc, true);
+    layoutMainParams.place(stereoConfig, 0, 4, 2, 1, thicc, true);
+	
 
     layout.place(presetBrowser, 1, 1, 2, 3, thicc, false);
 

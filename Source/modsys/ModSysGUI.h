@@ -177,7 +177,7 @@ namespace modSys6
                 props(nullptr),
                 colours(),
                 tooltipDefault(""),
-                thicc(2.5f), r_depth(1.f),
+                thicc(2.2f),
                 tooltipsEnabled(true),
                 font(juce::Font(juce::Typeface::createSystemTypefaceFor(BinaryData::nel19_ttf,
                     BinaryData::nel19_ttfSize)))
@@ -199,8 +199,6 @@ namespace modSys6
                     // INIT TOOLTIPS
                     tooltipsEnabled = props->getBoolValue("tooltips", true);
                     setTooltipsEnabled(tooltipsEnabled);
-                    // INIT RANDOMIZER
-                    r_depth = props->getValue("r_depth", "100").getFloatValue() * .01f;
                 }
             }
 
@@ -269,7 +267,7 @@ namespace modSys6
             juce::PropertiesFile* props;
             std::array<juce::Colour, static_cast<int>(ColourID::NumCols)> colours;
             juce::String tooltipDefault;
-            float thicc, r_depth;
+            float thicc;
             bool tooltipsEnabled;
             juce::Font font;
 
@@ -1186,6 +1184,8 @@ namespace modSys6
 
             static constexpr float LockAlpha = .4f;
 
+            using OnPaint = std::function<void(juce::Graphics&)>;
+
             inline Notify makeNotify(Paramtr& parameter, Utils& _utils)
             {
                 return [&p = parameter, &u = _utils](int t, const void*)
@@ -1352,7 +1352,8 @@ namespace modSys6
                 modDial(u, *this),
                 lockr(u, this, toString(getPID())),
                 attachedModSelected(u.getSelectedMod() == param.attachedMod),
-                valNorm(0.f), valSum(0.f), connecDepth(u.getConnecDepth(modDial.getConnecIdx())), dragY(0.f)
+                valNorm(0.f), valSum(0.f), connecDepth(u.getConnecDepth(modDial.getConnecIdx())), dragY(0.f),
+                onPaint(nullptr)
             {
                 init(modulatables);
             }
@@ -1366,7 +1367,8 @@ namespace modSys6
                 modDial(u, *this),
                 lockr(u, this, toString(getPID())),
                 attachedModSelected(u.getSelectedMod() == param.attachedMod),
-                valNorm(0.f), valSum(0.f), connecDepth(u.getConnecDepth(modDial.getConnecIdx())), dragY(0.f)
+                valNorm(0.f), valSum(0.f), connecDepth(u.getConnecDepth(modDial.getConnecIdx())), dragY(0.f),
+                onPaint(nullptr)
             {
                 init(modulatables);
             }
@@ -1400,6 +1402,7 @@ namespace modSys6
                 lockr.switchLock();
             }
             
+            OnPaint onPaint;
         protected:
             Param& param;
             const ParameterType pType;
@@ -1571,7 +1574,10 @@ namespace modSys6
                 else
                     g.setColour(col(Shared::shared.colour(ColourID::Txt)));
                 g.drawRoundedRectangle(bounds, thicc, thicc);
-                g.drawFittedText(param.getCurrentValueAsText(), bounds.toNearestInt(), juce::Justification::centred, 1);
+                if(onPaint == nullptr)
+                    g.drawFittedText(param.getCurrentValueAsText(), bounds.toNearestInt(), juce::Justification::centred, 1);
+				else
+					onPaint(g);
             }
 
             void resized() override
@@ -1895,16 +1901,22 @@ namespace modSys6
             }
 
             Tooltip(Utils& u) :
-                Comp(u, makeNotify(*this), "This component literally displays this very tooltip.", modSys6::gui::CursorType::Default),
-                tooltipPtr(this->utils.getTooltip())
-            {
-                
+                Comp
+                (
+                    u,
+                    makeNotify(*this),
+                    "This component literally displays this very tooltip.",
+                    modSys6::gui::CursorType::Default
+                ),
+                tooltipPtr(utils.getTooltip())
+            { 
             }
+            
             void tooltipsUpdated()
             {
                 if (Shared::shared.tooltipsEnabled)
                 {
-                    tooltipPtr = this->utils.getTooltip();
+                    tooltipPtr = utils.getTooltip();
                     return repaint();
                 }
                 else
@@ -1915,13 +1927,15 @@ namespace modSys6
                     return repaint();
                 }
             }
+            
         protected:
             juce::String* tooltipPtr;
 
             void paint(juce::Graphics& g) override
             {
                 g.setColour(Shared::shared.colour(ColourID::Txt));
-                g.drawFittedText(
+                g.drawFittedText
+                (
                     *tooltipPtr, getLocalBounds(), juce::Justification::bottomLeft, 1
                 );
             }
@@ -2210,6 +2224,7 @@ namespace modSys6
             {
                 addAndMakeVisible(lock);
             }
+            
             ParamtrRandomizer(Utils& u, juce::String&& _id) :
                 Comp(u, makeTooltip()),
                 randomizables(),
@@ -2224,26 +2239,41 @@ namespace modSys6
                 randomizables.clear();
                 randFuncs.clear();
             }
+            
             void add(Paramtr* p) { randomizables.push_back(p); }
+            
             void add(RandFunc&& r) { randFuncs.push_back(r); }
 
-            void operator()()
+            void operator()(bool sensitive)
             {
                 if (lock.isLocked()) return;
                 juce::Random rand;
-                const auto r_depth = Shared::shared.r_depth;
                 for (auto& func : randFuncs)
                     func(rand);
-                for (auto randomizable : randomizables)
-                {
-                    const PID pID = randomizable->getPID();
-                    auto param = utils.getParam(pID);
+                if(sensitive)
+                    for (auto randomizable : randomizables)
+                    {
+                        const PID pID = randomizable->getPID();
+                        auto param = utils.getParam(pID);
 
-                    auto val = param->getValue();
-                    val += (1.f * rand.nextFloat() - .5f) * r_depth;
-                    param->setValueNotifyingHost(juce::jlimit(0.f, 1.f, val));
-                }
+                        auto val = param->getValue();
+                        val += (rand.nextFloat() - .5f) * .1f;
+                        param->beginGesture();
+                        param->setValueNotifyingHost(juce::jlimit(0.f, 1.f, val));
+                        param->endGesture();
+                    }
+                else
+                    for (auto randomizable : randomizables)
+                    {
+                        const PID pID = randomizable->getPID();
+                        auto param = utils.getParam(pID);
+
+                        param->beginGesture();
+                        param->setValueNotifyingHost(rand.nextFloat());
+                        param->endGesture();
+                    }
             }
+            
         protected:
             std::vector<Paramtr*> randomizables;
             std::vector<RandFunc> randFuncs;
@@ -2304,17 +2334,20 @@ namespace modSys6
                     g.fillEllipse(x1 - pointRadius, y - pointRadius, pointSize, pointSize);
                 }
             }
+            
             void mouseEnter(const juce::MouseEvent& evt) override
             {
                 Comp::mouseEnter(evt);
                 repaint();
             }
+            
             void mouseUp(const juce::MouseEvent& evt) override
             {
                 if (evt.mouseWasDraggedSinceMouseDown()) return;
-                this->operator()();
+				this->operator()(evt.mods.isShiftDown());
                 tooltip = makeTooltip();
             }
+            
             void mouseExit(const juce::MouseEvent&) override
             {
                 tooltip = makeTooltip();

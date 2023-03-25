@@ -1,8 +1,8 @@
 #pragma once
 #include <array>
 #include <random>
-#include "Smooth.h"
 #include "../Interpolation.h"
+#include "PRM.h"
 
 #include <juce_audio_basics/juce_audio_basics.h>
 
@@ -11,6 +11,7 @@
 namespace perlin
 {
 	static constexpr float Pi = 3.14159265359f;
+	using PRM = dsp::PRM;
 
 	template<typename Float>
 	inline Float msInSamples(Float ms, Float Fs) noexcept
@@ -81,47 +82,6 @@ namespace perlin
 
 		Phase phase;
 		Float inc, fsInv;
-	};
-
-	struct PRM
-	{
-		/* startVal */
-		PRM(float startVal) :
-			smooth(startVal),
-			buf(),
-			smoothing(false)
-		{}
-
-		/* Fs, blockSize, smoothLenMs */
-		void prepare(float Fs, int blockSize, float smoothLenMs)
-		{
-			buf.resize(blockSize);
-			smooth.makeFromDecayInMs(smoothLenMs, Fs);
-		}
-
-		/* value, numSamples */
-		float* operator()(float value, int numSamples) noexcept
-		{
-			smoothing = smooth(buf.data(), value, numSamples);
-			return buf.data();
-		}
-
-		/* numSamples */
-		float* operator()(int numSamples) noexcept
-		{
-			smoothing = smooth(buf.data(), numSamples);
-			return buf.data();
-		}
-
-		/* idx */
-		float operator[](int i) const noexcept
-		{
-			return buf[i];
-		}
-
-		smooth::Smooth<float> smooth;
-		std::vector<float> buf;
-		bool smoothing;
 	};
 
 	inline void generateProceduralNoise(float* noise, int size, unsigned int seed)
@@ -209,12 +169,14 @@ namespace perlin
 
 			noiseIdx = static_cast<int>(timeInHzFloor) & NoiseSizeMax;
 			phasor.phase.phase = timeInHz - timeInHzFloor;
+
+			DBG(timeInHz << " :: " << timeInHzFloor);
 		}
 
 		/* playHeadPos, rateBeatsInv */
-		void updatePositionSyncProcedural(const PlayHeadPos& playHeadPos, double rateBeatsInv) noexcept
+		void updatePositionSyncProcedural(double ppq, double rateBeatsInv) noexcept
 		{
-			const auto ppq = playHeadPos.ppqPosition * rateBeatsInv + .5;
+			ppq = ppq * rateBeatsInv + .5;
 			const auto ppqFloor = std::floor(ppq);
 
 			noiseIdx = static_cast<int>(ppqFloor) & NoiseSizeMax;
@@ -446,10 +408,12 @@ namespace perlin
 			xPhase(0.f),
 			xInc(0.f),
 			crossfading(false),
+			lastBlockWasTemposync(false),
 			seed(),
 			// project position
 			curPosEstimate(-1),
-			curPosInSamples(0)
+			curPosInSamples(0),
+			latency(0)
 		{
 			setSeed(69420);
 
@@ -466,10 +430,11 @@ namespace perlin
 			generateProceduralNoise(noise.data(), Perlin::NoiseSize, static_cast<unsigned int>(_seed));
 		}
 
-		void prepare(float fs, int blockSize)
+		void prepare(float fs, int blockSize, int _latency)
 		{
-			const auto fsInv = 1.f / fs;
-			sampleRateInv = static_cast<double>(fsInv);
+			latency = _latency;
+
+			sampleRateInv = 1. / static_cast<double>(fs);
 
 			prevBuffer.setSize(2, blockSize, false, false, false);
 			for (auto& perlin : perlins)
@@ -482,8 +447,8 @@ namespace perlin
 		}
 
 		/* samples, numChannels, numSamples, playHeadPos,
-		rateHz, rateBeats, octaves, width, phs, shape,
-		temposync, procedural */
+		rateHz, rateBeats, octaves, width, phs,
+		shape, temposync, procedural */
 		void operator()(float* const* samples, int numChannels, int numSamples,
 			const PlayHeadPos& playHeadPos,
 			double _rateHz, double _rateBeats,
@@ -494,6 +459,8 @@ namespace perlin
 				processSync(playHeadPos, numSamples, _rateBeats, procedural);
 			else
 				processFree(playHeadPos, numSamples, _rateHz, procedural);
+			
+			lastBlockWasTemposync = temposync;
 
 			const auto octavesBuf = octavesPRM(octaves, numSamples);
 			const auto phsBuf = phsPRM(phs, numSamples);
@@ -549,11 +516,12 @@ namespace perlin
 		// crossfade
 		std::vector<float> xFadeBuffer;
 		float xPhase, xInc;
-		bool crossfading;
+		bool crossfading, lastBlockWasTemposync;
 		// seed
 		std::atomic<int> seed;
 		// project position
 		__int64 curPosEstimate, curPosInSamples;
+		int latency;
 
 		// PROCESS FREE
 		void processFree(const PlayHeadPos& playHeadPos, int numSamples, double _rateHz, bool procedural) noexcept
@@ -574,28 +542,17 @@ namespace perlin
 
 		void processFreeProcedural(const PlayHeadPos& playHeadPos, double _rateHz, int numSamples) noexcept
 		{
-			curPosInSamples = playHeadPos.timeInSamples;
+			curPosInSamples = playHeadPos.timeInSamples - latency;
 
 			if (!crossfading)
 			{
-				bool shallCrossfade = false;
-
-				if (playHeadJumps())
-				{
-					shallCrossfade = true;
-				}
-				else if (rateHz != _rateHz)
+				if (playHeadJumps() || rateHz != _rateHz || lastBlockWasTemposync)
 				{
 					rateHz = _rateHz;
 					rateInv = _rateHz * sampleRateInv;
-					shallCrossfade = true;
-				}
-
-				if (shallCrossfade)
-				{
+					
 					initCrossfade();
 					perlins[perlinIndex].updateSpeed(rateInv);
-
 				}
 			}
 
@@ -613,11 +570,9 @@ namespace perlin
 				processSyncRandom(playHeadPos, _rateBeats);
 		}
 
-		void processSyncUpdateSpeed(const PlayHeadPos& playHeadPos) noexcept
+		void processSyncUpdateSpeed(double bps) noexcept
 		{
-			const auto bpMins = playHeadPos.bpm;
-			const auto bpSecs = bpMins / 60.;
-			const auto bpSamples = bpSecs * sampleRateInv;
+			const auto bpSamples = bps * sampleRateInv;
 			const auto speed = rateInv * bpSamples;
 
 			perlins[perlinIndex].updateSpeed(speed);
@@ -628,36 +583,36 @@ namespace perlin
 			rateBeats = _rateBeats;
 			rateInv = .25 / rateBeats;
 
-			processSyncUpdateSpeed(playHeadPos);
+			const auto bpm = playHeadPos.bpm;
+			const auto bps = bpm / 60.;
+
+			processSyncUpdateSpeed(bps);
 		}
 
 		void processSyncProcedural(const PlayHeadPos& playHeadPos, double _rateBeats, int numSamples) noexcept
 		{
 			curPosInSamples = playHeadPos.timeInSamples;
 
+			const auto bpm = playHeadPos.bpm;
+			const auto bps = bpm / 60.;
+
 			if (!crossfading)
 			{
-				bool shallCrossfade = false;
-
-				if (playHeadJumps())
-				{
-					shallCrossfade = true;
-				}
-				else if (rateBeats != _rateBeats)
+				if (playHeadJumps() || rateBeats != _rateBeats || !lastBlockWasTemposync)
 				{
 					rateBeats = _rateBeats;
 					rateInv = .25 / rateBeats;
-					shallCrossfade = true;
-				}
-
-				if (shallCrossfade)
-				{
+					
 					initCrossfade();
-					processSyncUpdateSpeed(playHeadPos);
+					processSyncUpdateSpeed(bps);
 				}
 			}
-
-			perlins[perlinIndex].updatePositionSyncProcedural(playHeadPos, rateInv);
+			
+			const auto latencyInPPQ = latency * bps * sampleRateInv;
+			const auto ppq = playHeadPos.ppqPosition - latencyInPPQ;
+			
+			perlins[perlinIndex].updatePositionSyncProcedural(ppq, rateInv);
+			
 
 			processCurPosEstimate(numSamples);
 		}
