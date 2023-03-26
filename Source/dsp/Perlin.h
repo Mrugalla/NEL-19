@@ -114,6 +114,7 @@ namespace perlin
 
 	using PlayHeadPos = juce::AudioPlayHead::CurrentPositionInfo;
 	using InterpolationFunc = float(*)(const float*, float) noexcept;
+	using InterpolationFuncs = std::array<InterpolationFunc, 3>;
 	using SIMD = juce::FloatVectorOperations;
 
 	struct Perlin
@@ -169,8 +170,6 @@ namespace perlin
 
 			noiseIdx = static_cast<int>(timeInHzFloor) & NoiseSizeMax;
 			phasor.phase.phase = timeInHz - timeInHzFloor;
-
-			DBG(timeInHz << " :: " << timeInHzFloor);
 		}
 
 		/* playHeadPos, rateBeatsInv */
@@ -203,7 +202,7 @@ namespace perlin
 		}
 
 		// misc
-		std::array<InterpolationFunc, 3> interpolationFuncs;
+		InterpolationFuncs interpolationFuncs;
 		double sampleRateInv;
 		float fs;
 

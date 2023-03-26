@@ -148,11 +148,13 @@ namespace modSys6
                     arc.cubicTo(arcX0, arcY0, arcX1, arcY1, arcX2, arcY2);
                     g.strokePath(arc, stroke);
                 };
+                params[RateType].targetToggleState = 1;
 
                 params[RandType].onPaint = [&](juce::Graphics& g)
                 {
 					g.drawFittedText("P", params[RandType].getLocalBounds(), juce::Justification::centred, 1);
                 };
+				params[RandType].targetToggleState = 1;
 
                 startTimerHz(4);
             }

@@ -279,7 +279,8 @@ namespace modSys6
             bool drawLeft = true, bool drawRight = true)
         {
             g.setColour(col);
-            g.setFont(Shared::shared.font);
+            if(txt.isNotEmpty())
+                g.setFont(Shared::shared.font);
             {
                 const auto edgeLen = std::min(bounds.getWidth(), bounds.getHeight()) * .2f;
                 {
@@ -1086,7 +1087,9 @@ namespace modSys6
                 }
                 locked = static_cast<int>(child.getProperty(id, 0)) == 0 ? false : true;
             }
+            
             bool isLocked() { return locked; }
+            
             void switchLock()
             {
                 locked = !locked;
@@ -1100,6 +1103,7 @@ namespace modSys6
                 }
                 child.setProperty(id, locked ? 1 : 0, nullptr);
             }
+            
         protected:
             Comp* comp;
             juce::Identifier id;
@@ -1163,6 +1167,7 @@ namespace modSys6
                 if (!evt.mouseWasDraggedSinceMouseDown())
                 {
                     switchLock();
+                    comp->setAlpha(locked ? .3f : 1.f);
                     comp->repaint();
                 }
                 repaint();
@@ -1250,6 +1255,7 @@ namespace modSys6
                 {
                     setBufferedToImage(false);
                 }
+                
                 bool updateSetSelected(int selectedModIdx) noexcept
                 {
                     const auto c = this->utils.getConnecIdxWith(selectedModIdx, paramtr.getPID());
@@ -1261,10 +1267,15 @@ namespace modSys6
                     }
                     return false;
                 }
+                
                 void select(int _connecIdx) noexcept { connecIdx = _connecIdx; }
+                
                 const bool isSelected() const noexcept { return connecIdx != -1; }
+                
                 const bool isTryingToRemove() const noexcept { return tryRemove; }
+                
                 const int getConnecIdx() const noexcept { return connecIdx; }
+                
             protected:
                 Paramtr& paramtr;
                 float dragY;
@@ -1295,6 +1306,7 @@ namespace modSys6
                         g.setColour(paramtr.col(Shared::shared.colour(ColourID::Interact)));
                         txt = "M";
                     } 
+                    
                     g.drawEllipse(bounds, thicc);
                     {
                         const auto font = g.getCurrentFont();
@@ -1311,6 +1323,7 @@ namespace modSys6
                     dragY = evt.position.y / this->utils.getDragSpeed();
                     updateSetSelected(this->utils.getSelectedModIdx());
                 }
+                
                 void mouseDrag(const juce::MouseEvent& evt) override
                 {
                     if (!isSelected() || paramtr.isLocked()) return;
@@ -1321,7 +1334,9 @@ namespace modSys6
                     this->utils.setConnecDepth(connecIdx, depth);
                     dragY = dragYNew;
                 }
-                void mouseUp(const juce::MouseEvent& evt) override {
+                
+                void mouseUp(const juce::MouseEvent& evt) override
+                {
                     if (evt.mouseWasDraggedSinceMouseDown()) return;
                     else if (evt.mods.isLeftButtonDown()) return;
                     else if (!isSelected()) return;
@@ -1336,6 +1351,7 @@ namespace modSys6
                     }
                     repaintWithChildren(getParentComponent());
                 }
+                
                 void mouseExit(const juce::MouseEvent&) override
                 {
                     tryRemove = false;
@@ -1346,14 +1362,15 @@ namespace modSys6
             Paramtr(Utils& u, juce::String&& _name, juce::String&& _tooltip, PID _pID, std::vector<Paramtr*>& modulatables, ParameterType _pType = ParameterType::Knob) :
                 juce::Timer(),
                 Comp(u, makeNotify(*this, u), std::move(_tooltip)),
+                onPaint(nullptr),
+                targetToggleState(-1),
                 param(*u.getParam(_pID)),
                 pType(_pType),
                 label(u, std::move(_name)),
                 modDial(u, *this),
                 lockr(u, this, toString(getPID())),
                 attachedModSelected(u.getSelectedMod() == param.attachedMod),
-                valNorm(0.f), valSum(0.f), connecDepth(u.getConnecDepth(modDial.getConnecIdx())), dragY(0.f),
-                onPaint(nullptr)
+                valNorm(0.f), valSum(0.f), connecDepth(u.getConnecDepth(modDial.getConnecIdx())), dragY(0.f)
             {
                 init(modulatables);
             }
@@ -1361,14 +1378,15 @@ namespace modSys6
             Paramtr(Utils& u, juce::String&& _name, juce::String&& _tooltip, int _pID, std::vector<Paramtr*>& modulatables, ParameterType _pType = ParameterType::Knob) :
                 juce::Timer(),
                 Comp(u, makeNotify(*this, u), std::move(_tooltip)),
+                onPaint(nullptr),
+                targetToggleState(-1),
                 param(*u.getParam(static_cast<PID>(_pID))),
                 pType(_pType),
                 label(u, std::move(_name)),
                 modDial(u, *this),
                 lockr(u, this, toString(getPID())),
                 attachedModSelected(u.getSelectedMod() == param.attachedMod),
-                valNorm(0.f), valSum(0.f), connecDepth(u.getConnecDepth(modDial.getConnecIdx())), dragY(0.f),
-                onPaint(nullptr)
+                valNorm(0.f), valSum(0.f), connecDepth(u.getConnecDepth(modDial.getConnecIdx())), dragY(0.f)
             {
                 init(modulatables);
             }
@@ -1403,6 +1421,7 @@ namespace modSys6
             }
             
             OnPaint onPaint;
+            int targetToggleState;
         protected:
             Param& param;
             const ParameterType pType;
@@ -1560,20 +1579,29 @@ namespace modSys6
                 const auto thicc = Shared::shared.thicc;
                 const auto bounds = getLocalBounds().toFloat().reduced(thicc);
                 
-                if (isMouseOver())
+				auto col = Shared::shared.colour(ColourID::Hover);
+                
+
+                if (isMouseOverOrDragging())
                 {
-                    if (!isLocked())
-                    {
-                        g.setColour(Shared::shared.colour(ColourID::Hover));
-                        g.fillRoundedRectangle(bounds, thicc);
-                        if (isMouseButtonDown())
-                            g.fillRoundedRectangle(bounds, thicc);
-                    }
-                    g.setColour(col(Shared::shared.colour(ColourID::Interact)));
+                    g.setColour(col);
+                    g.fillRoundedRectangle(bounds, thicc);
                 }
+                
+                auto valNormInt = static_cast<int>(std::round(valNorm));
+                auto active = valNormInt == targetToggleState;
+                col = Shared::shared.colour(ColourID::Interact);
+                
+                if (active)
+                {
+                    g.setColour(col);
+                    g.drawRoundedRectangle(bounds, thicc, thicc);
+                }  
                 else
-                    g.setColour(col(Shared::shared.colour(ColourID::Txt)));
-                g.drawRoundedRectangle(bounds, thicc, thicc);
+                {
+                    visualizeGroup(g, "", bounds, col, thicc, true, true);
+                }
+                
                 if(onPaint == nullptr)
                     g.drawFittedText(param.getCurrentValueAsText(), bounds.toNearestInt(), juce::Justification::centred, 1);
 				else
