@@ -1088,7 +1088,7 @@ namespace modSys6
                 
                 setBufferedToImage(false);
 
-                startTimerHz(8);
+                startTimerHz(24);
             }
             
             void updateMod()
@@ -1098,7 +1098,9 @@ namespace modSys6
             
             void setMod(ModType t)
             {
-                if (modType == t) return;
+                if (modType == t)
+                    return;
+                
                 modType = t;
                 perlin.setVisible(false);
                 audioRate.setVisible(false);
@@ -1231,14 +1233,13 @@ namespace modSys6
             {
                 setMod(getModType());
 
-                const auto param = this->utils.getParam(PID::ModsMix);
-                const auto valSum = param->getValueSum();
+                const auto& param = *utils.getParam(PID::ModsMix);
+                const auto valSum = param.getValueSum();
                 const auto v = mOff == 0 ? 1.f - valSum : valSum;
-                if (modDepth != v)
-                {
-                    modDepth = v;
-                    repaint();
-                }
+                if (modDepth == v)
+                    return;
+                modDepth = v;
+                repaint();
             }
         };
     }

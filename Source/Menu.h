@@ -643,7 +643,8 @@ namespace menu2
 				auto optionChild = child.getChild(c);
 				options.push_back(optionChild.getProperty(id[ID]));
 			}
-			entries.push_back(std::make_unique<SwitchButton>(
+			entries.push_back(std::make_unique<SwitchButton>
+			(
 				utils, tooltp.toString(), buttonName, onSwitch, options, onIsEnabled
 			));
 			addAndMakeVisible(*entries.back().get());
@@ -695,22 +696,6 @@ namespace menu2
 					const auto mID = user->getValue(id);
 					const auto modType = vibrato::getModType(mID);
 					return static_cast<int>(modType) == i;
-				};
-				addSwitchButton(id, child, i, onSwitch, buttonName, onIsEnabled);
-			}
-			else if (buttonName == "oversampling")
-			{
-				const auto onSwitch = [this](int e)
-				{
-					const auto idStr = oversampling::getID();
-					juce::Identifier id(idStr);
-					processor.modSys.state.setProperty(id, e, nullptr);
-					processor.oversamplingEnabled.store(e);
-				};
-				const auto onIsEnabled = [this](int i)
-				{
-					const auto e = processor.oversampling.isEnabled();
-					return (e ? 1 : 0) == i;
 				};
 				addSwitchButton(id, child, i, onSwitch, buttonName, onIsEnabled);
 			}
@@ -775,13 +760,16 @@ namespace menu2
 				entries.push_back(std::make_unique<ImageStrip>(this->utils));
 
 				auto strip = static_cast<ImageStrip*>(entries.back().get());
-				strip->addImage(
+				strip->addImage
+				(
 					BinaryData::vst3_logo_small_png, BinaryData::vst3_logo_small_pngSize, "thanks to steinberg for having invented something that transcendents into magic occasionally."
 				);
-				strip->addImage(
+				strip->addImage
+				(
 					BinaryData::shuttle_png, BinaryData::shuttle_pngSize, "thanks to my son Lionel, who inspires me to push myself everyday."
 				);
-				strip->addImage(
+				strip->addImage
+				(
 					BinaryData::juce_png, BinaryData::juce_pngSize, "thanks to the juce framework for enabling programming noobs like me to fulfill their dreams."
 				);
 
@@ -791,16 +779,18 @@ namespace menu2
 		
 		void addText(const std::array<juce::Identifier, NumIDs>&, juce::ValueTree child, const int)
 		{
-			entries.push_back(std::make_unique<TextComp>(
-				this->utils, child.getProperty("text").toString()
-				));
+			entries.push_back(std::make_unique<TextComp>
+			(
+				utils, child.getProperty("text").toString()
+			));
 			addAndMakeVisible(entries.back().get());
 		}
 		
 		void addLink(const std::array<juce::Identifier, NumIDs>&, juce::ValueTree child, const int)
 		{
-			entries.push_back(std::make_unique<Link>(
-				this->utils,
+			entries.push_back(std::make_unique<Link>
+			(
+				utils,
 				child.getProperty("tooltip").toString(),
 				child.getProperty("id").toString(),
 				child.getProperty("link").toString()
@@ -835,7 +825,8 @@ namespace menu2
 		const auto height = static_cast<float>(button.getHeight());
 		const juce::Point<float> centre(width, height);
 		auto minDimen = std::min(width, height);
-		juce::Rectangle<float> bounds(
+		juce::Rectangle<float> bounds
+		(
 			(width - minDimen) * .5f,
 			(height - minDimen) * .5f,
 			minDimen,

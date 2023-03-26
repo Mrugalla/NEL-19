@@ -1,10 +1,6 @@
 <menu id="options">
   <menu id="audio" tooltip="adjust properties of this instance's core dsp">
     <textbox id="buffersize" tooltip="adjust the size of the vibrato's delay buffer."/>
-    <switch id="oversampling" tooltip="turn on oversampling to get lower sidelobes on strong modulation.">
-      <option id="1x"/>
-      <option id="4x"/>
-    </switch>
     <switch id="lookahead" tooltip="turn lookahead on to compensate for the vibrato's latency.">
       <option id="off"/>
       <option id="on"/>

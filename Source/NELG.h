@@ -40,29 +40,35 @@ namespace nelG
             bool isQuad, isElliptic, isVisible;
         };
     public:
-        Layout(const std::vector<float> xxx, const std::vector<float> yyy) :
+        Layout(std::vector<float>&& xxx, std::vector<float>&& yyy) :
             rXRaw(),
             rYRaw(),
             rX(),
             rY()
         {
-            rXRaw.resize(xxx.size() + 1, 0.f);
-            rYRaw.resize(yyy.size() + 1, 0.f);
+            rXRaw.resize(xxx.size() + 2, 0.f);
+            rYRaw.resize(yyy.size() + 2, 0.f);
             auto sum = 0.f;
-            for (auto x = 0; x < xxx.size(); ++x) {
+            for (auto x = 0; x < xxx.size(); ++x)
+            {
                 rXRaw[x + 1] = xxx[x];
                 sum += xxx[x];
             }
+            rXRaw[xxx.size() + 1] = 1.f;
             auto gain = 1.f / sum;
-            for (auto& x : rXRaw) x *= gain;
+            for (auto& x : rXRaw)
+                x *= gain;
 
             sum = 0.f;
-            for (auto y = 0; y < yyy.size(); ++y) {
+            for (auto y = 0; y < yyy.size(); ++y)
+            {
                 rYRaw[y + 1] = yyy[y];
                 sum += yyy[y];
             }
+			rYRaw[yyy.size() + 1] = 1.f;
             gain = 1.f / sum;
-            for (auto& y : rYRaw) y *= gain;
+            for (auto& y : rYRaw)
+                y *= gain;
 
             for (auto x = 1; x < rXRaw.size(); ++x)
                 rXRaw[x] += rXRaw[x - 1];
@@ -100,6 +106,7 @@ namespace nelG
             if (comp == nullptr) return;
             place(*comp, x, y, width, height, padding, isQuad);
         }
+        
         juce::Rectangle<float> operator()() const noexcept {
             return {
                 rX[0],
@@ -108,6 +115,7 @@ namespace nelG
                 rY[rY.size() - 1] - rY[0]
             };
         }
+        
         //juce::Rectangle<float> operator()(int x, int y, int width = 1, int height = 1, bool isQuad = false) const noexcept {
         //    juce::Rectangle<float> nBounds(rX[x], rY[y], rX[x + width] - rX[x], rY[y + height] - rY[y]);
         //    if (!isQuad) return nBounds;
@@ -127,20 +135,29 @@ namespace nelG
                 else
                     return maxQuadIn(nBounds).reduced(padding);
         }
-        juce::Rectangle<float> bottomBar() const noexcept {
-            return {
+        
+        juce::Rectangle<float> bottomBar() const noexcept
+        {
+            return
+            {
                 rX[0],
-                rY[rY.size() - 2],
+                rY[rY.size() - 3],
                 rX[rX.size() - 1] - rX[0],
-                rY[rY.size() - 1] - rY[rY.size() - 2] };
+                rY[rY.size() - 2] - rY[rY.size() - 3]
+            };
         }
-        juce::Rectangle<float> topBar() const noexcept {
-            return {
+        
+        juce::Rectangle<float> topBar() const noexcept
+        {
+            return
+            {
                 rX[0],
                 rY[0],
                 rX[rX.size() - 1] - rX[0],
-                rY[1] - rY[0] };
+                rY[1] - rY[0]
+            };
         }
+        
         juce::Rectangle<float> exceptBottomBar() const noexcept {
             return {
                 rX[0],
@@ -148,6 +165,27 @@ namespace nelG
                 rX[rX.size() - 1] - rX[0],
                 rY[rY.size() - 2] - rY[0] };
         }
+        
+        float getX(int i) const noexcept
+        {
+			return rX[i];
+		}
+
+		float getY(int i) const noexcept
+		{
+			return rY[i];
+		}
+        
+		float getW(int i) const noexcept
+		{
+			return rX[i + 1] - rX[i];
+		}
+
+		float getH(int i) const noexcept
+		{
+			return rY[i + 1] - rY[i];
+		}
+
         void paintGrid(juce::Graphics&)
         {
 #if DebugLayout

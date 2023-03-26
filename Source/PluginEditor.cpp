@@ -1,7 +1,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
-modSys6::gui::Notify makeNotify(juce::Component* comp)
+modSys6::gui::Notify makeNotify(Nel19AudioProcessorEditor* comp)
 {
     return [c = comp](int t, const void*)
     {
@@ -14,13 +14,37 @@ modSys6::gui::Notify makeNotify(juce::Component* comp)
     };
 }
 
+modSys6::gui::Notify makeNotifyDepthModes(std::array<modSys6::gui::Button, 5>& buttons, int i)
+{
+    return [&btns = buttons, i](int t, const void*)
+    {
+        for (auto& btn : btns)
+            btn.setState(0);
+
+        auto& btn = btns[i];
+
+        if (t == modSys6::gui::NotificationType::PatchUpdated)
+        {
+            auto& p = btn.utils.audioProcessor;
+            const auto fs = static_cast<float>(p.oversampling.getSampleRateUpsampled());
+            const auto sizeInMs = std::round(p.vibrat.getSizeInMs(fs));
+
+            btn.setState
+            (
+                sizeInMs == (i == 0 ? 1.f : i == 1 ? 4.f : i == 2 ? 20.f : i == 3 ? 420.f : 2000.f) ? 1 : 0
+            );
+        }
+        return false;
+    };
+}
+
 Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     AudioProcessorEditor(&p),
     audioProcessor(p),
     layout
     (
         { 3, 21, 8 },
-        { 5, 3, 34, 34, 3 }
+        { 2, 21, 1 }
     ),
     layoutMacros
     (
@@ -30,7 +54,7 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     layoutMainParams
     (
         { 8, 13 },
-        { 5, 5, 5, 5, 3 }
+        { 2, 5, 5, 5, 5, 2 }
     ),
     layoutBottomBar
     (
@@ -39,7 +63,7 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     ),
     layoutTopBar
     (
-        { 2, 2, 2, 21, 8 },
+        { 2, 2, 2, 2, 13 },
         { 1 }
     ),
     utils(p.modSys, *this, p.appProperties.getUserSettings(), p),
@@ -69,6 +93,15 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     gainWet(utils, "Gain", "The output gain of the wet signal.", modSys6::PID::WetGain, modulatables, modSys6::gui::ParameterType::Knob),
     stereoConfig(utils, "StereoConfig", "Configurate if effect is applied to l/r or m/s", modSys6::PID::StereoConfig, modulatables, modSys6::gui::ParameterType::Switch),
 	feedback(utils, "Feedback", "Dial in some feedback to this vibrato's delay.", modSys6::PID::Feedback, modulatables, modSys6::gui::ParameterType::Knob),
+
+    depthModes
+    {
+        modSys6::gui::Button(utils, makeNotifyDepthModes(depthModes, 0), "Click here to resize the internal delay"),
+        modSys6::gui::Button(utils, makeNotifyDepthModes(depthModes, 1), "Click here to resize the internal delay"),
+        modSys6::gui::Button(utils, makeNotifyDepthModes(depthModes, 2), "Click here to resize the internal delay"),
+        modSys6::gui::Button(utils, makeNotifyDepthModes(depthModes, 3), "Click here to resize the internal delay"),
+        modSys6::gui::Button(utils, makeNotifyDepthModes(depthModes, 4), "Click here to resize the internal delay")
+    },
 	
     macro0Dragger(utils, modSys6::ModType::Macro, 0, modulatables),
     macro1Dragger(utils, modSys6::ModType::Macro, 1, modulatables),
@@ -78,7 +111,20 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     visualizer(utils, "Visualizes the sum of the vibrato's modulators.", p.getChannelCountOfBus(false, 0), 1),
 
     paramRandomizer(utils, modulatables, "MainRandomizer"),
-
+    hq
+    (
+        utils,
+        [&](int t, const void*)
+        {
+            if (t == modSys6::gui::NotificationType::PatchUpdated)
+            {
+                hq.setState(p.oversamplingEnabled.load());
+                hq.repaint();
+            }
+            return false;
+        },
+        "Enable oversampling to reduce sidelobes during strong modulation."
+    ),
     popUp(utils),
     enterValue(utils),
 
@@ -132,6 +178,7 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
         addAndMakeVisible(m);
 
     addAndMakeVisible(paramRandomizer);
+    addAndMakeVisible(hq);
     addAndMakeVisible(menuButton);
 
     addAndMakeVisible(visualizer);
@@ -142,6 +189,42 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     addAndMakeVisible(gainWet);
     addAndMakeVisible(stereoConfig);
 	addAndMakeVisible(feedback);
+
+    {
+        const auto fs = static_cast<float>(audioProcessor.oversampling.getSampleRateUpsampled());
+        const auto curDelaySizeMs = std::round(audioProcessor.vibrat.getSizeInMs(fs));
+
+        for (auto i = 0; i < depthModes.size(); ++i)
+        {
+            auto& dMode = depthModes[i];
+            addAndMakeVisible(dMode);
+
+            enum { One, Four, Twenty, FourTwenty, TwoSec, NumModes };
+            juce::String txt(i == 0 ? "1" : i == 1 ? "4" : i == 2 ? "20" : i == 3 ? "420" : "2k");
+            dMode.onPaint = modSys6::gui::makeTextButtonOnPaint(txt, juce::Justification::centred, 1);
+
+            dMode.setState
+            (
+                curDelaySizeMs == (i == 0 ? 1.f : i == 1 ? 4.f : i == 2 ? 20.f : i == 3 ? 420.f : 2000.f) ? 1 : 0
+            );
+
+            dMode.onClick = [&, i]()
+            {
+                const auto delaySizeMs = i == 0 ? 1.f : i == 1 ? 4.f : i == 2 ? 20.f : i == 3 ? 420.f : 2000.f;
+
+                juce::Identifier vibDelaySizeID(vibrato::toString(vibrato::ObjType::DelaySize));
+                audioProcessor.modSys.state.setProperty(vibDelaySizeID, delaySizeMs, nullptr);
+                audioProcessor.forcePrepare();
+
+                for (auto j = 0; j < depthModes.size(); ++j)
+                {
+                    depthModes[j].setState(i == j ? 1 : 0);
+                    depthModes[j].repaint();
+                }
+            };
+        }
+    }
+    
 
     addAndMakeVisible(macro0Dragger);
     addAndMakeVisible(macro1Dragger);
@@ -204,6 +287,16 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
         return audioProcessor.modSys.state;
     };
 
+    hq.onPaint = modSys6::gui::makeTextButtonOnPaint("HQ", juce::Justification::centred, 1);
+    hq.onClick = [&]()
+    {
+        auto e = !audioProcessor.oversamplingEnabled.load();
+        audioProcessor.oversamplingEnabled.store(e);
+        hq.setState(e);
+        hq.repaint();
+    };
+	hq.setState(audioProcessor.oversamplingEnabled.load());
+
     setResizable(true, true);
     {
         const auto user = p.appProperties.getUserSettings();
@@ -224,43 +317,74 @@ void Nel19AudioProcessorEditor::resized()
 
     layout.setBounds(getLocalBounds().toFloat().reduced(thicc));
     layoutBottomBar.setBounds(layout.bottomBar());
-    layoutTopBar.setBounds(layout.topBar());
-    layoutMacros.setBounds(layout(0, 2, 1, 2).reduced(thicc));
-    layoutMainParams.setBounds(layout(2, 2, 1, 2).reduced(thicc));
+    layoutTopBar.setBounds(layout(0, 0, 2, 1));
+    layoutMacros.setBounds(layout(0, 1, 1, 1));
+    layoutMainParams.setBounds(layout(2, 1, 1, 1));
     
-    layoutBottomBar.place(tooltips, 0, 0, 1, 1, thicc, false);
-    layoutBottomBar.place(buildDate, 1, 0, 1, 1, thicc, false);
+    layoutBottomBar.place(tooltips,  0, 0, 1, 1);
+    layoutBottomBar.place(buildDate, 1, 0, 1, 1);
 
-    layoutMacros.place(macro0, 0, 0, 1, 1, thicc);
-    layoutMacros.place(macro1, 0, 2, 1, 1, thicc);
-    layoutMacros.place(macro2, 0, 4, 1, 1, thicc);
-    layoutMacros.place(macro3, 0, 6, 1, 1, thicc);
-    macro0Dragger.setQBounds(layoutMacros(0, 1, 1, 1, true).reduced(thicc));
-    macro1Dragger.setQBounds(layoutMacros(0, 3, 1, 1, true).reduced(thicc));
-    macro2Dragger.setQBounds(layoutMacros(0, 5, 1, 1, true).reduced(thicc));
-    macro3Dragger.setQBounds(layoutMacros(0, 7, 1, 1, true).reduced(thicc));
+    layoutMacros.place(macro0, 0, 0, 1, 1);
+    layoutMacros.place(macro1, 0, 2, 1, 1);
+    layoutMacros.place(macro2, 0, 4, 1, 1);
+    layoutMacros.place(macro3, 0, 6, 1, 1);
+    macro0Dragger.setQBounds(layoutMacros(0, 1, 1, 1, true));
+    macro1Dragger.setQBounds(layoutMacros(0, 3, 1, 1, true));
+    macro2Dragger.setQBounds(layoutMacros(0, 5, 1, 1, true));
+    macro3Dragger.setQBounds(layoutMacros(0, 7, 1, 1, true));
 
-    layoutTopBar.place(paramRandomizer, 1, 0, 1, 1, thicc, true);
-    layoutTopBar.place(menuButton,      0, 0, 1, 1, thicc, true);
-    layoutTopBar.place(presetBrowser.getOpenCloseButton(), 2, 0, 1, 1, thicc, true);
-    layoutTopBar.place(nelLabel,        3, 0, 1, 1, thicc, false);
-    layoutTopBar.place(visualizer,      4, 0, 1, 1, thicc, false);
+    {
+        auto area = layout(1, 1, 1, 1);
+        const auto x = area.getX();
+        const auto w = area.getWidth();
+		const auto h = area.getHeight() * .5f;
+        auto y = area.getY();
+        for (auto i = 0; i < 2; ++i)
+        {
+            auto& modComp = modComps[i];
+            modComp.setBounds(juce::Rectangle<float>(x, y, w, h).toNearestInt());
+            y += h;
+        }
+    }
+
+    
+    {
+        const auto area = layoutMainParams(0, 0, 2, 1);
+		const auto w = area.getWidth() / static_cast<float>(depthModes.size());
+        const auto h = area.getHeight();
+		const auto y = area.getY();
+        auto x = area.getX();
+		for (auto i = 0; i < depthModes.size(); ++i)
+		{
+			auto& depthMode = depthModes[i];
+            depthMode.setBounds(juce::Rectangle<float>(x, y, w, h).toNearestInt());
+			x += w;
+		}
+    }
+    layoutMainParams.place(modsDepth, 0, 1, 2, 1);
+    layoutMainParams.place(modsMix, 0, 2, 2, 1);
+    layoutMainParams.place(dryWetMix, 0, 3, 2, 1);
+    layoutMainParams.place(gainWet, 0, 4, 1, 1);
+    layoutMainParams.place(feedback, 1, 4, 1, 1);
+    layoutMainParams.place(stereoConfig, 0, 5, 1, 1, 0.f, true);
+    
+    layoutTopBar.place(paramRandomizer, 1, 0, 1, 1, 0.f, true);
+    layoutTopBar.place(menuButton,      0, 0, 1, 1, 0.f, true);
+    layoutTopBar.place(presetBrowser.getOpenCloseButton(), 2, 0, 1, 1, 0.f, true);
+    layoutTopBar.place(hq,              3, 0, 1, 1, 0.f, true);
+    layoutTopBar.place(nelLabel,        4, 0, 1, 1);
+    {
+        auto area = layoutMainParams(0, 0, 2, 1);
+        area.setY(layoutTopBar.getY(0));
+		area.setHeight(static_cast<float>(hq.getHeight()));
+
+        visualizer.setBounds(area.toNearestInt());
+    }
 
     popUp.setBounds({ 0, 0, 100, 50 });
     enterValue.setBounds({ 0, 0, 100, 50 });
 
-    layout.place(modComps[0], 1, 2, 1, 1, thicc, false);
-    layout.place(modComps[1], 1, 3, 1, 1, thicc, false);
-    
-    layoutMainParams.place(modsDepth,    0, 0, 2, 1, thicc, true);
-    layoutMainParams.place(modsMix,      0, 1, 2, 1, thicc, true);
-    layoutMainParams.place(dryWetMix,    0, 2, 2, 1, thicc, true);
-    layoutMainParams.place(gainWet,      0, 3, 1, 1, thicc, true);
-    layoutMainParams.place(feedback,     1, 3, 1, 1, thicc, true);
-    layoutMainParams.place(stereoConfig, 0, 4, 2, 1, thicc, true);
-	
-
-    layout.place(presetBrowser, 1, 1, 2, 3, thicc, false);
+    layout.place(presetBrowser, 1, 1, 2, 2, 0.f, false);
 
     {
         auto user = audioProcessor.appProperties.getUserSettings();
@@ -274,23 +398,6 @@ void Nel19AudioProcessorEditor::resized()
 void Nel19AudioProcessorEditor::paint(juce::Graphics& g)
 {
     g.fillAll(utils.colour(modSys6::gui::ColourID::Bg));
-    modSys6::gui::visualizeGroup
-    (
-        g,
-        "Mods",
-        layout(1, 1, 1, 3, 0.f, false),
-        utils.colour(modSys6::gui::ColourID::Hover),
-        modSys6::gui::Shared::shared.thicc
-    );
-    modSys6::gui::visualizeGroup
-    (
-        g,
-        "Main",
-        layout(2, 1, 1, 3, 0.f, false),
-        utils.colour(modSys6::gui::ColourID::Hover),
-        modSys6::gui::Shared::shared.thicc,
-        false, false
-    );
 }
 
 void Nel19AudioProcessorEditor::mouseEnter(const juce::MouseEvent&)

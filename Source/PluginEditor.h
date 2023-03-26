@@ -33,10 +33,12 @@ private:
     modSys6::gui::Visualizer visualizer;
 
     modSys6::gui::Paramtr modsDepth, modsMix, dryWetMix, gainWet, stereoConfig, feedback;
+    std::array<modSys6::gui::Button, 5> depthModes;
 
     modSys6::gui::ModDragger macro0Dragger, macro1Dragger, macro2Dragger, macro3Dragger;
 
     modSys6::gui::ParamtrRandomizer paramRandomizer;
+    modSys6::gui::Button hq;
 
     modSys6::gui::PopUp popUp;
     modSys6::gui::EnterValueComp enterValue;
