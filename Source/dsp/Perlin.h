@@ -520,7 +520,7 @@ namespace perlin
 		// seed
 		std::atomic<int> seed;
 		// project position
-		__int64 curPosEstimate, curPosInSamples;
+		__int64_t curPosEstimate, curPosInSamples;
 		int latency;
 
 		// PROCESS FREE
