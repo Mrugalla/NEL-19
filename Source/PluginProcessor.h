@@ -79,6 +79,7 @@ ich studiere.
 #include "oversampling/Oversampling.h"
 #include <JuceHeader.h>
 #include "modsys/ModSys.h"
+#include "BenchmarkProcessBlock.h"
 #include <limits>
 
 struct Nel19AudioProcessor :
@@ -135,6 +136,8 @@ struct Nel19AudioProcessor :
 private:
     Smooth depthSmooth, modsMixSmooth;
     std::vector<float> depthBuf, modsMixBuf;
+
+    benchmark::ProcessBlock benchmark;
 
     void processBlockVibrato(juce::AudioBuffer<float>&, const juce::MidiBuffer&) noexcept;
     

@@ -219,6 +219,8 @@ bool Nel19AudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) con
 
 void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
 {
+    //benchmark();
+
     juce::ScopedNoDenormals noDenormals;
     const auto numSamples = buffer.getNumSamples();
     {
