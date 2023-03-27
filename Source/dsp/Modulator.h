@@ -584,7 +584,7 @@ namespace vibrato
 			void operator()(Buffer& buffer, int numChannelsOut, int numSamples,
 				const PosInfo& transport) noexcept
 			{
-				float* samples[] = { buffer[0].data(), buffer[1].data() };
+				float* samples[2] = { buffer[0].data(), buffer[1].data() };
 				
 				perlin
 				(

@@ -10,7 +10,7 @@ namespace benchmark
 	using File = juce::File;
 	using SpecialLoc = File::SpecialLocationType;
 
-	using Clock = std::chrono::high_resolution_clock;
+	using Clock = std::chrono::steady_clock;
 	using TimePoint = std::chrono::time_point<Clock>;
 	using Duration = std::chrono::duration<double>;
 	using AtomicDuration = std::atomic<Duration>;
@@ -42,8 +42,6 @@ namespace benchmark
 			Timer(),
 			duration()
 		{
-			startTimerHz(12);
-
 			const auto desktop = SpecialLoc::userDesktopDirectory;
 			const auto folder = File::getSpecialLocation(desktop).getChildFile("Benchmark");
 			if (!folder.exists())
@@ -52,6 +50,8 @@ namespace benchmark
 			if (file.exists())
 				file.deleteFile();
 			file.create();
+
+			startTimerHz(12);
 		}
 
 		~ProcessBlock()
