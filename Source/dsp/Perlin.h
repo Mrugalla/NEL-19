@@ -154,6 +154,22 @@ namespace perlin
 			phaseBuffer.resize(blockSize);
 		}
 
+		/* newPhase */
+		void updatePosition(double newPhase) noexcept
+		{
+			const auto newPhaseFloor = std::floor(newPhase);
+
+			noiseIdx = static_cast<int>(newPhaseFloor) & NoiseSizeMax;
+			phasor.phase.phase = newPhase - newPhaseFloor;
+		}
+
+		/* playHeadPos, rateBeatsInv */
+		void updatePositionSyncProcedural(double ppq, double rateBeatsInv) noexcept
+		{
+			ppq = ppq * rateBeatsInv + .5;
+			updatePosition(ppq);
+		}
+
 		/* rateHzInv */
 		void updateSpeed(double rateHzInv) noexcept
 		{
@@ -163,23 +179,9 @@ namespace perlin
 		/*  playHeadPos, rateHz */
 		void updatePosition(const PlayHeadPos& playHeadPos, double rateHz) noexcept
 		{
-			const auto timeInSamples = playHeadPos.timeInSamples;
-			const auto timeInSecs = static_cast<double>(timeInSamples) * sampleRateInv;
-			const auto timeInHz = timeInSecs * rateHz;
-			const auto timeInHzFloor = std::floor(timeInHz);
-
-			noiseIdx = static_cast<int>(timeInHzFloor) & NoiseSizeMax;
-			phasor.phase.phase = timeInHz - timeInHzFloor;
-		}
-
-		/* playHeadPos, rateBeatsInv */
-		void updatePositionSyncProcedural(double ppq, double rateBeatsInv) noexcept
-		{
-			ppq = ppq * rateBeatsInv + .5;
-			const auto ppqFloor = std::floor(ppq);
-
-			noiseIdx = static_cast<int>(ppqFloor) & NoiseSizeMax;
-			phasor.phase.phase = ppq - ppqFloor;
+			const auto timeSecs = playHeadPos.timeInSeconds;
+			const auto timeHz = timeSecs * rateHz;
+			updatePosition(timeHz);
 		}
 
 		/* samples, noise, gainBuffer,

@@ -22,7 +22,6 @@ Nel19AudioProcessor::Nel19AudioProcessor()
     dryWet(),
     modSys(*this, [this]() { loadPatch(); }),
     oversampling(),
-    oversamplingEnabled(false),
     modulators
     {
         vibrato::Modulator(modSys.getBeatsData()),
@@ -36,7 +35,6 @@ Nel19AudioProcessor::Nel19AudioProcessor()
     },
     vibrat(),
     visualizerValues{ 0.f, 0.f },
-    lookaheadEnabled(true),
     depthSmooth(0.f), modsMixSmooth(0.f),
     depthBuf(), modsMixBuf()
 #endif
@@ -163,10 +161,14 @@ void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize)
     
     dryWet.prepare(sampleRateF, maxBufferSize, delaySizeHalf);
     
-	auto latency = delaySizeHalf * (lookaheadEnabled.load() ? 1 : 0);
+    using PID = modSys6::PID;
+
+    const auto lookaheadEnabled = modSys.getParam(PID::Lookahead)->getValueSum() > .5f;
+
+	auto latency = delaySizeHalf * (lookaheadEnabled ? 1 : 0);
     
 #if OversamplingEnabled
-    const auto osEnabled = oversamplingEnabled.load();
+	const auto osEnabled = modSys.getParam(PID::HQ)->getValueSum() > .5f;
     oversampling.prepareToPlay(sampleRate, maxBufferSize, osEnabled);
 
     const auto sampleRateUpD = oversampling.getSampleRateUpsampled();
@@ -466,16 +468,6 @@ void Nel19AudioProcessor::savePatch()
         const auto bufferSize = vibrat.getSizeInMs(static_cast<float>(oversampling.getSampleRateUpsampled()));
         modSys.state.setProperty(id, bufferSize, nullptr);
     }
-    {
-        const juce::Identifier id(oversampling::getID());
-        const auto oEnabled = oversampling.isEnabled() ? 1 : 0;
-        modSys.state.setProperty(id, oEnabled, nullptr);
-    }
-    {
-        const juce::Identifier id(getLookaheadID());
-        const auto oEnabled = lookaheadEnabled.load() ? 1 : 0;
-        modSys.state.setProperty(id, oEnabled, nullptr);
-    }
 }
 
 void Nel19AudioProcessor::setStateInformation(const void* data, int sizeInBytes)
@@ -525,24 +517,6 @@ void Nel19AudioProcessor::loadPatch()
             modSys.state.setProperty(id, bufferSize, nullptr);
         }
     }
-    {
-        const juce::Identifier id(oversampling::getID());
-        const auto oEnabledStr = modSys.state.getProperty(id, "").toString();
-        if (oEnabledStr.isNotEmpty())
-        {
-            const auto oEnabled = oEnabledStr.getIntValue() == 1 ? true : false;
-            oversamplingEnabled.store(oEnabled);
-        }
-    }
-    {
-        const juce::Identifier id(getLookaheadID());
-        const auto oEnabledStr = modSys.state.getProperty(id, "").toString();
-        if (oEnabledStr.isNotEmpty())
-        {
-            const auto oEnabled = oEnabledStr.getIntValue() == 1 ? true : false;
-            lookaheadEnabled.store(oEnabled);
-        }
-    }
     prepareToPlay(getSampleRate(), getBlockSize());
     suspendProcessing(false);
 }
@@ -554,16 +528,17 @@ juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 
 void Nel19AudioProcessor::timerCallback()
 {
+    using PID = modSys6::PID;
+    
+    const bool oversamplingChanged = (modSys.getParam(PID::HQ)->getValueSum() > .5f) != oversampling.isEnabled();
+
     const auto curLatency = getLatencySamples();
     const auto latencyWithoutOversampling = curLatency - oversampling.getLatency();
     const auto hasLatency = latencyWithoutOversampling != 0;
-    const bool oversamplingChanged = oversamplingEnabled.load() != oversampling.isEnabled();
-    const bool lookaheadChanged = lookaheadEnabled.load() != hasLatency;
+    const bool lookaheadChanged = (modSys.getParam(PID::Lookahead)->getValueSum() > .5f) != hasLatency;
     
     if (oversamplingChanged || lookaheadChanged)
-    {
         forcePrepare();
-    }
 }
 
 void Nel19AudioProcessor::forcePrepare()
@@ -571,11 +546,6 @@ void Nel19AudioProcessor::forcePrepare()
     suspendProcessing(true);
 	prepareToPlay(getSampleRate(), getBlockSize());
 	suspendProcessing(false);
-}
-
-juce::String Nel19AudioProcessor::getLookaheadID()
-{
-    return "lookahead";
 }
 
 #undef RemoveValueTree

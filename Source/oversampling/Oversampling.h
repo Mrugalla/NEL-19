@@ -14,11 +14,6 @@ namespace oversampling
 	using String = juce::String;
 	using AudioBuffer = juce::AudioBuffer<float>;
 
-	inline String getID()
-	{
-		return "oversamplingOrder";
-	}
-
 	inline void zeroStuff(float* const* samplesDest, const float* const* samplesSrc, int numChannels, int numSamples) noexcept
 	{
 		for (auto ch = 0; ch < numChannels; ++ch)

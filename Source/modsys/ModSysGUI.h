@@ -744,6 +744,18 @@ namespace modSys6
             }
         };
 
+        struct BgGenComp :
+            public Comp
+        {
+            // if you ever want to start writing this class,
+            // you have to solve this before:
+            // 1. knobs ticks' are filling the background to appear transparent
+            // 2. buttons have no background fill yet
+            BgGenComp(Utils& u) :
+				Comp(u, "", CursorType::Default)
+            {}
+        };
+
         struct BlinkyBoy :
             public juce::Timer
         {

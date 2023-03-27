@@ -86,8 +86,6 @@ struct Nel19AudioProcessor :
     public juce::Timer
 {
     using ChannelSet = juce::AudioChannelSet;
-
-    static juce::String getLookaheadID();
     
     using Smooth = smooth::Smooth<float>;
     static constexpr int NumActiveMods = 2;
@@ -126,7 +124,6 @@ struct Nel19AudioProcessor :
     modSys6::ModSys modSys;
     
     oversampling::OversamplerWithShelf oversampling;
-	std::atomic<bool> oversamplingEnabled;
     
     std::array<vibrato::Modulator, NumActiveMods> modulators;
     juce::AudioBuffer<float> modsBuffer;
@@ -135,7 +132,6 @@ struct Nel19AudioProcessor :
     vibrato::Processor vibrat;
     
     std::array<float, 2> visualizerValues;
-    std::atomic<bool> lookaheadEnabled;
 private:
     Smooth depthSmooth, modsMixSmooth;
     std::vector<float> depthBuf, modsMixBuf;

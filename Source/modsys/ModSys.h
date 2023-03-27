@@ -61,7 +61,7 @@ namespace modSys6
 		Pitchbend1Smooth,
 		LFO1FreeSync, LFO1RateFree, LFO1RateSync, LFO1Waveform, LFO1Phase, LFO1Width,
 
-		Depth, ModsMix, DryWetMix, WetGain, StereoConfig, Feedback,
+		Depth, ModsMix, DryWetMix, WetGain, StereoConfig, Feedback, HQ, Lookahead,
 
 		NumParams
 	};
@@ -155,6 +155,8 @@ namespace modSys6
 		case PID::WetGain: return "Gain Wet";
 		case PID::StereoConfig: return "Stereo Config";
 		case PID::Feedback: return "Feedback";
+		case PID::HQ: return "HQ";
+		case PID::Lookahead: return "Lookahead";
 
 		default: return "";
 		}
@@ -867,6 +869,38 @@ namespace modSys6
 				return str.getFloatValue();
 			};
 
+			ValToStrFunc valToStrHQ = [](float v)
+			{
+				return v < .5f ? juce::String("1x") :
+					juce::String("4x");
+			};
+			StrToValFunc strToValHQ = [](const juce::String& str)
+			{
+				const auto text = str.toLowerCase();
+				if (text == "1x" || text == "1" || text == "low" || text == "lo" || text == "off" || text == "false")
+					return 0.f;
+				else if (text == "4x" || text == "4" || text == "high" || text == "hi" || text == "420")
+					return 1.f;
+
+				return 1.f;
+			};
+			
+			ValToStrFunc valToStrLookahead = [](float v)
+			{
+				return v < .5f ? juce::String("Off") :
+					juce::String("On");
+			};
+			StrToValFunc strToValLookahead = [](const juce::String& str)
+			{
+				const auto text = str.toLowerCase();
+				if (text == "off" || text == "false" || text == "0" || text == "Nopezies")
+					return 0.f;
+				else if (text == "on" || text == "true" || text == "1" || text == "Fuck Yeah")
+					return 1.f;
+
+				return 1.f;
+			};
+
 			for (auto p = 0; p < NumMSParams; ++p)
 			{
 				const PID pID = static_cast<PID>(p);
@@ -1001,12 +1035,14 @@ namespace modSys6
 				params.push_back(new Param(withOffset(PID::LFO0Width, offset), makeRange::stepped(0.f, .5f, LFOPhaseStep), 0.f, valToStrPhase360, strToValPhase, Unit::Degree));
 			}
 
-			params.push_back(new Param(PID::Depth, makeRange::biasXL(0.f, 1.f, 0.f), 1.f, valToStrPercent, strToValPercent));
+			params.push_back(new Param(PID::Depth, makeRange::lin(0.f, 1.f), 1.f, valToStrPercent, strToValPercent, Unit::Percent));
 			params.push_back(new Param(PID::ModsMix, makeRange::biasXL(0.f, 1.f, 0.f), 0.f, valToStrRatio, strToValRatio));
 			params.push_back(new Param(PID::DryWetMix, makeRange::biasXL(0.f, 1.f, 0.f), 1.f, valToStrRatio, strToValRatio));
 			params.push_back(new Param(PID::WetGain, makeRange::biasXL(-120.f, 4.5f, .9f), 0.f, valToStrDb, strToValDb));
 			params.push_back(new Param(PID::StereoConfig, makeRange::toggle(), 1.f, valToStrLRMS, strToValLRMS));
 			params.push_back(new Param(PID::Feedback, makeRange::lin(-1.f, 1.f), 0.f, valToStrPercent, strToValPercent, Unit::Percent));
+			params.push_back(new Param(PID::HQ, makeRange::toggle(), 1.f, valToStrHQ, strToValHQ, Unit::Power));
+			params.push_back(new Param(PID::Lookahead, makeRange::toggle(), 1.f, valToStrLookahead, strToValLookahead, Unit::Power));
 
 			for (auto param : params)
 				audioProcessor.addParameter(param);

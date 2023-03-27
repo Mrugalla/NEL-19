@@ -63,7 +63,7 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     ),
     layoutTopBar
     (
-        { 2, 2, 2, 2, 13 },
+        { 2, 2, 2, 2, 2, 13 },
         { 1 }
     ),
     utils(p.modSys, *this, p.appProperties.getUserSettings(), p),
@@ -111,20 +111,8 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     visualizer(utils, "Visualizes the sum of the vibrato's modulators.", p.getChannelCountOfBus(false, 0), 1),
 
     paramRandomizer(utils, modulatables, "MainRandomizer"),
-    hq
-    (
-        utils,
-        [&](int t, const void*)
-        {
-            if (t == modSys6::gui::NotificationType::PatchUpdated)
-            {
-                hq.setState(p.oversamplingEnabled.load());
-                hq.repaint();
-            }
-            return false;
-        },
-        "Enable oversampling to reduce sidelobes during strong modulation."
-    ),
+	hq(utils, "HQ", "Strong vibrato causes less 'grainy' sidelobes with 4x oversampling.", modSys6::PID::HQ, modulatables, modSys6::gui::ParameterType::Switch),
+	lookahead(utils, "Lookahead", "Lookahead aligns the average position of the vibrato with the dry signal.", modSys6::PID::Lookahead, modulatables, modSys6::gui::ParameterType::Switch),
     popUp(utils),
     enterValue(utils),
 
@@ -135,7 +123,7 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
         "All the extra stuff.",
         [this]()
         {
-            menu2::openMenu(menu, audioProcessor, utils, *this, layout(1, 1, 2, 3).toNearestInt(), menuButton);
+            menu2::openMenu(menu, audioProcessor, utils, *this, layout(1, 1, 2, 1).toNearestInt(), menuButton);
         },
         [this](juce::Graphics& g, menu2::ButtonM&)
         {
@@ -179,6 +167,7 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
 
     addAndMakeVisible(paramRandomizer);
     addAndMakeVisible(hq);
+	addAndMakeVisible(lookahead);
     addAndMakeVisible(menuButton);
 
     addAndMakeVisible(visualizer);
@@ -267,10 +256,6 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
             modComps[m].setMod(type);
         }
         {
-            const auto val = rand.nextFloat() > .5f;
-            audioProcessor.oversamplingEnabled.store(val);
-        }
-        {
             const auto range = modSys6::makeRange::withCentre(.1f, 10000.f, 4.f);
             const auto val = range.convertFrom0to1(rand.nextFloat());
             const juce::Identifier id(vibrato::toString(vibrato::ObjType::DelaySize));
@@ -286,16 +271,6 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
         audioProcessor.savePatch();
         return audioProcessor.modSys.state;
     };
-
-    hq.onPaint = modSys6::gui::makeTextButtonOnPaint("HQ", juce::Justification::centred, 1);
-    hq.onClick = [&]()
-    {
-        auto e = !audioProcessor.oversamplingEnabled.load();
-        audioProcessor.oversamplingEnabled.store(e);
-        hq.setState(e);
-        hq.repaint();
-    };
-	hq.setState(audioProcessor.oversamplingEnabled.load());
 
     setResizable(true, true);
     {
@@ -346,7 +321,6 @@ void Nel19AudioProcessorEditor::resized()
             y += h;
         }
     }
-
     
     {
         const auto area = layoutMainParams(0, 0, 2, 1);
@@ -372,7 +346,8 @@ void Nel19AudioProcessorEditor::resized()
     layoutTopBar.place(menuButton,      0, 0, 1, 1, 0.f, true);
     layoutTopBar.place(presetBrowser.getOpenCloseButton(), 2, 0, 1, 1, 0.f, true);
     layoutTopBar.place(hq,              3, 0, 1, 1, 0.f, true);
-    layoutTopBar.place(nelLabel,        4, 0, 1, 1);
+	layoutTopBar.place(lookahead,       4, 0, 1, 1, 0.f, true);
+    layoutTopBar.place(nelLabel,        5, 0, 1, 1);
     {
         auto area = layoutMainParams(0, 0, 2, 1);
         area.setY(layoutTopBar.getY(0));
@@ -384,7 +359,7 @@ void Nel19AudioProcessorEditor::resized()
     popUp.setBounds({ 0, 0, 100, 50 });
     enterValue.setBounds({ 0, 0, 100, 50 });
 
-    layout.place(presetBrowser, 1, 1, 2, 2, 0.f, false);
+    layout.place(presetBrowser, 1, 1, 2, 1, 0.f, false);
 
     {
         auto user = audioProcessor.appProperties.getUserSettings();
@@ -392,7 +367,7 @@ void Nel19AudioProcessorEditor::resized()
         user->setValue("BoundsHeight", getHeight());
     }
     
-    layout.place(menu.get(), 1, 1, 2, 3, 0.f, false);
+    layout.place(menu.get(), 1, 1, 2, 2, 0.f, false);
 }
 
 void Nel19AudioProcessorEditor::paint(juce::Graphics& g)

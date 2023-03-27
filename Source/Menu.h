@@ -699,24 +699,6 @@ namespace menu2
 				};
 				addSwitchButton(id, child, i, onSwitch, buttonName, onIsEnabled);
 			}
-			else if (buttonName == "lookahead")
-			{
-				const auto onSwitch = [this](int e)
-				{
-					bool enabled = e == 1;
-					processor.suspendProcessing(true);
-					processor.lookaheadEnabled.store(enabled);
-					utils.audioProcessor.forcePrepare();
-					const juce::Identifier id(processor.getLookaheadID());
-					processor.modSys.state.setProperty(id, e, nullptr);
-				};
-				const auto onIsEnabled = [this](int i)
-				{
-					const bool e = processor.lookaheadEnabled.load();
-					return (e ? 1 : 0) == i;
-				};
-				addSwitchButton(id, child, i, onSwitch, buttonName, onIsEnabled);
-			}
 		}
 		
 		void addTextBox(const std::array<juce::Identifier, NumIDs>& id, juce::ValueTree child, const int)

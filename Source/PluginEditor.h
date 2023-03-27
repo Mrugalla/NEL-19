@@ -38,7 +38,7 @@ private:
     modSys6::gui::ModDragger macro0Dragger, macro1Dragger, macro2Dragger, macro3Dragger;
 
     modSys6::gui::ParamtrRandomizer paramRandomizer;
-    modSys6::gui::Button hq;
+    modSys6::gui::Paramtr hq, lookahead;
 
     modSys6::gui::PopUp popUp;
     modSys6::gui::EnterValueComp enterValue;
