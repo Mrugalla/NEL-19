@@ -663,6 +663,7 @@ namespace modSys6
                 setBufferedToImage(true);
                 makeCursor(*this, cursorType);
             }
+            
             Comp(Utils& _utils, const juce::String& _tooltip = "", CursorType _cursorType = CursorType::Interact) :
                 utils(_utils),
                 tooltip(_tooltip),
@@ -673,6 +674,7 @@ namespace modSys6
                 setBufferedToImage(true);
                 makeCursor(*this, cursorType);
             }
+            
             Comp(Utils& _utils, Notify _notify, juce::String&& _tooltip = "", CursorType _cursorType = CursorType::Interact) :
                 utils(_utils),
                 tooltip(_tooltip),
@@ -683,6 +685,7 @@ namespace modSys6
                 setBufferedToImage(true);
                 makeCursor(*this, cursorType);
             }
+            
             Comp(Utils& _utils, Notify _notify, const juce::String& _tooltip = "", CursorType _cursorType = CursorType::Interact) :
                 utils(_utils),
                 tooltip(_tooltip),
@@ -693,6 +696,7 @@ namespace modSys6
                 setBufferedToImage(true);
                 makeCursor(*this, cursorType);
             }
+            
             void setMouseCursor(CursorType ct = CursorType::NumCursors)
             {
                 if (ct == CursorType::NumCursors)
@@ -700,6 +704,7 @@ namespace modSys6
                 else
                     makeCursor(*this, ct);
             }
+            
             const juce::String& getTooltip() const noexcept { return tooltip; }
 
             Utils& utils;
@@ -711,6 +716,7 @@ namespace modSys6
             {
                 utils.setTooltip(&tooltip);
             }
+            
             void mouseDown(const juce::MouseEvent&) override
             {
                 notifyBasic(NotificationType::KillEnterValue);
@@ -723,6 +729,7 @@ namespace modSys6
                 g.setColour(col);
                 g.drawRoundedRectangle(getLocalBounds().toFloat(), t, t);
             }
+
         private:
             const CursorType cursorType;
             
@@ -930,9 +937,15 @@ namespace modSys6
                 state(0)
             {}
             
-            int getState() const noexcept { return state; }
+            int getState() const noexcept
+            {
+                return state;
+            }
             
-            void setState(int x) { state = x; }
+            void setState(int x) noexcept
+            {
+                state = x;
+            }
 
             OnPaint onPaint;
             OnClick onClick;
@@ -943,23 +956,27 @@ namespace modSys6
             {
                 onPaint(g, *this);
             }
+            
             void mouseEnter(const juce::MouseEvent& evt) override
             {
                 Comp::mouseEnter(evt);
                 repaint();
             }
+            
             void mouseExit(const juce::MouseEvent&) override
             {
                 repaint();
             }
+            
             void mouseDown(const juce::MouseEvent&) override
             {
                 repaint();
             }
+            
             void mouseUp(const juce::MouseEvent& evt) override
             {
                 if (!evt.mouseWasDraggedSinceMouseDown())
-                    if (onClick != nullptr)
+                    if (onClick)
                         onClick();
                 repaint();
             }
@@ -968,40 +985,33 @@ namespace modSys6
         inline Button::OnPaint makeTextButtonOnPaint(const String& text, Just just = Just::centred,
             int targetToggleState = -1)
         {
-            return[txt = std::move(text), just, targetToggleState](Graphics& g, Button& button)
+            return[txt = text, just, targetToggleState](Graphics& g, Button& button)
             {
                 const auto thicc = Shared::shared.thicc;
                 const auto bounds = button.getLocalBounds().toFloat().reduced(thicc);
                 g.setColour(Shared::shared.colour(ColourID::Bg));
                 g.fillRoundedRectangle(bounds, thicc);
-                juce::Colour mainCol;
-                if (button.isMouseButtonDown())
+                
+                if (button.isMouseOver())
                 {
-                    g.setColour(Shared::shared.colour(ColourID::Hover));
+					g.setColour(Shared::shared.colour(ColourID::Hover));
                     g.fillRoundedRectangle(bounds, thicc);
-
-                    if (button.isMouseOver())
+                    if(button.isMouseButtonDown())
                         g.fillRoundedRectangle(bounds, thicc);
-                    mainCol = Shared::shared.colour(ColourID::Interact);
                 }
-                else
-                {
-                    if (button.isMouseOver())
-                    {
-                        g.setColour(Shared::shared.colour(ColourID::Hover));
-                        g.fillRoundedRectangle(bounds, thicc);
-                        mainCol = Shared::shared.colour(ColourID::Interact);
-                    }
-                    else
-                        mainCol = Shared::shared.colour(ColourID::Txt);
-                }
-                g.setColour(mainCol);
-                if (targetToggleState != -1 && button.getState() == targetToggleState)
+                g.setColour(Shared::shared.colour(ColourID::Interact));
+                
+                const auto state = button.getState();
+                if (state == targetToggleState)
                     g.drawRoundedRectangle(bounds, thicc, thicc);
                 else
                     visualizeGroup(g, bounds, thicc);
-                g.setFont(Shared::shared.font);
-                g.drawFittedText(txt, bounds.toNearestInt(), just, 1);
+                
+                if (txt.isNotEmpty())
+                {
+                    g.setFont(Shared::shared.font);
+                    g.drawFittedText(txt, bounds.toNearestInt(), just, 1);
+                }
             };
         }
         
@@ -1815,7 +1825,7 @@ namespace modSys6
             void mouseEnter(const juce::MouseEvent& evt) override
             {
                 Comp::mouseEnter(evt);
-                this->notify(NotificationType::ParameterHovered, this);
+                notify(NotificationType::ParameterHovered, this);
                 if (pType == ParameterType::Switch)
                     repaint();
             }
@@ -3270,14 +3280,11 @@ presetbrowser
 
 ParamtrRandomizer
     should randomize?
-        vibrato mods
-            modtype
         parameter-modulations
             depth
             add + remove
 
 Paramtr
     sometimes lock not serialized (on load?)
-    sensitive drag shift only changable mid-drag in standalone
 
 */

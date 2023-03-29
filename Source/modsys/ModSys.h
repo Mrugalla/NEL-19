@@ -657,7 +657,7 @@ namespace modSys6
 		Params(juce::AudioProcessor& audioProcessor, BeatsData& beatsData) :
 			params()
 		{
-			beats::create(beatsData, 1.f / 64.f, 2.f);
+			beats::create(beatsData, 1.f / 64.f, 8.f);
 
 			const auto strToValDivision = [](const juce::String& txt, const float altVal)
 			{

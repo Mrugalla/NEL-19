@@ -137,9 +137,7 @@ private:
     Smooth depthSmooth, modsMixSmooth;
     std::vector<float> depthBuf, modsMixBuf;
 
-    benchmark::ProcessBlock benchmark;
-
-    void processBlockVibrato(juce::AudioBuffer<float>&, const juce::MidiBuffer&) noexcept;
+    void processBlockVibrato(juce::AudioBuffer<float>&, const juce::MidiBuffer&, bool) noexcept;
     
     void timerCallback() override;
 

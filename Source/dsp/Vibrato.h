@@ -80,14 +80,10 @@ namespace vibrato
 		return { sIn, sOut };
 	}
 	
-	/* this method is likely not correct yet lol */
-	inline SamplePair getAllpassPair(float* smpls, const float* ring, const InterpolationFunc& interpolate,
-		float r, float feedback, int size, int s) noexcept
+	inline SamplePair getAllpassPair(float*, const float*, const InterpolationFunc&,
+		float, float, int, int) noexcept
 	{
-		const auto sOut = interpolate(ring, r, size);
-		const auto sFb = fastTanh(feedback * sOut);
-		const auto sIn = smpls[s] + sFb;
-		return { sOut, sIn };
+		return { 0.f, 0.f };
 	}
 
 	struct Delay
@@ -138,6 +134,52 @@ namespace vibrato
 			}
 		}
 
+		void processNoDepth(float* const* samples, int numChannels, int numSamples,
+			const int* wHead)
+		{
+			auto ringBuf = ringBuffer.getArrayOfWritePointers();
+
+			for (auto ch = 0; ch < numChannels; ++ch)
+			{
+				auto ring = ringBuf[ch];
+				auto smpls = samples[ch];
+
+				for (auto s = 0; s < numSamples; ++s)
+				{
+					const auto w = wHead[s];
+					const auto r = w;
+
+					ring[w] = smpls[s];
+					smpls[s] = ring[r];
+				}
+			}
+		}
+		
+		void processFF(float* const* samples, int numChannels, int numSamples,
+			float* depthBuf, const int* wHead,
+			InterpolationType interpolationType) noexcept
+		{
+			synthesizeReadHeadFF(numSamples, depthBuf, wHead);
+
+			auto ringBuf = ringBuffer.getArrayOfWritePointers();
+			const auto& interpolate = interpolationFuncs[static_cast<int>(interpolationType)];
+
+			for (auto ch = 0; ch < numChannels; ++ch)
+			{
+				auto ring = ringBuf[ch];
+				auto smpls = samples[ch];
+
+				for (auto s = 0; s < numSamples; ++s)
+				{
+					const auto w = wHead[s];
+					const auto r = depthBuf[s];
+
+					ring[w] = smpls[s];
+					smpls[s] = interpolate(ring, r, delaySizeInt);
+				}
+			}
+		}
+
 	private:
 		std::array<InterpolationFunc, 2> interpolationFuncs;
 		AudioBuffer ringBuffer;
@@ -152,17 +194,29 @@ namespace vibrato
 				// map buffer [-1, 1] to [0, delaySize]
 				juce::FloatVectorOperations::multiply(buf, delayMid, numSamples);
 				juce::FloatVectorOperations::add(buf, delayMid, numSamples);
-				for (auto s = 0; s < numSamples; ++s)
-				{
-					const auto dly = buf[s];
-					auto rh = static_cast<float>(wHead[s]) - dly;
-					if (rh < 0.f)
-						rh += delaySize;
-					if (rh >= delaySize)
-						rh -= delaySize;
+				synthesizeReadHead(buf, numSamples, wHead);
+			}
+		}
 
-					buf[s] = rh;
-				}
+		void synthesizeReadHeadFF(int numSamples, float* depthBuf, const int* wHead) noexcept
+		{
+			// map from [0, 1] to [delaySizeHalf, 0]
+			for (auto s = 0; s < numSamples; ++s)
+				depthBuf[s] = 1.f - depthBuf[s];
+			juce::FloatVectorOperations::multiply(depthBuf, delayMid, numSamples);
+			synthesizeReadHead(depthBuf, numSamples, wHead);
+		}
+
+		void synthesizeReadHead(float* buf, int numSamples, const int* wHead) noexcept
+		{
+			for (auto s = 0; s < numSamples; ++s)
+			{
+				const auto dly = buf[s];
+				auto rh = static_cast<float>(wHead[s]) - dly;
+				if (rh < 0.f)
+					rh += delaySize;
+
+				buf[s] = rh;
 			}
 		}
 	};
@@ -172,7 +226,8 @@ namespace vibrato
 		Processor() :
 			feedbackPRM(0.f),
 			wHead(),
-			delay(),
+			vibrato(),
+			delayFF(),
 			size(0)
 		{
 		}
@@ -181,27 +236,48 @@ namespace vibrato
 		{
 			size = _delaySize;
 			wHead.prepare(blockSize, size);
-			delay.prepare(size);
+			vibrato.prepare(size);
+			delayFF.prepare(size);
 			feedbackPRM.prepare(Fs, blockSize, 8.f);
 		}
 
-		/* samples, numChannels, numSamples, vibBuf, feedback[-1,1] */
+		/* samples, numChannels, numSamples, vibBuf, depthBuf[0,1], feedback[-1,1], lookaheadEnabled */
 		void operator()(float* const* samples, int numChannels, int numSamples,
-			float* const* vibBuf, float feedback, InterpolationType interpolationType) noexcept
+			float* const* vibBuf, float* depthBuf, float feedback, InterpolationType interpolationType,
+			bool lookaheadEnabled) noexcept
 		{
 			auto fbBuf = feedbackPRM(feedback, numSamples);
 			if(!feedbackPRM.smoothing)
 				juce::FloatVectorOperations::fill(fbBuf, feedback, numSamples);
 
 			wHead(numSamples);
-			delay
-			(
-				samples, numChannels, numSamples,
-				vibBuf,
-				wHead.data(),
-				fbBuf,
-				interpolationType
-			);
+			
+			const bool isVibrating = depthBuf[0] != 0.f;
+
+			if(isVibrating)
+				vibrato
+				(
+					samples, numChannels, numSamples,
+					vibBuf,
+					wHead.data(),
+					fbBuf,
+					interpolationType
+				);
+			else
+				vibrato.processNoDepth
+				(
+					samples, numChannels, numSamples,
+					wHead.data()
+				);
+
+			if(lookaheadEnabled)
+				delayFF.processFF
+				(
+					samples, numChannels, numSamples,
+					depthBuf,
+					wHead.data(),
+					interpolationType
+				);
 		}
 		
 		float getSizeInMs(float Fs) const noexcept
@@ -217,7 +293,7 @@ namespace vibrato
 	protected:
 		PRM feedbackPRM;
 		WHead wHead;
-		Delay delay;
+		Delay vibrato, delayFF;
 		int size;
 		
 		const size_t ringBufferSize() const noexcept

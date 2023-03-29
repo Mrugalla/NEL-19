@@ -18,13 +18,13 @@ modSys6::gui::Notify makeNotifyDepthModes(std::array<modSys6::gui::Button, 5>& b
 {
     return [&btns = buttons, i](int t, const void*)
     {
-        for (auto& btn : btns)
-            btn.setState(0);
-
-        auto& btn = btns[i];
-
         if (t == modSys6::gui::NotificationType::PatchUpdated)
         {
+            for (auto& btn : btns)
+                btn.setState(0);
+            
+            auto& btn = btns[i];
+            
             auto& p = btn.utils.audioProcessor;
             const auto fs = static_cast<float>(p.oversampling.getSampleRateUpsampled());
             const auto sizeInMs = std::round(p.vibrat.getSizeInMs(fs));
@@ -182,34 +182,61 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     {
         const auto fs = static_cast<float>(audioProcessor.oversampling.getSampleRateUpsampled());
         const auto curDelaySizeMs = std::round(audioProcessor.vibrat.getSizeInMs(fs));
+        
+        enum { One, Four, Twenty, FourTwenty, TwoSec, NumModes };
+
+        const auto getTime = [](int i)
+        {
+			switch (i)
+			{
+			case One: return 1.f;
+			case Four: return 4.f;
+			case Twenty: return 20.f;
+			case FourTwenty: return 420.f;
+			case TwoSec: return 2000.f;
+			default: return 4.f;
+			}
+		};
+
+        const auto getString = [](int i)
+        {
+            switch (i)
+            {
+            case One: return "1";
+            case Four: return "4";
+            case Twenty: return "20";
+            case FourTwenty: return "420";
+            case TwoSec: return "2k";
+            default: return "4";
+            }
+        };
 
         for (auto i = 0; i < depthModes.size(); ++i)
         {
             auto& dMode = depthModes[i];
             addAndMakeVisible(dMode);
-
-            enum { One, Four, Twenty, FourTwenty, TwoSec, NumModes };
-            juce::String txt(i == 0 ? "1" : i == 1 ? "4" : i == 2 ? "20" : i == 3 ? "420" : "2k");
-            dMode.onPaint = modSys6::gui::makeTextButtonOnPaint(txt, juce::Justification::centred, 1);
+            
+            dMode.onPaint = modSys6::gui::makeTextButtonOnPaint(getString(i), juce::Justification::centred, 1);
 
             dMode.setState
             (
-                curDelaySizeMs == (i == 0 ? 1.f : i == 1 ? 4.f : i == 2 ? 20.f : i == 3 ? 420.f : 2000.f) ? 1 : 0
+                std::abs(curDelaySizeMs - getTime(i)) < 1.f ? 1 : 0
             );
 
             dMode.onClick = [&, i]()
             {
-                const auto delaySizeMs = i == 0 ? 1.f : i == 1 ? 4.f : i == 2 ? 20.f : i == 3 ? 420.f : 2000.f;
+                for (auto& d : depthModes)
+                    d.setState(0);
 
                 juce::Identifier vibDelaySizeID(vibrato::toString(vibrato::ObjType::DelaySize));
-                audioProcessor.modSys.state.setProperty(vibDelaySizeID, delaySizeMs, nullptr);
+                audioProcessor.modSys.state.setProperty(vibDelaySizeID, getTime(i), nullptr);
                 audioProcessor.forcePrepare();
 
-                for (auto j = 0; j < depthModes.size(); ++j)
-                {
-                    depthModes[j].setState(i == j ? 1 : 0);
-                    depthModes[j].repaint();
-                }
+				auto& dMode = depthModes[i];
+                dMode.setState(1);
+
+                for (auto& d : depthModes)
+                    d.repaint();
             };
         }
     }

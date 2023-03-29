@@ -154,7 +154,8 @@ void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize)
         if (delaySizeMs <= 0.f || std::isnan(delaySizeMs) || std::isinf(delaySizeMs))
             delaySizeMs = static_cast<float>(defaultDelaySizeMs);
     }
-	auto delaySize = static_cast<int>(std::round(sampleRateF * delaySizeMs / 1000.f));
+    const auto delaySizeF = std::round(sampleRateF * delaySizeMs / 1000.f);
+	auto delaySize = static_cast<int>(delaySizeF);
     if (delaySize % 2 != 0)
 		delaySize += 1;
     const auto delaySizeHalf = delaySize / 2;
@@ -219,8 +220,6 @@ bool Nel19AudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) con
 
 void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
 {
-    benchmark();
-
     juce::ScopedNoDenormals noDenormals;
     const auto numSamples = buffer.getNumSamples();
     {
@@ -246,26 +245,27 @@ void Nel19AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     auto samples = buffer.getArrayOfWritePointers();
 
 	const auto dryWetMix = modSys.getParam(modSys6::PID::DryWetMix)->getValueSum();
-    dryWet.saveDry(samplesRead, dryWetMix, numChannels, numSamples);
-
+	const auto lookaheadEnabled = modSys.getParam(modSys6::PID::Lookahead)->getValueSum() > .5f;
+    dryWet.saveDry(samplesRead, dryWetMix, numChannels, numSamples, lookaheadEnabled);
     
 #if !DebugModsBuffer
     const auto midSideEnabled = modSys.getParam(modSys6::PID::StereoConfig)->getValueSum() > .5f;
     if (midSideEnabled && numChannels == 2)
     {
         midSide::encode(samples, numSamples);
-        processBlockVibrato(buffer, midi);
+        processBlockVibrato(buffer, midi, lookaheadEnabled);
         midSide::decode(samples, numSamples);
     }
     else
 #endif
-    processBlockVibrato(buffer, midi);
+        processBlockVibrato(buffer, midi, lookaheadEnabled);
 
     const auto gainWet = modSys.getParam(modSys6::PID::WetGain)->getValSumDenorm();
     dryWet.processWet(samples, gainWet, numChannels, numSamples);
 }
 
-void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& bufferOut, const juce::MidiBuffer& midi) noexcept
+void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& bufferOut, const juce::MidiBuffer& midi,
+    bool lookaheadEnabled) noexcept
 {
     const auto numChannels = bufferOut.getNumChannels();
 #if OversamplingEnabled
@@ -381,10 +381,16 @@ void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& bufferOu
         {
             const auto m0 = modulators[0].buffer[ch].data();
             const auto m1 = modulators[1].buffer[ch].data();
+            auto& visualizer = visualizerValues[ch];
             auto mAll = modsBuf[ch];
             for (auto s = 0; s < numSamples; ++s)
-                mAll[s] = (m0[s] + modsMixBuf[s] * (m1[s] - m0[s])) * depthBuf[s];
-            visualizerValues[ch] = mAll[numSamples - 1];
+            {
+                const auto smpl = (m0[s] + modsMixBuf[s] * (m1[s] - m0[s])) * depthBuf[s];
+                const auto shifted = smpl - 1.f;
+				const auto smpl2 = shifted + depthBuf[s] * (smpl - shifted);
+                mAll[s] = smpl2;
+                visualizer = smpl;
+            }
         }
     }
 
@@ -406,8 +412,10 @@ void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& bufferOu
         numChannels,
         numSamples,
         modsBuf,
+        depthBuf.data(),
         feedback,
-		osEnabled ? vibrato::InterpolationType::Lerp : vibrato::InterpolationType::Spline
+		osEnabled ? vibrato::InterpolationType::Lerp : vibrato::InterpolationType::Spline,
+        lookaheadEnabled
     );
 #endif
     
@@ -426,7 +434,13 @@ void Nel19AudioProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer,
         return;
 	auto numChannels = buffer.getNumChannels();
     auto samples = buffer.getArrayOfWritePointers();
-    dryWet.processBypass(samples, numChannels, numSamples);
+    dryWet.processBypass
+    (
+        samples,
+        numChannels,
+        numSamples,
+        modSys.getParam(modSys6::PID::Lookahead)->getValueSum() > .5f
+    );
 }
 
 bool Nel19AudioProcessor::hasEditor() const { return true; }
@@ -520,6 +534,9 @@ void Nel19AudioProcessor::loadPatch()
         }
     }
     prepareToPlay(getSampleRate(), getBlockSize());
+
+    //benchmark::processBlock(*this);
+
     suspendProcessing(false);
 }
 

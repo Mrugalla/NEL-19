@@ -112,12 +112,8 @@ namespace drywet
 			delay.prepare(blockSize, latency);
 		}
 		
-		void processBypass(float* const* samples, int numChannels, int numSamples) noexcept
-		{
-			delay(samples, numChannels, numSamples);
-		}
-		
-		void saveDry(const float* const* samples, float mixVal, int numChannels, int numSamples) noexcept
+		void saveDry(const float* const* samples, float mixVal, int numChannels, int numSamples,
+			bool lookaheadEnabled) noexcept
 		{
 			auto bufs = buffers.getArrayOfWritePointers();
 
@@ -133,7 +129,13 @@ namespace drywet
 					bufs[kMixWet][s] = std::sqrt(bufs[kMix][s]);
 			}
 			
-			delay(bufs, samples, numChannels, numSamples);
+			if(lookaheadEnabled)
+				delay(bufs, samples, numChannels, numSamples);
+			else
+			{
+				for (auto ch = 0; ch < numChannels; ++ch)
+					juce::FloatVectorOperations::copy(bufs[kL + ch], samples[ch], numSamples);
+			}
 		}
 		
 		void processWet(float* const* samples, float _gainWet, int numChannels, int numSamples) noexcept
@@ -161,6 +163,19 @@ namespace drywet
 			}
 		}
 	
+		void processBypass(float* const* samples, int numChannels, int numSamples,
+			bool lookaheadEnabled) noexcept
+		{
+			if (lookaheadEnabled)
+				delay(samples, numChannels, numSamples);
+			else
+			{
+				auto bufs = buffers.getArrayOfWritePointers();
+				for (auto ch = 0; ch < numChannels; ++ch)
+					juce::FloatVectorOperations::copy(bufs[kL + ch], samples[ch], numSamples);
+			}
+		}
+
 	protected:
 		smooth::Smooth<float> mixSmooth;
 		FFDelay delay;
