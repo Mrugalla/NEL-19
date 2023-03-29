@@ -93,6 +93,7 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     gainWet(utils, "Gain", "The output gain of the wet signal.", modSys6::PID::WetGain, modulatables, modSys6::gui::ParameterType::Knob),
     stereoConfig(utils, "StereoConfig", "Configurate if effect is applied to l/r or m/s", modSys6::PID::StereoConfig, modulatables, modSys6::gui::ParameterType::Switch),
 	feedback(utils, "Feedback", "Dial in some feedback to this vibrato's delay.", modSys6::PID::Feedback, modulatables, modSys6::gui::ParameterType::Knob),
+	damp(utils, "Damp", "This is a lowpass filter in the feedback path.", modSys6::PID::Damp, modulatables, modSys6::gui::ParameterType::Knob),
 
     depthModes
     {
@@ -178,6 +179,7 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     addAndMakeVisible(gainWet);
     addAndMakeVisible(stereoConfig);
 	addAndMakeVisible(feedback);
+	addAndMakeVisible(damp);
 
     {
         const auto fs = static_cast<float>(audioProcessor.oversampling.getSampleRateUpsampled());
@@ -364,8 +366,9 @@ void Nel19AudioProcessorEditor::resized()
     }
     layoutMainParams.place(modsDepth, 0, 1, 2, 1);
     layoutMainParams.place(modsMix, 0, 2, 2, 1);
-    layoutMainParams.place(dryWetMix, 0, 3, 2, 1);
-    layoutMainParams.place(gainWet, 0, 4, 1, 1);
+    layoutMainParams.place(gainWet, 0, 3, 1, 1);
+    layoutMainParams.place(dryWetMix, 1, 3, 1, 1);
+    layoutMainParams.place(damp, 0, 4, 1, 1);
     layoutMainParams.place(feedback, 1, 4, 1, 1);
     layoutMainParams.place(stereoConfig, 0, 5, 1, 1, 0.f, true);
     

@@ -406,6 +406,7 @@ void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& bufferOu
     }
 #else
 	const auto feedback = modSys.getParam(modSys6::PID::Feedback)->getValSumDenorm();
+	const auto dampHz = modSys.getParam(modSys6::PID::Damp)->getValSumDenorm();
     vibrat
     (
         buffer.getArrayOfWritePointers(),
@@ -414,6 +415,7 @@ void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& bufferOu
         modsBuf,
         depthBuf.data(),
         feedback,
+        dampHz,
 		osEnabled ? vibrato::InterpolationType::Lerp : vibrato::InterpolationType::Spline,
         lookaheadEnabled
     );

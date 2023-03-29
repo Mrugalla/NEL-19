@@ -7,11 +7,22 @@
 
 namespace vibrato
 {
+	static constexpr float Pi = 3.14159265358979323846f;
+	static constexpr float PiHalf = Pi / 2.f;
+
 	using AudioBuffer = juce::AudioBuffer<float>;
 	using WHead = dsp::WHead;
 	using PRM = dsp::PRM;
+	using LP = smooth::Lowpass<float>;
+
 	/* buffer, x, size */
 	using InterpolationFunc = float(*)(const float*, float, int) noexcept;
+	using FilterUpdateFunc = void(*)(LP&, float dampFc) noexcept;
+
+	inline float fastTanh2(float x) noexcept
+	{
+		return x / (1.f + std::abs(x));
+	}
 
 	inline float fastTanh(float x) noexcept
 	{
@@ -66,16 +77,29 @@ namespace vibrato
 		return interpolation::cubicHermiteSpline(buffer, x, size);
 	}
 
+	inline void noUpdate(LP&, float) noexcept {} // yes, this is important
+
+	inline void updateFilter(LP& lp, float dampFc) noexcept
+	{
+		lp.makeFromDecayInFc(dampFc);
+	}
+
+	inline float waveshape(float x) noexcept
+	{
+		return -.405548f * x * x * x + 1.34908f * x;
+	}
+
 	struct SamplePair
 	{
 		float sIn, sOut;
 	};
 
 	inline SamplePair getDelayPair(float* smpls, const float* ring, const InterpolationFunc& interpolate,
-		float r, float feedback, int size, int s) noexcept
+		LP& lp, float r, float feedback, int size, int s) noexcept
 	{
 		const auto sOut = interpolate(ring, r, size);
-		const auto sFb = fastTanh(feedback * sOut);
+		const auto sLP = lp(sOut);
+		const auto sFb = waveshape(feedback * sLP);
 		const auto sIn = smpls[s] + sFb;
 		return { sIn, sOut };
 	}
@@ -90,6 +114,7 @@ namespace vibrato
 	{
 		Delay() :
 			interpolationFuncs{ &lerp, &cubic },
+			filterUpdateFuncs{ &noUpdate, &updateFilter },
 			ringBuffer(),
 			delaySize(0.f), delayMid(0.f), delayMax(0.f),
 			delaySizeInt(0)
@@ -106,27 +131,31 @@ namespace vibrato
 		}
 
 		void operator()(float* const* samples, int numChannels, int numSamples,
-			float* const* vibBuf, const int* wHead, const float* fbBuf,
-			InterpolationType interpolationType) noexcept
+			float* const* vibBuf, const int* wHead, const float* fbBuf, const float* dampFcBuf,
+			InterpolationType interpolationType, bool dampSmoothing) noexcept
 		{
 			synthesizeReadHead(numChannels, numSamples, vibBuf, wHead);
 			
 			auto ringBuf = ringBuffer.getArrayOfWritePointers();
 			const auto& interpolate = interpolationFuncs[static_cast<int>(interpolationType)];
+			const auto& updateFilter = filterUpdateFuncs[dampSmoothing ? 1 : 0];
 
 			for (auto ch = 0; ch < numChannels; ++ch)
 			{
 				auto ring = ringBuf[ch];
 				const auto rHead = vibBuf[ch];
 				auto smpls = samples[ch];
+				auto& lp = lps[ch];
 
 				for (auto s = 0; s < numSamples; ++s)
 				{
+					updateFilter(lp, dampFcBuf[s]);
+					
 					const auto w = wHead[s];
 					const auto r = rHead[s];
 					const auto fb = fbBuf[s];
 
-					const auto pair = getDelayPair(smpls, ring, interpolate, r, fb, delaySizeInt, s);
+					const auto pair = getDelayPair(smpls, ring, interpolate, lp, r, fb, delaySizeInt, s);
 
 					ring[w] = pair.sIn;
 					smpls[s] = pair.sOut;
@@ -182,6 +211,8 @@ namespace vibrato
 
 	private:
 		std::array<InterpolationFunc, 2> interpolationFuncs;
+		std::array<FilterUpdateFunc, 2> filterUpdateFuncs;
+		std::array<LP, 2> lps;
 		AudioBuffer ringBuffer;
 		float delaySize, delayMid, delayMax;
 		int delaySizeInt;
@@ -225,9 +256,11 @@ namespace vibrato
 	{
 		Processor() :
 			feedbackPRM(0.f),
+			dampPRM(1.f),
 			wHead(),
 			vibrato(),
 			delayFF(),
+			fsInv(1.f),
 			size(0)
 		{
 		}
@@ -239,30 +272,39 @@ namespace vibrato
 			vibrato.prepare(size);
 			delayFF.prepare(size);
 			feedbackPRM.prepare(Fs, blockSize, 8.f);
+			dampPRM.prepare(Fs, blockSize, 13.f);
+
+			fsInv = 1.f / Fs;
 		}
 
-		/* samples, numChannels, numSamples, vibBuf, depthBuf[0,1], feedback[-1,1], lookaheadEnabled */
+		/* samples, numChannels, numSamples, vibBuf, depthBuf[0,1], feedback[-1,1], dampHz[1, N], lookaheadEnabled */
 		void operator()(float* const* samples, int numChannels, int numSamples,
-			float* const* vibBuf, float* depthBuf, float feedback, InterpolationType interpolationType,
+			float* const* vibBuf, float* depthBuf, float feedback, float dampHz, InterpolationType interpolationType,
 			bool lookaheadEnabled) noexcept
 		{
-			auto fbBuf = feedbackPRM(feedback, numSamples);
-			if(!feedbackPRM.smoothing)
-				juce::FloatVectorOperations::fill(fbBuf, feedback, numSamples);
-
 			wHead(numSamples);
 			
 			const bool isVibrating = depthBuf[0] != 0.f;
 
-			if(isVibrating)
+			if (isVibrating)
+			{
+				auto fbBuf = feedbackPRM(feedback, numSamples);
+				if (!feedbackPRM.smoothing)
+					juce::FloatVectorOperations::fill(fbBuf, feedback, numSamples);
+
+				const auto dampFc = dampHz * fsInv;
+				const auto dampBuf = dampPRM(dampFc, numSamples);
+
 				vibrato
 				(
 					samples, numChannels, numSamples,
 					vibBuf,
 					wHead.data(),
-					fbBuf,
-					interpolationType
+					fbBuf, dampBuf,
+					interpolationType,
+					dampPRM.smoothing
 				);
+			}
 			else
 				vibrato.processNoDepth
 				(
@@ -291,9 +333,10 @@ namespace vibrato
 		}
 		
 	protected:
-		PRM feedbackPRM;
+		PRM feedbackPRM, dampPRM;
 		WHead wHead;
 		Delay vibrato, delayFF;
+		float fsInv;
 		int size;
 		
 		const size_t ringBufferSize() const noexcept
@@ -306,6 +349,6 @@ namespace vibrato
 /*
 
 feature ideas:
-	allpass instead of delay (or in feedback loop, considering fb delay)
+	allpass instead of delay
 
 */

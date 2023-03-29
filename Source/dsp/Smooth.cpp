@@ -86,7 +86,7 @@ namespace smooth
 	template<typename Float>
 	void Lowpass<Float>::makeFromDecayInFc(Float fc) noexcept
 	{
-		getXFromFc(fc);
+		setX(getXFromFc(fc));
 	}
 
 	template<typename Float>

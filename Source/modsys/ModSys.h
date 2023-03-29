@@ -61,7 +61,7 @@ namespace modSys6
 		Pitchbend1Smooth,
 		LFO1FreeSync, LFO1RateFree, LFO1RateSync, LFO1Waveform, LFO1Phase, LFO1Width,
 
-		Depth, ModsMix, DryWetMix, WetGain, StereoConfig, Feedback, HQ, Lookahead,
+		Depth, ModsMix, DryWetMix, WetGain, StereoConfig, Feedback, Damp, HQ, Lookahead,
 
 		NumParams
 	};
@@ -155,6 +155,7 @@ namespace modSys6
 		case PID::WetGain: return "Gain Wet";
 		case PID::StereoConfig: return "Stereo Config";
 		case PID::Feedback: return "Feedback";
+		case PID::Damp: return "Damp";
 		case PID::HQ: return "HQ";
 		case PID::Lookahead: return "Lookahead";
 
@@ -1041,6 +1042,7 @@ namespace modSys6
 			params.push_back(new Param(PID::WetGain, makeRange::biasXL(-120.f, 4.5f, .9f), 0.f, valToStrDb, strToValDb));
 			params.push_back(new Param(PID::StereoConfig, makeRange::toggle(), 1.f, valToStrLRMS, strToValLRMS));
 			params.push_back(new Param(PID::Feedback, makeRange::lin(-1.f, 1.f), 0.f, valToStrPercent, strToValPercent, Unit::Percent));
+			params.push_back(new Param(PID::Damp, makeRange::quad(40.f, 8000.f, 2), 180.f, valToStrHz, strToValHz, Unit::Hz));
 			params.push_back(new Param(PID::HQ, makeRange::toggle(), 1.f, valToStrHQ, strToValHQ, Unit::Power));
 			params.push_back(new Param(PID::Lookahead, makeRange::toggle(), 1.f, valToStrLookahead, strToValLookahead, Unit::Power));
 
