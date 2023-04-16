@@ -2,8 +2,6 @@
 #include "Phasor.h"
 #include "Wavetable.h"
 #include "PRM.h"
-#include <array>
-#include <vector>
 #include "StandalonePlayHead.h"
 
 #define DebugPhasor false
@@ -152,114 +150,25 @@ namespace dsp
         }
     };
 
-    struct XFade
-    {
-        using AudioBuffer = juce::AudioBuffer<float>;
-
-        XFade() :
-            buffer(),
-            phase(0.),
-            inc(0.),
-            idx(0),
-            fading(false)
-        {}
-
-		void prepare(double sampleRate, double lengthMs, int blockSize)
-		{
-            buffer.setSize(3, blockSize, false, true, false);
-			inc = msInInc(lengthMs, sampleRate);
-		}
-
-        void init() noexcept
-        {
-            idx = 1 - idx;
-            phase = 0.;
-			fading = true;
-        }
-
-        float* const* getSamples() noexcept
-        {
-			return buffer.getArrayOfWritePointers();
-        }
-
-        void synthesizePhase(int numSamples) noexcept
-        {
-            auto xSamples = getSamples();
-            auto xBuf = xSamples[2];
-
-            for (auto s = 0; s < numSamples; ++s)
-            {
-                xBuf[s] = static_cast<float>(phase);
-                phase += inc;
-                if (phase > 1.)
-                {
-                    fading = false;
-                    phase = 1.;
-                    for (; s < numSamples; ++s)
-                        xBuf[s] = 1.f;
-                    return;
-                }
-            }
-        }
-
-        void operator()(float* const* samples, int numChannels, int numSamples) noexcept
-        {
-            synthesizePhase(numSamples);
-
-            auto xSamples = getSamples();
-            auto xBuf = xSamples[2];
-
-            for (auto ch = 0; ch < numChannels; ++ch)
-            {
-                auto smpls = samples[ch];
-                const auto xSmpls = xSamples[ch];
-
-                for (auto s = 0; s < numSamples; ++s)
-                {
-                    const auto smpl = smpls[s];
-                    const auto xSmpl = xSmpls[s];
-
-                    const auto xFade = xBuf[s];
-                    const auto xPi = xFade * Pi;
-                    const auto frac = std::cos(xPi + Pi) + 1.f;
-                    const auto xFrac = std::cos(xPi) + 1.f;
-
-                    smpls[s] = (smpl * frac + xSmpl * xFrac) * .5f;
-                }
-            }
-        }
-
-        AudioBuffer buffer;
-        double phase, inc;
-        int idx;
-        bool fading;
-    };
-    
-    struct LFO_XFadesSpeed
+    struct LFO_Procedural
     {
         using Wavetables = LFO::Wavetables;
-        using LFOs = std::array<LFO, 2>;
 
-        LFO_XFadesSpeed() :
-            lfos(),
-            xFade(),
+        LFO_Procedural() :
+            lfo(),
             //
-            xTransport(),
             sampleRate(1.), sampleRateInv(1.), latency(0.),
             rateSync(1.), rateHz(1.)
         {
-            setPlayHead(xTransport, 120., sampleRateInv, 0, false);
         }
-        
-        void prepare(double _sampleRate, int blockSize, double _latency)
+
+        void prepare(double _sampleRate, int, double _latency)
         {
-			sampleRate = _sampleRate;
-			sampleRateInv = 1. / sampleRate;
-			latency = _latency;
-            
-            xFade.prepare(sampleRate, 120., blockSize);
-            for (auto& lfo : lfos)
-                lfo.prepare(sampleRateInv);
+            sampleRate = _sampleRate;
+            sampleRateInv = 1. / sampleRate;
+            latency = _latency;
+
+            lfo.prepare(sampleRateInv);
         }
 
         void operator()(const Wavetables& wavetables, float* const* samples,
@@ -271,62 +180,7 @@ namespace dsp
             const auto bpm = transport.bpm;
             const auto bps = bpm / 60.;
             const auto quarterNoteLength = sampleRate / bps;
-            
-            if(!xFade.fading)
-                updateSpeed(quarterNoteLength, _rateSync, _rateHz, temposync);
 
-            if (transport.isPlaying)
-            {
-                updatePosition
-                (
-                    transport.ppqPosition,
-                    quarterNoteLength,
-                    bps,
-                    temposync
-                );
-            }
-
-			auto& lfo = lfos[xFade.idx];
-            
-            lfo
-            (
-                samples,
-                numChannels,
-                numSamples,
-                wavetables,
-                phaseInfo,
-                widthInfo,
-                wtPosInfo
-            );
-
-            if (!xFade.fading)
-                return;
-
-            lfos[1 - xFade.idx]
-            (
-                xFade.getSamples(),
-                numChannels,
-                numSamples,
-                wavetables,
-                phaseInfo,
-                widthInfo,
-                wtPosInfo
-            );
-            
-            xFade(samples, numChannels, numSamples);
-        }
-
-    protected:
-        LFOs lfos;
-        XFade xFade;
-        //
-        PosInfo xTransport;
-        double sampleRate, sampleRateInv, latency;
-        double rateSync, rateHz;
-        
-        void updateSpeed(double quarterNoteLength,
-            double _rateSync, double _rateHz, bool temposync) noexcept
-        {
             auto nInc = 0.;
             if (temposync)
             {
@@ -338,218 +192,45 @@ namespace dsp
                 nInc = _rateHz * sampleRateInv;
             }
 
-            if (lfos[xFade.idx].speedChanged(nInc))
+            rateSync = _rateSync;
+            rateHz = _rateHz;
+            lfo.updateSpeed(nInc);
+
+            if (transport.isPlaying)
             {
-                xFade.init();
-				rateSync = _rateSync;
-				rateHz = _rateHz;
-                lfos[xFade.idx].updateSpeed(nInc);
-            }
-        }
-
-        void updatePosition(double ppqPosition, double quarterNoteLength, 
-            double bps, bool temposync) noexcept
-        {
-			auto& lfo = lfos[xFade.idx];
-
-            if (temposync)
-            {
-                const auto latencyLengthInQuarterNotes = latency / quarterNoteLength;
-                auto ppq = (ppqPosition - latencyLengthInQuarterNotes) * .25;
-                while (ppq < 0.f)
-                    ++ppq;
-                const auto ppqCh = ppq / rateSync;
-                lfo.updatePhase(ppqCh - std::floor(ppqCh));
-            }
-            else
-            {
-                const auto lfoPhase = ppqPosition / bps * rateHz;
-                lfo.updatePhase(lfoPhase - std::floor(lfoPhase));
-            }
-        }
-    };
-    
-    struct LFO_XFadesPlayHeadJump
-    {
-        using Wavetables = LFO::Wavetables;
-        using LFOs = std::array<LFO_XFadesSpeed, 2>;
-        
-        LFO_XFadesPlayHeadJump() :
-            lfos(),
-            xFade(),
-            //
-            xTransport(),
-            sampleRateInv(1.),
-            posEstimate(0)
-        {
-        }
-
-        void prepare(double sampleRate, int blockSize, double latency)
-        {
-			sampleRateInv = 1. / sampleRate;
-            xFade.prepare(sampleRate, 120., blockSize);
-
-            for (auto& lfo : lfos)
-                lfo.prepare(sampleRate, blockSize, latency);
-        }
-
-        void operator()(const Wavetables& wavetables, float* const* samples,
-            int numChannels, int numSamples,
-            const PosInfo& transport, double rateHz, double rateSync,
-            const PRMInfo& phaseInfo, const PRMInfo& widthInfo, const PRMInfo& wtPosInfo,
-            bool temposync) noexcept
-        {
-            Int64 posInc = transport.isPlaying ? numSamples : 0;
-            if (!xFade.fading)
-            {
-                const auto error = std::abs(transport.timeInSamples - posEstimate);
-                if (error > 1)
+                if (temposync)
                 {
-                    xFade.init();
-                    setPlayHead(xTransport, transport.bpm, sampleRateInv, posEstimate, transport.isPlaying);
+                    const auto latencyLengthInQuarterNotes = latency / quarterNoteLength;
+                    auto ppq = (transport.ppqPosition - latencyLengthInQuarterNotes) * .25;
+                    while (ppq < 0.f)
+                        ++ppq;
+                    const auto ppqCh = ppq / rateSync;
+                    lfo.updatePhase(ppqCh - std::floor(ppqCh));
+                }
+                else
+                {
+                    const auto lfoPhase = transport.ppqPosition / bps * rateHz;
+                    lfo.updatePhase(lfoPhase - std::floor(lfoPhase));
                 }
             }
 
-            lfos[xFade.idx]
+            lfo
             (
-                wavetables,
                 samples,
                 numChannels,
                 numSamples,
-                transport,
-                rateHz,
-                rateSync,
+                wavetables,
                 phaseInfo,
                 widthInfo,
-                wtPosInfo,
-                temposync
+                wtPosInfo
             );
-
-            posEstimate = transport.timeInSamples + posInc;
-
-            if (!xFade.fading)
-                return;
-            
-			lfos[1 - xFade.idx]
-			(
-				wavetables,
-				xFade.getSamples(),
-				numChannels,
-				numSamples,
-				xTransport,
-				rateHz,
-				rateSync,
-				phaseInfo,
-				widthInfo,
-				wtPosInfo,
-				temposync
-			);
-
-            xFade(samples, numChannels, numSamples);
-
-            movePlayHead(xTransport, sampleRateInv, numSamples);
         }
 
     protected:
-        LFOs lfos;
-        XFade xFade;
+        LFO lfo;
         //
-        PosInfo xTransport;
-        double sampleRateInv;
-        Int64 posEstimate;
-    };
-
-    struct LFO_XFadesPlayBack
-    {
-        using Wavetables = LFO::Wavetables;
-        using LFOs = std::array<LFO_XFadesPlayHeadJump, 2>;
-
-        LFO_XFadesPlayBack() :
-            lfos(),
-            xFade(),
-            //
-            xTransport(),
-            sampleRateInv(1.),
-            wasPlaying(false)
-        {
-            xTransport.isPlaying = false;
-        }
-
-        void prepare(double sampleRate, int blockSize, double latency)
-        {
-            sampleRateInv = 1. / sampleRate;
-            xFade.prepare(sampleRate, 120., blockSize);
-            for (auto& lfo : lfos)
-                lfo.prepare(sampleRate, blockSize, latency);
-        }
-
-        void operator()(const Wavetables& wavetables, float* const* samples,
-            int numChannels, int numSamples,
-            const PosInfo& transport, double rateHz, double rateSync,
-            const PRMInfo& phaseInfo, const PRMInfo& widthInfo, const PRMInfo& wtPosInfo,
-            bool temposync) noexcept
-        {
-            if (transport.isPlaying)
-            {
-                if (!xFade.fading && !wasPlaying)
-                {
-                    xFade.init();
-                    xTransport.bpm = transport.bpm;
-					xTransport.timeInSamples = transport.timeInSamples;
-					xTransport.timeInSeconds = transport.timeInSeconds;
-					xTransport.ppqPosition = transport.ppqPosition;
-                }
-
-                wasPlaying = true;
-            }
-            else
-                wasPlaying = false;
-
-            lfos[xFade.idx]
-			(
-				wavetables,
-				samples,
-				numChannels,
-				numSamples,
-				transport,
-				rateHz,
-				rateSync,
-				phaseInfo,
-				widthInfo,
-				wtPosInfo,
-				temposync
-			);
-
-			if (!xFade.fading)
-				return;
-
-			lfos[1 - xFade.idx]
-			(
-				wavetables,
-				xFade.getSamples(),
-				numChannels,
-				numSamples,
-				xTransport,
-				rateHz,
-				rateSync,
-				phaseInfo,
-				widthInfo,
-				wtPosInfo,
-				temposync
-			);
-
-			xFade(samples, numChannels, numSamples);
-
-            movePlayHead(xTransport, sampleRateInv, numSamples);
-		}
-
-    protected:
-        LFOs lfos;
-        XFade xFade;
-        //
-        PosInfo xTransport;
-        double sampleRateInv;
-        bool wasPlaying;
+        double sampleRate, sampleRateInv, latency;
+        double rateSync, rateHz;
     };
 
     struct LFOFinal
@@ -600,7 +281,7 @@ namespace dsp
 
     protected:
         const Wavetables& wavetables;
-        LFO_XFadesPlayBack lfo;
+        LFO_Procedural lfo;
         PRM phasePRM, widthPRM, wtPosPRM;
     };
 }

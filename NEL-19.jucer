@@ -43,7 +43,6 @@
       <GROUP id="{64C413BA-3699-8A57-746B-A094BA76D880}" name="dsp">
         <FILE id="mnD5YL" name="DryWetProcessor.h" compile="0" resource="0"
               file="Source/dsp/DryWetProcessor.h"/>
-        <FILE id="tr9boL" name="LFO.h" compile="0" resource="0" file="Source/dsp/LFO.h"/>
         <FILE id="s09m9X" name="LFO2.h" compile="0" resource="0" file="Source/dsp/LFO2.h"/>
         <FILE id="bv92ia" name="MidSideEncoder.h" compile="0" resource="0"
               file="Source/dsp/MidSideEncoder.h"/>
@@ -59,6 +58,7 @@
         <FILE id="NhBr3Z" name="Vibrato.h" compile="0" resource="0" file="Source/dsp/Vibrato.h"/>
         <FILE id="O7aCGe" name="Wavetable.h" compile="0" resource="0" file="Source/dsp/Wavetable.h"/>
         <FILE id="mhVKy8" name="WHead.h" compile="0" resource="0" file="Source/dsp/WHead.h"/>
+        <FILE id="Ee3rkw" name="XFade.h" compile="0" resource="0" file="Source/dsp/XFade.h"/>
       </GROUP>
       <GROUP id="{DF5CA124-D2C0-471E-8D17-297CEBC9FA0F}" name="releasePool">
         <FILE id="ZsHHV2" name="ReleasePool.cpp" compile="1" resource="0" file="Source/releasePool/ReleasePool.cpp"/>
