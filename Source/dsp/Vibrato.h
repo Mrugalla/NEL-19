@@ -12,6 +12,7 @@ namespace vibrato
 
 	using AudioBuffer = juce::AudioBuffer<float>;
 	using WHead = dsp::WHead;
+	using PRMInfo = dsp::PRMInfo;
 	using PRM = dsp::PRM;
 	using LP = smooth::Lowpass<float>;
 
@@ -131,14 +132,14 @@ namespace vibrato
 		}
 
 		void operator()(float* const* samples, int numChannels, int numSamples,
-			float* const* vibBuf, const int* wHead, const float* fbBuf, const float* dampFcBuf,
-			InterpolationType interpolationType, bool dampSmoothing) noexcept
+			float* const* vibBuf, const int* wHead, const float* fbBuf, const PRMInfo& dampFcInfo,
+			InterpolationType interpolationType) noexcept
 		{
 			synthesizeReadHead(numChannels, numSamples, vibBuf, wHead);
 			
 			auto ringBuf = ringBuffer.getArrayOfWritePointers();
 			const auto& interpolate = interpolationFuncs[static_cast<int>(interpolationType)];
-			const auto& updateFilter = filterUpdateFuncs[dampSmoothing ? 1 : 0];
+			const auto& updateFilter = filterUpdateFuncs[dampFcInfo.smoothing ? 1 : 0];
 
 			for (auto ch = 0; ch < numChannels; ++ch)
 			{
@@ -149,7 +150,7 @@ namespace vibrato
 
 				for (auto s = 0; s < numSamples; ++s)
 				{
-					updateFilter(lp, dampFcBuf[s]);
+					updateFilter(lp, dampFcInfo[s]);
 					
 					const auto w = wHead[s];
 					const auto r = rHead[s];
@@ -288,21 +289,20 @@ namespace vibrato
 
 			if (isVibrating)
 			{
-				auto fbBuf = feedbackPRM(feedback, numSamples);
-				if (!feedbackPRM.smoothing)
-					juce::FloatVectorOperations::fill(fbBuf, feedback, numSamples);
+				const auto fbInfo = feedbackPRM(feedback, numSamples);
+				if (!fbInfo.smoothing)
+					juce::FloatVectorOperations::fill(fbInfo.buf, feedback, numSamples);
 
 				const auto dampFc = dampHz * fsInv;
-				const auto dampBuf = dampPRM(dampFc, numSamples);
+				const auto dampInfo = dampPRM(dampFc, numSamples);
 
 				vibrato
 				(
 					samples, numChannels, numSamples,
 					vibBuf,
 					wHead.data(),
-					fbBuf, dampBuf,
-					interpolationType,
-					dampPRM.smoothing
+					fbInfo.buf, dampInfo,
+					interpolationType
 				);
 			}
 			else

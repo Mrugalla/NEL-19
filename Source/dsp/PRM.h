@@ -4,13 +4,32 @@
 
 namespace dsp
 {
+	struct PRMInfo
+	{
+		PRMInfo(float* _buf, float _val, bool _smoothing) :
+			buf(_buf),
+			val(_val),
+			smoothing(_smoothing)
+		{}
+
+		/* idx */
+		float operator[](int i) const noexcept
+		{
+			return buf[i];
+		}
+
+		float* buf;
+		float val;
+		bool smoothing;
+	};
+
 	struct PRM
 	{
 		/* startVal */
 		PRM(float startVal) :
 			smooth(startVal),
 			buf(),
-			smoothing(false)
+			value(startVal)
 		{}
 
 		/* Fs, blockSize, smoothLenMs */
@@ -21,17 +40,18 @@ namespace dsp
 		}
 
 		/* value, numSamples */
-		float* operator()(float value, int numSamples) noexcept
+		PRMInfo operator()(float val, int numSamples) noexcept
 		{
-			smoothing = smooth(buf.data(), value, numSamples);
-			return buf.data();
+			value = val;
+			bool smoothing = smooth(buf.data(), value, numSamples);
+			return { buf.data(), value, smoothing};
 		}
 
 		/* numSamples */
-		float* operator()(int numSamples) noexcept
+		PRMInfo operator()(int numSamples) noexcept
 		{
-			smoothing = smooth(buf.data(), numSamples);
-			return buf.data();
+			bool smoothing = smooth(buf.data(), numSamples);
+			return { buf.data(), value, smoothing };
 		}
 
 		/* idx */
@@ -40,8 +60,9 @@ namespace dsp
 			return buf[i];
 		}
 
+	protected:
 		smooth::Smooth<float> smooth;
 		std::vector<float> buf;
-		bool smoothing;
+		float value;
 	};
 }

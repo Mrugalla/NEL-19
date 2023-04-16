@@ -1,6 +1,7 @@
 #pragma once
 #include <chrono>
 #include <thread>
+#include "Wavetable.h"
 #include "Modulator.h"
 #include "../NELG.h"
 
@@ -12,7 +13,7 @@ namespace modSys6
         struct WavetableView :
             public Comp
         {
-            using Tables = vibrato::Wavetable3D<WTSize, NumTables>;
+            using Tables = dsp::Wavetable3D<WTSize, NumTables>;
 
             WavetableView(Utils& u, juce::String&& _tooltip, const Tables& _tables) :
                 Comp(u, std::move(_tooltip), CursorType::Default),
@@ -745,11 +746,11 @@ namespace modSys6
             public Comp,
             public juce::Timer
         {
-            using WTView = WavetableView<vibrato::LFOTableSize, vibrato::LFONumTables, 3, (1 << 7) + 1>;
+            using WTView = WavetableView<dsp::LFOTableSize, dsp::LFONumTables, 3, (1 << 7) + 1>;
 
             enum { IsSync, RateFree, RateSync, Waveform, Phase, Width, NumParams };
 
-            ModCompLFO(Utils& u, std::vector<Paramtr*>& modulatables, vibrato::LFOTables& _tables, int mOff = 0) :
+            ModCompLFO(Utils& u, std::vector<Paramtr*>& modulatables, dsp::LFOTables& _tables, int mOff = 0) :
                 Comp(u, "", CursorType::Default),
                 layout(
                     { 50, 50, 50, 50, 50 },
@@ -814,7 +815,7 @@ namespace modSys6
             nelG::Layout layout;
             std::array<Paramtr, NumParams> params;
             const Param& lfoWaveformParam;
-            vibrato::LFOTables& tables;
+            dsp::LFOTables& tables;
             WTView tableView;
             Browser wavetableBrowser;
             Button browserButton;
@@ -1027,7 +1028,7 @@ namespace modSys6
 
         public:
             ModComp(Utils& u, std::vector<Paramtr*>& modulatables,
-                vibrato::LFOTables& _tables, int _mOff = 0) :
+                dsp::LFOTables& _tables, int _mOff = 0) :
                 Comp(u, makeNotify(*this), "", CursorType::Default),
                 layout(
                     { 80, 10, 10 },

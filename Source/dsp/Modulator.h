@@ -1,14 +1,19 @@
 #pragma once
 #include "../Interpolation.h"
 #include "../modsys/ModSys.h"
+#include "../Approx.h"
 #include <random>
 #include "Smooth.h"
 #include "Perlin.h"
+#include "Wavetable.h"
+#include "LFO2.h"
 
 #define DebugAudioRateEnv false
 
 namespace vibrato
 {
+	static constexpr float Tau = 6.283185307179586476925286766559f;
+
 	using SmoothF = smooth::Smooth<float>;
 	using SmoothD = smooth::Smooth<double>;
 
@@ -239,303 +244,6 @@ namespace vibrato
 		}
 	};
 
-	template<size_t Size>
-	struct Wavetable
-	{
-		using Func = std::function<float(float x)>;
-
-		void makeTableWeierstrasz(float a, float b, int N)
-		{
-			fill([N, b, a](float x)
-			{
-				auto smpl = 0.f;
-				for (auto n = 0; n < N; ++n)
-				{
-					const auto nF = static_cast<float>(n);
-					smpl += std::pow(a, nF) * std::cos(std::pow(b, nF) * x * 3.14159265359f);
-				}
-				return smpl;
-			}, true, true);
-		}
-
-		void makeTableTriangle(int n)
-		{
-			const auto pi = 3.14159265359f;
-			const auto tri = [&](float x, float fc, float phase)
-			{
-				return 1.f - 2.f * std::acos(std::cos(fc * x * pi + phase * pi)) / pi;
-			};
-
-			fill([tri, n](float x)
-				{
-					const auto nF = static_cast<float>(n + 1);
-					const auto n8 = static_cast<float>(n) / 8.f;
-					return tri(x, 1.f, 0.f) + tri(x, nF, n8) / nF;
-
-				}, true, true
-			);
-		}
-
-		void makeTableSinc(bool window, int N)
-		{
-			const auto pi = 3.14159265359f;
-
-			const auto wndw = window ? [](float xpi)
-			{
-				if (xpi == 0.f) return 1.f;
-				return std::sin(xpi) / xpi;
-			} :
-			[](float)
-			{
-				return 1.f;
-			};
-			const auto sinc = [](float xPiA)
-			{
-				if (xPiA == 0.f) return 1.f;
-				return 2.f * std::sin(xPiA) / xPiA - 1.f;
-			};
-
-			fill([pi, wndw, sinc, N](float x)
-			{
-				const auto xpi = x * pi;
-				const auto tablesInv = 1.f / static_cast<float>(N);
-				
-				auto smpl = 0.f;
-				for (auto n = 0; n < N; ++n)
-				{
-					const auto nF = static_cast<float>(n);
-					const auto x2 = (nF + 2) * x * .5f;
-					const auto a2 = 2.f * nF + 1.f;
-					
-					smpl += wndw(xpi) * sinc(x2 * a2) * tablesInv;
-				}
-				return smpl;
-
-			}, false, true);
-		}
-
-		Wavetable() :
-			table()
-		{}
-		
-		void fill(const Func& func, bool removeDC, bool normalize)
-		{
-			static constexpr float SizeInv = 1.f / static_cast<float>(Size);
-
-			// SYNTHESIZE WAVE
-			for (auto s = 0; s < Size; ++s)
-			{
-				auto x = 2.f * static_cast<float>(s) * SizeInv - 1.f;
-				table[s] = func(x);
-			}
-
-			if (removeDC)
-			{
-				auto sum = 0.f;
-				for (const auto& s : table)
-					sum += s;
-				sum *= SizeInv;
-				if (sum != 0.f)
-					for (auto& s : table)
-						s -= sum;
-			}
-
-			if (normalize)
-			{
-				auto max = 0.f;
-				for (const auto& s : table)
-				{
-					const auto a = std::abs(s);
-					if (max < a)
-						max = a;
-				}
-				if (max != 0.f && max != 1.f)
-				{
-					const auto g = 1.f / max;
-					for (auto& s : table)
-						s *= g;
-				}
-			}
-
-			// COPY FIRST ENTRY/IES FOR INTERPOLATION
-			for (auto s = Size; s < table.size(); ++s)
-				table[s] = table[s - Size];
-		}
-		
-		float operator[](float x) const noexcept
-		{
-			static constexpr float SizeF = static_cast<float>(Size);
-			x = x * SizeF;
-			const auto xFloor = std::floor(x);
-			const auto i0 = static_cast<int>(xFloor);
-			const auto i1 = i0 + 1;
-			const auto frac = x - xFloor;
-			return table[i0] + frac * (table[i1] - table[i0]);
-		}
-		
-		float operator[](int idx) const noexcept
-		{
-			return table[idx];
-		}
-		
-	protected:
-		std::array<float, Size + 2> table;
-	};
-
-	template<size_t WTSize, size_t NumTables>
-	struct Wavetable2D
-	{
-		using Func = std::function<float(float x)>;
-		static constexpr float MaxTablesF = static_cast<float>(NumTables - 1);
-		using Table = Wavetable<WTSize>;
-		using Tables = std::array<Table, NumTables + 1>;
-
-		Wavetable2D() :
-			tables()
-		{}
-		
-		void fill(const Func& func, int tablesIdx, bool removeDC, bool normalize)
-		{
-			tables[tablesIdx].fill(func, removeDC, normalize);
-		}
-		
-		void finishFills()
-		{
-			for(auto i = NumTables; i < tables.size(); ++i)
-				tables[i] = tables[i - NumTables];
-		}
-		
-		float operator()(int tablesIdx, int tableIdx) const noexcept
-		{
-			return tables[tablesIdx][tableIdx];
-		}
-		
-		float operator()(int tablesIdx, float tablePhase) const noexcept
-		{
-			return tables[tablesIdx][tablePhase];
-		}
-		
-		float operator()(float tablesPhase, int tableIdx) const noexcept
-		{
-			const auto x = tablesPhase * MaxTablesF;
-			const auto xFloor = std::floor(x);
-			const auto i0 = static_cast<int>(xFloor);
-			const auto i1 = i0 + 1;
-			const auto frac = x - xFloor;
-			const auto v0 = tables[i0][tableIdx];
-			const auto v1 = tables[i1][tableIdx];
-
-			return v0 + frac * (v1 - v0);
-		}
-		
-		float operator()(float tablesPhase, float tablePhase) const noexcept
-		{
-			const auto x = tablesPhase * MaxTablesF;
-			const auto xFloor = std::floor(x);
-			const auto i0 = static_cast<int>(xFloor);
-			const auto i1 = i0 + 1;
-			const auto frac = x - xFloor;
-			const auto v0 = tables[i0][tablePhase];
-			const auto v1 = tables[i1][tablePhase];
-
-			return v0 + frac * (v1 - v0);
-		}
-		
-		Table& operator[](int i) noexcept { return tables[i]; }
-		
-		const Table& operator[](int i) const noexcept { return tables[i]; }
-	
-	protected:
-		Tables tables;
-	};
-
-	template<size_t WTSize, size_t NumTables>
-	struct Wavetable3D
-	{
-		using Func = std::function<float(float x)>;
-		using Funcs = std::array<Func, NumTables>;
-		using Tables = Wavetable3D<WTSize, NumTables>;
-
-		void makeTablesWeierstrasz()
-		{
-			name = "Weierstrasz";
-			tables[0].makeTableWeierstrasz(0.f, 0.f, 1);
-			tables[1].makeTableWeierstrasz(.0625f, 7.f, 8);
-			tables[2].makeTableWeierstrasz(.125f, 5.f, 5);
-			tables[3].makeTableWeierstrasz(.1875f, 4.f, 4);
-			tables[4].makeTableWeierstrasz(.25f, 3.f, 3);
-			tables[5].makeTableWeierstrasz(.3125f, 3.f, 4);
-			tables[6].makeTableWeierstrasz(.375f, 3.f, 3);
-			tables[7].makeTableWeierstrasz(.4375f, 2.f, 6);
-		}
-		
-		void makeTablesTriangles()
-		{
-			name = "Triangle";
-			for (auto n = 0; n < NumTables; ++n)
-				tables[n].makeTableTriangle(n);
-		}
-		
-		void makeTablesSinc()
-		{
-			name = "Sinc";
-			for (auto n = 0; n < NumTables; ++n)
-				tables[n].makeTableSinc(true, n + 1);
-		}
-
-		Wavetable3D() :
-			tables(),
-			name("empty table")
-		{}
-		
-		void fill(const Funcs& funcs, bool removeDC, bool normalize)
-		{
-			for (auto f = 0; f < NumTables; ++f)
-				tables.fill(funcs[f], f, removeDC, normalize);
-			tables.finishFills();
-		}
-		
-		float operator()(float tablesPhase, float tablePhase) const noexcept
-		{
-			return tables(tablesPhase, tablePhase);
-		}
-		
-		float operator()(float tablesPhase, int tableIdx) const noexcept
-		{
-			return tables(tablesPhase, tableIdx);
-		}
-		
-		float operator()(int tablesIdx, float tablePhase) const noexcept
-		{
-			return tables(tablesIdx, tablePhase);
-		}
-		
-		float operator()(int tablesIdx, int tableIdx) const noexcept
-		{
-			return tables(tablesIdx, tableIdx);
-		}
-
-		Wavetable2D<WTSize, NumTables> tables;
-		juce::String name;
-	};
-
-	enum TableType { Weierstrasz, Tri, Sinc, NumTypes };
-	
-	inline juce::String toString(TableType t)
-	{
-		switch (t)
-		{
-		case TableType::Weierstrasz: return "Weierstrasz";
-		case TableType::Tri: return "Triangle";
-		case TableType::Sinc: return "Sinc";
-		default: return "";
-		}
-	}
-
-	static constexpr int LFOTableSize = 1 << 11;
-	static constexpr int LFONumTables = 8;
-	using LFOTables = Wavetable3D<LFOTableSize, LFONumTables>;
-
 	// creates a modulator curve mapped to [-1, 1]
 	// of some ModType (like perlin, audiorate, dropout etc.)
 	class Modulator
@@ -543,7 +251,7 @@ namespace vibrato
 		static constexpr float SafetyCoeff = .99f;
 		using Buffer = std::array<std::vector<float>, 4>;
 		using BeatsData = modSys6::BeatsData;
-		using Tables = LFOTables;
+		using Tables = dsp::LFOTables;
 
 		using PlayHead = juce::AudioPlayHead;
 		using PosInfo = PlayHead::CurrentPositionInfo;
@@ -634,13 +342,13 @@ namespace vibrato
 				float operator()() noexcept
 				{
 					phasor();
-					return std::cos(approx::Tau * phasor.phase);
+					return std::cos(Tau * phasor.phase);
 				}
 				
 				inline float withPhaseOffset(Osc& other, float offset) noexcept
 				{
 					const auto phase = other.phasor.phase + offset;
-					return std::cos(approx::Tau * phase);
+					return std::cos(Tau * phase);
 				}
 
 				Phasor<float> phasor;
@@ -1275,278 +983,65 @@ namespace vibrato
 			int pitchbend;
 		};
 		
-		class LFO
+		struct LFO
 		{
-			template<typename Float>
-			struct PhaseSyncronizer
-			{
-				PhaseSyncronizer() :
-					inc(static_cast<Float>(1))
-				{}
-
-				void prepare(Float Fs, Float timeInMs) noexcept
-				{
-					inc = static_cast<Float>(1) / (Fs * timeInMs * static_cast<Float>(.001));
-				}
-
-				Float operator()(Float curPhase, Float destPhase) const noexcept
-				{
-					const auto dist = destPhase - curPhase;
-					curPhase += inc * dist;
-					return curPhase;
-				}
-				
-			protected:
-				Float inc;
-			};
-
-			struct TempoSync
-			{
-				TempoSync(const BeatsData& _beatsData) :
-					syncer(),
-					phaseSmooth(0.f),
-					beatsData(_beatsData),
-					fs(1.), extLatency(0.),
-					phasor(0.), inc(0.)
-				{}
-				
-				void prepare(float sampleRate, int latency)
-				{
-					fs = static_cast<double>(sampleRate);
-					extLatency = static_cast<double>(latency);
-					phaseSmooth.makeFromDecayInMs(20.f, sampleRate);
-					syncer.prepare(fs, 420.f);
-				}
-				
-				void processTempoSyncStuff(float* buffer, float rateSync, float phase, int numSamples, const PosInfo& transport)
-				{
-					if (transport.isPlaying)
-					{
-						const auto rateSyncV = static_cast<double>(beatsData[static_cast<int>(rateSync)].val);
-						const auto rateSyncInv = 1. / rateSyncV;
-
-						const auto bpm = transport.bpm;
-						const auto bps = bpm / 60.;
-						const auto quarterNoteLengthInSamples = fs / bps;
-						const auto barLengthInSamples = quarterNoteLengthInSamples * 4.;
-						inc = 1. / (barLengthInSamples * rateSyncV);
-
-						const auto latencyLengthInQuarterNotes = extLatency / quarterNoteLengthInSamples;
-						auto ppq = (transport.ppqPosition - latencyLengthInQuarterNotes) * .25;
-						while (ppq < 0.f)
-							++ppq;
-						const auto ppqCh = ppq * rateSyncInv;
-						
-						auto newPhasor = ppqCh - std::floor(ppqCh);
-						if (newPhasor < phasor)
-							++newPhasor;
-
-						auto phaseVal = 0.;
-
-						for (auto s = 0; s < numSamples; ++s)
-						{
-							phasor += inc;
-							phasor = syncer(phasor, newPhasor);
-							newPhasor += inc;
-
-							phaseVal = static_cast<double>(phaseSmooth(phase));
-							auto shifted = phasor + phaseVal;
-							while (shifted < 0.)
-								++shifted;
-							while (shifted >= 1.)
-								--shifted;
-							buffer[s] = static_cast<float>(shifted);
-						}
-
-						const auto p = buffer[numSamples - 1] - phaseVal;
-						phasor = p < 0.f ? p + 1.f : p >= 1.f ? p - 1.f : p;
-					}
-					else
-					{
-						for (auto s = 0; s < numSamples; ++s)
-						{
-							phasor += inc;
-							if (phasor >= 1.f)
-								--phasor;
-							const auto phaseVal = static_cast<double>(phaseSmooth(phase));
-							auto shifted = phasor + phaseVal;
-							if (shifted < 0.)
-								++shifted;
-							else if (shifted >= 1.)
-								--shifted;
-							buffer[s] = static_cast<float>(shifted);
-						}
-					}
-				}
-			
-				PhaseSyncronizer<double> syncer;
-				SmoothF phaseSmooth;
-			protected:
-				const BeatsData& beatsData;
-				double fs, extLatency, phasor, inc;
-			};
-		
-		public:
-			LFO(const Tables& _tables, const BeatsData& _beatsData) :
-				tables(_tables),
-				tempoSync(_beatsData),
-
-				waveformSmooth(0.f),
-				widthSmooth(0.f), rateSmooth(0.f),
-				widthBuf(), rateBuf(), waveformBuf(),
-
-				phasor(),
-				fsInv(1.f),
-				
-				rateFree(-1.f),
-				rateSync(0.f),
-				isSync(false),
-
-				waveformV(0.f),
-				phaseV(0.f),
-				widthV(0.f)
+			LFO(const Tables& _tables) :
+				lfo(_tables),
+				rateHz(0.),
+				rateSync(0.),
+				phase(0.f),
+				width(0.f),
+				wtPos(0.f),
+				temposync(false)
 			{}
 			
-			void prepare(float sampleRate, int blockSize, int latency)
+			/* fs, blockSize, latency */
+			void prepare(float fs, int blockSize, int latency)
 			{
-				const auto fs = sampleRate;
-				fsInv = 1.f / fs;
-				tempoSync.prepare(sampleRate, latency);
-				waveformSmooth.makeFromDecayInMs(20.f, fs);
-				widthSmooth.makeFromDecayInMs(20.f, fs);
-				rateSmooth.makeFromDecayInMs(12.f, fs);
-				widthBuf.resize(blockSize);
-				rateBuf.resize(blockSize);
-				waveformBuf.resize(blockSize);
+				lfo.prepare(fs, blockSize, static_cast<double>(latency));
 			}
 			
-			void setParameters(bool _isSync, float _rateFree, float _rateSync,
-				float _waveform, float _phase, float _width) noexcept
+			/* temposync, rateHz, rateSync, wtPos[0,1], phase[0,.5], width[0,.5] */
+			void setParameters(bool _temposync, float _rateHz, float _rateSync,
+				float _wtPos, float _phase, float _width) noexcept
 			{
-				isSync = _isSync;
+				temposync = _temposync;
+				rateHz = _rateHz;
 				rateSync = _rateSync;
-				rateFree = _rateFree;
-				waveformV = _waveform;
-				phaseV = _phase;
-				widthV = _width;
+				wtPos = _wtPos;
+				phase = _phase;
+				width = _width;
 			}
 			
 			void operator()(Buffer& buffer, int numChannels, int numSamples,
-				const PosInfo& transport) noexcept
+				PosInfo& transport) noexcept
 			{
-				{ // SYNTHESIZE PHASOR
-					auto buf = buffer[0].data();
+				float* samples[] = { buffer[0].data(), buffer[1].data() };
 
-					if (isSync)
-						tempoSync.processTempoSyncStuff(buf, rateSync, phaseV, numSamples, transport);
-					else
-					{
-						if (phaseV != 0.f)
-						{
-							const auto ppq = transport.ppqPosition;
-							const auto bpm = transport.bpm;
-							const auto bps = bpm / 60.;
-
-							const auto inc = rateFree * fsInv;
-							const auto phase = ppq / bps * rateFree;
-
-							phasor.inc = inc;
-							phasor.phase = phase - std::floor(phase);
-
-							for (auto s = 0; s < numSamples; ++s)
-							{
-								buf[s] = static_cast<float>(phasor.phase) + tempoSync.phaseSmooth(phaseV);
-								if (buf[s] < 0.f)
-									++buf[s];
-								else if (buf[s] >= 1.f)
-									--buf[s];
-								phasor();
-							}
-						}
-						else
-						{
-							auto rateSmoothing = rateSmooth(rateBuf.data(), rateFree * fsInv, numSamples);
-
-							if (rateSmoothing)
-								for (auto s = 0; s < numSamples; ++s)
-								{
-									phasor.inc = rateBuf[s];
-									buf[s] = static_cast<float>(phasor.process());
-								}
-							else
-							{
-								phasor.inc = rateFree * fsInv;
-								for (auto s = 0; s < numSamples; ++s)
-									buf[s] = static_cast<float>(phasor.process());
-							}
-						}
-					}
-				}
-
-				{ // PROCESS WIDTH
-					if (numChannels != 2)
-						return;
-					
-					const auto buf0 = buffer[0].data();
-					auto buf1 = buffer[1].data();
-					juce::FloatVectorOperations::copy(buf1, buf0, numSamples);
-
-					auto widthSmoothing = widthSmooth(widthBuf.data(), widthV, numSamples);
-
-					if (widthSmoothing)
-						juce::FloatVectorOperations::add(buf1, buf0, widthBuf.data(), numSamples);
-					else
-						juce::FloatVectorOperations::add(buf1, buf0, widthV, numSamples);
-
-					for (auto s = 0; s < numSamples; ++s)
-					{
-						if (buf1[s] >= 1.f)
-							--buf1[s];
-					}
-				}
-
-				{ // PROCESS WAVEFORM
-					auto waveformSmoothing = waveformSmooth(waveformBuf.data(), waveformV, numSamples);
-					if(waveformSmoothing)
-						for (auto ch = 0; ch < numChannels; ++ch)
-						{
-							auto buf = buffer[ch].data();
-							for (auto s = 0; s < numSamples; ++s)
-							{
-								const auto tablesPhase = waveformBuf[s];
-								const auto tablePhase = buf[s];
-								buf[s] = tables(tablesPhase, tablePhase) * SafetyCoeff;
-							}
-						}
-					else
-						for (auto ch = 0; ch < numChannels; ++ch)
-						{
-							auto buf = buffer[ch].data();
-							for (auto s = 0; s < numSamples; ++s)
-								buf[s] = tables(waveformV, buf[s]) * SafetyCoeff;
-						}
-				}
+				lfo
+				(
+					samples,
+					numChannels,
+					numSamples,
+					transport,
+					rateHz,
+					rateSync,
+					phase,
+					width,
+					wtPos,
+					temposync
+				);
 			}
 		
 		protected:
-			const Tables& tables;
-			TempoSync tempoSync;
-			SmoothF waveformSmooth;
-			SmoothF widthSmooth, rateSmooth;
-			std::vector<float> widthBuf, rateBuf, waveformBuf;
-
-			Phasor<double> phasor;
-
-			float fsInv;
-
-			float rateFree, rateSync;
-			bool isSync;
-
-			float waveformV, phaseV, widthV;
+			dsp::LFOFinal lfo;
+			double rateHz, rateSync;
+			float phase, width, wtPos;
+			bool temposync;
 		};
 
 	public:
-		Modulator(const BeatsData& beatsData) :
+		Modulator() :
 			buffer(),
 			standalonePlayHead(),
 			tables(),
@@ -1556,7 +1051,7 @@ namespace vibrato
 			envFol(),
 			macro(),
 			pitchbend(),
-			lfo(tables, beatsData),
+			lfo(tables),
 			
 			type(ModType::Perlin)
 		{
@@ -1570,11 +1065,11 @@ namespace vibrato
 			if (child.isValid())
 			{
 				const auto tableType = child.getProperty(id).toString();
-				if (tableType == toString(TableType::Weierstrasz))
+				if (tableType == toString(dsp::TableType::Weierstrasz))
 					tables.makeTablesWeierstrasz();
-				else if (tableType == toString(TableType::Tri))
+				else if (tableType == toString(dsp::TableType::Tri))
 					tables.makeTablesTriangles();
-				else if (tableType == toString(TableType::Sinc))
+				else if (tableType == toString(dsp::TableType::Sinc))
 					tables.makeTablesSinc();
 			}
 		}

@@ -2,7 +2,7 @@
 #include "PluginEditor.h"
 #define RemoveValueTree false
 #define OversamplingEnabled true
-#define DebugModsBuffer false
+#define DebugModsBuffer true
 
 Nel19AudioProcessor::Nel19AudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -22,11 +22,7 @@ Nel19AudioProcessor::Nel19AudioProcessor()
     dryWet(),
     modSys(*this, [this]() { loadPatch(); }),
     oversampling(),
-    modulators
-    {
-        vibrato::Modulator(modSys.getBeatsData()),
-        vibrato::Modulator(modSys.getBeatsData())
-    },
+    modulators(),
     modsBuffer(),
     modType
     {
@@ -35,7 +31,7 @@ Nel19AudioProcessor::Nel19AudioProcessor()
     },
     vibrat(),
     visualizerValues{ 0.f, 0.f },
-    depthSmooth(0.f), modsMixSmooth(0.f),
+    depthSmooth(1.f), modsMixSmooth(0.f),
     depthBuf(), modsMixBuf()
 #endif
 {
@@ -168,7 +164,7 @@ void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize)
 
 	auto latency = delaySizeHalf * (lookaheadEnabled ? 1 : 0);
     
-#if OversamplingEnabled
+#if OversamplingEnabled && !DebugModsBuffer
 	const auto osEnabled = modSys.getParam(PID::HQ)->getValueSum() > .5f;
     oversampling.prepareToPlay(sampleRate, maxBufferSize, osEnabled);
 
@@ -177,6 +173,10 @@ void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize)
     latency += oversampling.getLatency();
 
     const auto sampleRateUpF = static_cast<float>(sampleRateUpD);
+#else
+    const auto sampleRateUpF = static_cast<float>(sampleRate);
+	const auto blockSizeUp = maxBufferSize;
+    bool osEnabled = false;
 #endif
     depthSmooth.makeFromDecayInMs(24.f, sampleRateUpF);
     modsMixSmooth.makeFromDecayInMs(24.f, sampleRateUpF);
@@ -268,13 +268,15 @@ void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& bufferOu
     bool lookaheadEnabled) noexcept
 {
     const auto numChannels = bufferOut.getNumChannels();
-#if OversamplingEnabled
+#if OversamplingEnabled && !DebugModsBuffer
     auto& buffer = oversampling.upsample(bufferOut);
-#endif
     const auto osEnabled = oversampling.isEnabled();
+#else
+	auto& buffer = bufferOut;
+#endif
     const auto samplesRead = buffer.getArrayOfReadPointers();
     const auto numSamples = buffer.getNumSamples();
-
+    
     auto curPlayHead = getPlayHead();
     using namespace modSys6;
     
@@ -396,10 +398,10 @@ void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& bufferOu
 
 #if DebugModsBuffer
     const auto depth = modSys.getParam(modSys6::PID::Depth)->getValueSum();
-    for (auto ch = 0; ch < numChannelsOut; ++ch)
+    for (auto ch = 0; ch < numChannels; ++ch)
     {
-        const auto mAll = modsBuffer[ch].data();
-        auto samples = buffer->getWritePointer(ch);
+        const auto mAll = modsBuf[ch];
+        auto samples = buffer.getWritePointer(ch);
         for (auto s = 0; s < numSamples; ++s)
             samples[s] = mAll[s] * depth;
         visualizerValues[ch] = mAll[numSamples - 1];
@@ -421,7 +423,7 @@ void Nel19AudioProcessor::processBlockVibrato(juce::AudioBuffer<float>& bufferOu
     );
 #endif
     
-#if OversamplingEnabled
+#if OversamplingEnabled  && !DebugModsBuffer
     if(osEnabled)
         oversampling.downsample(bufferOut);
 #endif
@@ -550,9 +552,11 @@ juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 void Nel19AudioProcessor::timerCallback()
 {
     using PID = modSys6::PID;
-    
+#if OversamplingEnabled && !DebugModsBuffer
     const bool oversamplingChanged = (modSys.getParam(PID::HQ)->getValueSum() > .5f) != oversampling.isEnabled();
-
+#else
+	const bool oversamplingChanged = false;
+#endif
     const auto curLatency = getLatencySamples();
     const auto latencyWithoutOversampling = curLatency - oversampling.getLatency();
     const auto hasLatency = latencyWithoutOversampling != 0;
