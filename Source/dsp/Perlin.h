@@ -327,6 +327,8 @@ namespace perlin
 
 	struct Perlin2
 	{
+		using Int64 = juce::int64;
+
 		Perlin2() :
 			// misc
 			sampleRateInv(1.),
@@ -452,7 +454,7 @@ namespace perlin
 		// seed
 		std::atomic<int> seed;
 		// project position
-		__int64_t curPosEstimate, curPosInSamples;
+		Int64 curPosEstimate, curPosInSamples;
 		int latency;
 
 		// PROCESS FREE

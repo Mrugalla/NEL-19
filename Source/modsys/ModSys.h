@@ -1029,7 +1029,7 @@ namespace modSys6
 				static constexpr float LFOPhaseStep = 5.f / 360.f;
 
 				params.push_back(new Param(withOffset(PID::LFO0FreeSync, offset), makeRange::toggle(), 1.f, valToStrFreeSync, strToValFreeSync, Unit::NumUnits));
-				params.push_back(new Param(withOffset(PID::LFO0RateFree, offset), makeRange::quad(0.f, 40.f, 2), 4.f, valToStrHz, strToValHz, Unit::Hz));
+				params.push_back(new Param(withOffset(PID::LFO0RateFree, offset), makeRange::quad(.2f, 40.f, 2), 4.f, valToStrHz, strToValHz, Unit::Hz));
 				params.push_back(new Param(withOffset(PID::LFO0RateSync, offset), makeRange::beats(32.f, .5f, false), .25f, valToStrBeats2, strToValBeats2, Unit::Beats));
 				params.push_back(new Param(withOffset(PID::LFO0Waveform, offset), makeRange::lin(0.f, 1.f), 0.f, valToStrPercent, strToValPercent, Unit::Percent));
 				params.push_back(new Param(withOffset(PID::LFO0Phase, offset), makeRange::stepped(-.5f, .5f, LFOPhaseStep), 0.f, valToStrPhase360, strToValPhase, Unit::Degree));

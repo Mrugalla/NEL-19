@@ -113,6 +113,7 @@ namespace dsp
             Track() :
                 gain(0.),
                 destGain(0.),
+                inc(0.),
                 fading(false)
             {}
 
@@ -136,8 +137,7 @@ namespace dsp
 				return destGain != gain;
             }
 
-            void synthesizeGainValues(float* xBuf,
-                double inc, int numSamples) noexcept
+            void synthesizeGainValues(float* xBuf, int numSamples) noexcept
             {
                 if (!isFading())
                 {
@@ -147,7 +147,7 @@ namespace dsp
                 }
                 
                 fading = true;
-                synthesizeGainValuesInternal(xBuf, inc, numSamples);
+                synthesizeGainValuesInternal(xBuf, numSamples);
                 makeSmooth(xBuf, numSamples);
             }
             
@@ -179,11 +179,11 @@ namespace dsp
 					    SIMD::add(dest[ch], src[ch], numSamples);
             }
 
-            double gain, destGain;
-            bool fading;
+            double gain, destGain, inc;
         protected:
-            void synthesizeGainValuesInternal(float* xBuf,
-                double inc, int numSamples) noexcept
+            bool fading;
+            
+            void synthesizeGainValuesInternal(float* xBuf, int numSamples) noexcept
             {
                 if (destGain == 1.)
                     for (auto s = 0; s < numSamples; ++s)
@@ -223,7 +223,6 @@ namespace dsp
         XFadeMixer() :
             buffer(),
             tracks(),
-            inc(0.),
             idx(0)
         {
         }
@@ -231,7 +230,13 @@ namespace dsp
         void prepare(double sampleRate, double lengthMs, int blockSize)
         {
             buffer.setSize(3 * NumTracks, blockSize, false, true, false);
-            inc = msInInc(lengthMs, sampleRate);
+            const auto inc = msInInc(lengthMs, sampleRate);
+            for (auto& track : tracks)
+            {
+                track.gain = 0.;
+                track.inc = inc;
+            }
+            tracks[idx].gain = 1.;
         }
 
         void init() noexcept
@@ -274,7 +279,6 @@ namespace dsp
 		AudioBuffer buffer;
         std::array<Track, NumTracks> tracks;
     public:
-        double inc;
         int idx;
     };
 

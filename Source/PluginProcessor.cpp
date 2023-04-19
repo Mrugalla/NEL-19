@@ -2,7 +2,7 @@
 #include "PluginEditor.h"
 #define RemoveValueTree false
 #define OversamplingEnabled true
-#define DebugModsBuffer true
+#define DebugModsBuffer false
 
 Nel19AudioProcessor::Nel19AudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -186,7 +186,7 @@ void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize)
     modsBuffer.setSize(2, blockSizeUp, false, true, false);
     
     for (auto m = 0; m < NumActiveMods; ++m)
-        modulators[m].prepare(sampleRateUpF, blockSizeUp, latency);
+        modulators[m].prepare(sampleRateUpF, blockSizeUp, latency, oversampling.isEnabled() ? 4 : 1);
         
     vibrat.prepare
     (

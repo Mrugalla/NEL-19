@@ -995,10 +995,16 @@ namespace vibrato
 				temposync(false)
 			{}
 			
-			/* fs, blockSize, latency */
-			void prepare(float fs, int blockSize, int latency)
+			/* fs, blockSize, latency, oversamplingFactor */
+			void prepare(float fs, int blockSize, int latency, int oversamplingFactor)
 			{
-				lfo.prepare(fs, blockSize, static_cast<double>(latency));
+				lfo.prepare
+				(
+					static_cast<double>(fs),
+					blockSize,
+					static_cast<double>(latency),
+					oversamplingFactor
+				);
 			}
 			
 			/* temposync, rateHz, rateSync, wtPos[0,1], phase[0,.5], width[0,.5] */
@@ -1088,7 +1094,7 @@ namespace vibrato
 
 		void setType(ModType t) noexcept { type = t; }
 		
-		void prepare(float sampleRate, int maxBlockSize, int latency)
+		void prepare(float sampleRate, int maxBlockSize, int latency, int oversamplingFactor)
 		{
 			standalonePlayHead.prepare(static_cast<double>(sampleRate));
 			for(auto& b: buffer)
@@ -1099,7 +1105,7 @@ namespace vibrato
 			envFol.prepare(sampleRate, maxBlockSize);
 			macro.prepare(sampleRate);
 			pitchbend.prepare(sampleRate);
-			lfo.prepare(sampleRate, maxBlockSize, latency);
+			lfo.prepare(sampleRate, maxBlockSize, latency, oversamplingFactor);
 		}
 
 		// parameters

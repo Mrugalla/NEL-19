@@ -142,7 +142,7 @@ namespace dsp
 
     struct LFO_Procedural
     {
-        static constexpr double XFadeLengthMs = 120.;
+        static constexpr double XFadeLengthMs = 200.;
         static constexpr int NumLFOs = 3;
         using Mixer = XFadeMixer<NumLFOs>;
         using Wavetables = LFO::Wavetables;
@@ -157,14 +157,16 @@ namespace dsp
             latency(0.), sampleRate(1.), sampleRateInv(1.),
             quarterNoteLength(0.), bps(1.),
             rateHz(0.), rateSync(0.), bpm(0.), inc(0.),
-            posEstimate(0)
+            posEstimate(0), oversamplingFactor(1)
         {}
 
-        void prepare(double _sampleRate, int blockSize, double _latency)
+        void prepare(double _sampleRate, int blockSize, double _latency, int _oversamplingFactor)
         {
-			latency = _latency;
+            inc = 0.;
+            latency = _latency;
 			sampleRate = _sampleRate;
             sampleRateInv = 1. / sampleRate;
+			oversamplingFactor = _oversamplingFactor;
 
             mixer.prepare(sampleRate, XFadeLengthMs, blockSize);
             
@@ -195,7 +197,7 @@ namespace dsp
 
                 if (track.isEnabled())
                 {
-                    track.synthesizeGainValues(xSamples[2], mixer.inc, numSamples);
+                    track.synthesizeGainValues(xSamples[2], numSamples);
 
                     lfos[0]
                     (
@@ -222,7 +224,7 @@ namespace dsp
                 if (track.isEnabled())
                 {
                     auto xSamples = mixer.getSamples(i);
-                    track.synthesizeGainValues(xSamples[2], mixer.inc, numSamples);
+                    track.synthesizeGainValues(xSamples[2], numSamples);
 
                     lfos[i]
                     (
@@ -248,16 +250,12 @@ namespace dsp
         double latency, sampleRate, sampleRateInv, quarterNoteLength, bps;
         double rateHz, rateSync, bpm, inc;
         Int64 posEstimate;
+        int oversamplingFactor;
         
         const bool isLooping(Int64 timeInSamples) const noexcept
         {
             const auto error = std::abs(timeInSamples - posEstimate);
             return error > 1;
-        }
-
-        const bool isNotLooping(Int64 timeInSamples) const noexcept
-        {
-            return !isLooping(timeInSamples);
         }
 
         void updateLFO(const PosInfo& transport, double _rateHz, double _rateSync, 
@@ -268,7 +266,7 @@ namespace dsp
             if (transport.isPlaying)
             {
                 updatePosition(lfos[mixer.idx], transport.ppqPosition, temposync);
-                posEstimate = transport.timeInSamples + numSamples;
+                posEstimate = transport.timeInSamples + numSamples / oversamplingFactor;
             }
             else
 				posEstimate = transport.timeInSamples;
@@ -282,11 +280,6 @@ namespace dsp
         bool changesSpeed(double nBpm, double nInc) const noexcept
         {
             return !keepsSpeed(nBpm, nInc);
-        }
-
-        const bool shallXFade(double nBpm, double nInc, Int64 timeInSamples) const noexcept
-        {
-            return isLooping(timeInSamples) || (changesSpeed(nBpm, nInc) && !mixer.stillFading());
         }
 
         void updateSpeed(double nBpm, double _rateHz, double _rateSync,
@@ -304,15 +297,16 @@ namespace dsp
             else
                 nInc = _rateHz * sampleRateInv;
 
-			if (shallXFade(nBpm, nInc, timeInSamples))
+            if (isLooping(timeInSamples) || (changesSpeed(nBpm, nInc) && !mixer.stillFading()))
 			{
-                mixer.init();
                 inc = nInc;
                 bpm = nBpm;
                 bps = nBps;
                 quarterNoteLength = nQuarterNoteLength;
                 rateSync = _rateSync;
                 rateHz = _rateHz;
+                
+                mixer.init();
                 lfos[mixer.idx].updateSpeed(inc);
 			}
         }
