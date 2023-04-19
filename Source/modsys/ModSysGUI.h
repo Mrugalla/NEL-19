@@ -2,6 +2,7 @@
 #include "../PluginProcessor.h"
 #include "ModSys.h"
 #include <array>
+#include <cstdint>
 
 namespace modSys6
 {
