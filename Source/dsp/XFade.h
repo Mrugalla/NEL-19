@@ -112,21 +112,33 @@ namespace dsp
         {
             Track() :
                 gain(0.),
-                dest(0.)
+                destGain(0.)
             {}
 
-            const bool isFading() const noexcept
+            void disable() noexcept
             {
-				return dest != gain;
+                destGain = 0.;
             }
 
-            void synthesizeGainValues(float* xBuf, 
+			void enable() noexcept
+			{
+				destGain = 1.;
+			}
+
+            const bool isEnabled() const noexcept
+            {
+                return gain + destGain != 0.;
+            }
+            
+            const bool isFading() const noexcept
+            {
+				return destGain != gain;
+            }
+
+            void synthesizeGainValues(float* xBuf,
                 double inc, int numSamples) noexcept
             {
-                if (!isFading())
-                    return SIMD::fill(xBuf, dest, numSamples);
-
-				if(dest == 1.)
+                if(destGain == 1.)
                     for (auto s = 0; s < numSamples; ++s)
                     {
                         xBuf[s] = static_cast<float>(gain);
@@ -144,7 +156,7 @@ namespace dsp
                     {
                         xBuf[s] = static_cast<float>(gain);
                         gain -= inc;
-                        if (gain <= 0.)
+                        if (gain < 0.)
                         {
                             gain = 0.;
                             for (; s < numSamples; ++s)
@@ -154,30 +166,23 @@ namespace dsp
                     }
             }
             
-            void operator()(float* const* samples, float* const* xSamples,
-                int numChannels, int numSamples) noexcept
-            {
-                
-            }
-            
             void copy(float* const* dest, const float* const* src,
                 int numChannels, int numSamples) const noexcept
             {
                 const auto xBuf = src[2];
                 for (auto ch = 0; ch < numChannels; ++ch)
-                    for(auto s = 0; s < numSamples; ++s)
-						dest[ch][s] = src[ch][s] * xBuf[s];
+                    SIMD::multiply(dest[ch], src[ch], xBuf, numSamples);
             }
 
             void add(float* const* dest, const float* const* src,
                 int numChannels, int numSamples) const noexcept
             {
-				const auto xBuf = src[2];
-				for (auto ch = 0; ch < numChannels; ++ch)
-					SIMD::addWithMultiply(dest[ch], src[ch], xBuf, numSamples);
+                const auto xBuf = src[2];
+                for (auto ch = 0; ch < numChannels; ++ch)
+                    SIMD::addWithMultiply(dest[ch], src[ch], xBuf, numSamples);
             }
 
-            double gain, dest;
+            double gain, destGain;
         };
 
         XFadeMixer() :
@@ -186,7 +191,6 @@ namespace dsp
             inc(0.),
             idx(0)
         {
-			tracks[idx].dest = tracks[idx].gain = 1.;
         }
 
         void prepare(double sampleRate, double lengthMs, int blockSize)
@@ -199,8 +203,8 @@ namespace dsp
         {
             idx = (idx + 1) % NumTracks;
             for (auto& track : tracks)
-                track.dest = 0.;
-            tracks[idx].dest = 1.;
+                track.disable();
+            tracks[idx].enable();
         }
 
         float* const* getSamples(int i) noexcept
@@ -212,56 +216,25 @@ namespace dsp
         {
             return &buffer.getArrayOfReadPointers()[i * 3];
         }
-
-        void synthesizeGainValues(int i, int numSamples) noexcept
-        {
-            auto xSamples = getSamples(i);
-            auto xBuf = xSamples[2];
-            auto& track = tracks[i];
-            
-            track.synthesizeGainValues(xBuf, inc, numSamples);
-        }
         
-        const bool isEnabled(int i) const noexcept
-        {
-			return tracks[i].gain + tracks[i].dest != 0.;
-		}
-
-        const bool isFading(int i) const noexcept
-        {
-			return tracks[i].gain != tracks[i].dest;
-        }
-        
-        void copy(float* const* dest, int i, int numChannels, int numSamples) const noexcept
-        {
-			tracks[i].copy(dest, getSamples(i), numChannels, numSamples);
-        }
-
-        void add(float* const* dest, int i, int numChannels, int numSamples) const noexcept
-        {
-			tracks[i].add(dest, getSamples(i), numChannels, numSamples);
-        }
-
-        void copyAndAdd(float* const* dest, int numChannels, int numSamples) noexcept
-        {
-            copy(dest, 0, numChannels, numSamples);
-			for (auto i = 1; i < NumTracks; ++i)
-				add(dest, i, numChannels, numSamples);
-        }
-
         const int numTracksEnabled() const noexcept
         {
             auto sum = 0;
 			for (auto i = 0; i < NumTracks; ++i)
-				sum += isEnabled(i) ? 1 : 0;
+				sum += (tracks[i].isEnabled() ? 1 : 0);
 			return sum;
+        }
+
+        Track& operator[](int i) noexcept
+        {
+            return tracks[i];
         }
 
     protected:
 		AudioBuffer buffer;
         std::array<Track, NumTracks> tracks;
-        double inc;
     public:
+        double inc;
         int idx;
     };
 
