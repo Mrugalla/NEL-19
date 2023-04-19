@@ -3,24 +3,13 @@
 #include "Wavetable.h"
 #include "PRM.h"
 #include "StandalonePlayHead.h"
+#include "XFade.h"
 
 #define DebugPhasor false
 
 namespace dsp
 {
 	static constexpr float Pi = 3.141592653589f;
-
-    template<typename Float>
-    inline Float msInSamples(Float ms, Float Fs) noexcept
-    {
-        return ms * Fs * static_cast<Float>(0.001);
-    }
-
-    template<typename Float>
-    inline Float msInInc(Float ms, Float Fs) noexcept
-    {
-        return static_cast<Float>(1) / msInSamples(ms, Fs);
-    }
 
     struct LFO
     {
@@ -31,7 +20,7 @@ namespace dsp
         {
         }
 
-        void prepare(double fsInv)
+        void prepare(double fsInv) noexcept
         {
             phasor.prepare(fsInv);
         }
@@ -152,39 +141,100 @@ namespace dsp
 
     struct LFO_Procedural
     {
+        static constexpr int NumLFOs = 2;
+        using Mixer = XFadeMixer<NumLFOs>;
         using Wavetables = LFO::Wavetables;
+        using LFOs = std::array<LFO, NumLFOs>;
 
-        LFO_Procedural() :
-            lfo(),
-            //
-            sampleRate(1.), sampleRateInv(1.), latency(0.),
-            rateSync(1.), rateHz(1.)
-        {
-        }
+        LFO_Procedural(const Wavetables& _wavetables) :
+            mixer(),
+            wavetables(_wavetables),
+            lfos(),
+            phasePRM(0.f), widthPRM(0.f), wtPosPRM(0.f),
+            latency(0.), sampleRate(1.), sampleRateInv(1.),
+            quarterNoteLength(0.), bps(1.),
+            rateHz(0.), rateSync(0.), inc(0.)
+        {}
 
-        void prepare(double _sampleRate, int, double _latency)
+        void prepare(double _sampleRate, int blockSize, double _latency)
         {
-            sampleRate = _sampleRate;
+			latency = _latency;
+			sampleRate = _sampleRate;
             sampleRateInv = 1. / sampleRate;
-            latency = _latency;
 
-            lfo.prepare(sampleRateInv);
+            mixer.prepare(sampleRate, 420., blockSize);
+            
+            const auto fs = static_cast<float>(sampleRate);
+            phasePRM.prepare(fs, blockSize, 14.f);
+            widthPRM.prepare(fs, blockSize, 14.f);
+            wtPosPRM.prepare(fs, blockSize, 14.f);
+
+            for(auto& lfo: lfos)
+                lfo.prepare(sampleRateInv);
         }
 
-        void operator()(const Wavetables& wavetables, float* const* samples,
+        void operator()(float* const* samples,
             int numChannels, int numSamples,
-            const PosInfo& transport, double _rateHz, double _rateSync,
-            const PRMInfo& phaseInfo, const PRMInfo& widthInfo, const PRMInfo& wtPosInfo,
+            PosInfo& transport, double _rateHz, double _rateSync,
+            float phase, float width, float wtPos,
             bool temposync) noexcept
         {
-            const auto bpm = transport.bpm;
-            const auto bps = bpm / 60.;
-            const auto quarterNoteLength = sampleRate / bps;
+            const auto phaseInfo = phasePRM(phase, numSamples);
+            const auto widthInfo = widthPRM(width, numSamples);
+            const auto wtPosInfo = wtPosPRM(wtPos, numSamples);
+            
+			updateLFO(transport, _rateHz, _rateSync, temposync);
+
+            for (auto i = 0; i < NumLFOs; ++i)
+            {
+                if (mixer.isEnabled(i))
+                {
+                    mixer.synthesizeGainValues(i, numSamples);
+
+                    auto& lfo = lfos[i];
+                    auto xSamples = mixer.getSamples(i);
+                    
+                    lfo
+                    (
+                        xSamples,
+                        numChannels,
+                        numSamples,
+                        wavetables,
+                        phaseInfo,
+                        widthInfo,
+                        wtPosInfo
+                    );
+                }
+            }
+            
+            mixer.copyAndAdd(samples, numChannels, numSamples);
+        }
+
+    protected:
+        Mixer mixer;
+        const Wavetables& wavetables;
+        LFOs lfos;
+        PRM phasePRM, widthPRM, wtPosPRM;
+        double latency, sampleRate, sampleRateInv, quarterNoteLength, bps;
+        double rateHz, rateSync, inc;
+        
+        void updateLFO(const PosInfo& transport, double _rateHz, double _rateSync, bool temposync) noexcept
+        {
+            updateSpeed(transport.bpm, _rateHz, _rateSync, temposync);
+            if(transport.isPlaying)
+			    updatePosition(lfos[mixer.idx], transport.ppqPosition, temposync);
+        }
+
+        void updateSpeed(double nBpm, double _rateHz, double _rateSync,
+            bool temposync) noexcept
+        {
+            const auto nBps = nBpm / 60.;
+            const auto nQuarterNoteLength = sampleRate / nBps;
 
             auto nInc = 0.;
             if (temposync)
             {
-                const auto barLength = quarterNoteLength * 4.;
+                const auto barLength = nQuarterNoteLength * 4.;
                 nInc = 1. / (barLength * _rateSync);
             }
             else
@@ -192,97 +242,35 @@ namespace dsp
                 nInc = _rateHz * sampleRateInv;
             }
 
+            if (nInc == inc)
+                return;
+            
+            mixer.init();
+            inc = nInc;
+            bps = nBps;
+            quarterNoteLength = nQuarterNoteLength;
             rateSync = _rateSync;
             rateHz = _rateHz;
-            lfo.updateSpeed(nInc);
+            lfos[mixer.idx].updateSpeed(inc);
+        }
 
-            if (transport.isPlaying)
+        void updatePosition(LFO& lfo, double ppqPosition, bool temposync) noexcept
+        {
+            if (temposync)
             {
-                if (temposync)
-                {
-                    const auto latencyLengthInQuarterNotes = latency / quarterNoteLength;
-                    auto ppq = (transport.ppqPosition - latencyLengthInQuarterNotes) * .25;
-                    while (ppq < 0.f)
-                        ++ppq;
-                    const auto ppqCh = ppq / rateSync;
-                    lfo.updatePhase(ppqCh - std::floor(ppqCh));
-                }
-                else
-                {
-                    const auto lfoPhase = transport.ppqPosition / bps * rateHz;
-                    lfo.updatePhase(lfoPhase - std::floor(lfoPhase));
-                }
+                const auto latencyLengthInQuarterNotes = latency / quarterNoteLength;
+                auto ppq = (ppqPosition - latencyLengthInQuarterNotes) * .25;
+                while (ppq < 0.f)
+                    ++ppq;
+                const auto ppqCh = ppq / rateSync;
+                lfo.updatePhase(ppqCh - std::floor(ppqCh));
             }
-
-            lfo
-            (
-                samples,
-                numChannels,
-                numSamples,
-                wavetables,
-                phaseInfo,
-                widthInfo,
-                wtPosInfo
-            );
+            else
+            {
+                const auto lfoPhase = ppqPosition / bps * rateHz;
+                lfo.updatePhase(lfoPhase - std::floor(lfoPhase));
+            }
         }
-
-    protected:
-        LFO lfo;
-        //
-        double sampleRate, sampleRateInv, latency;
-        double rateSync, rateHz;
-    };
-
-    struct LFOFinal
-    {
-        using Wavetables = LFO::Wavetables;
-
-        LFOFinal(const Wavetables& _wavetables) :
-            wavetables(_wavetables),
-            lfo(),
-            phasePRM(0.f), widthPRM(0.f), wtPosPRM(0.f)
-        {}
-
-        void prepare(double sampleRate, int blockSize, double latency)
-        {
-            const auto fs = static_cast<float>(sampleRate);
-            phasePRM.prepare(fs, blockSize, 14.f);
-            widthPRM.prepare(fs, blockSize, 14.f);
-            wtPosPRM.prepare(fs, blockSize, 14.f);
-
-            lfo.prepare(sampleRate, blockSize, latency);
-        }
-
-        void operator()(float* const* samples,
-            int numChannels, int numSamples,
-            PosInfo& transport, double rateHz, double rateSync,
-            float phase, float width, float wtPos,
-            bool temposync) noexcept
-        {
-            const auto phaseInfo = phasePRM(phase, numSamples);
-            const auto widthInfo = widthPRM(width, numSamples);
-            const auto wtPosInfo = wtPosPRM(wtPos, numSamples);
-
-            lfo
-            (
-                wavetables,
-                samples,
-                numChannels,
-                numSamples,
-                transport,
-                rateHz,
-                rateSync,
-                phaseInfo,
-                widthInfo,
-                wtPosInfo,
-                temposync
-            );
-        }
-
-    protected:
-        const Wavetables& wavetables;
-        LFO_Procedural lfo;
-        PRM phasePRM, widthPRM, wtPosPRM;
     };
 }
 

@@ -1034,7 +1034,7 @@ namespace vibrato
 			}
 		
 		protected:
-			dsp::LFOFinal lfo;
+			dsp::LFO_Procedural lfo;
 			double rateHz, rateSync;
 			float phase, width, wtPos;
 			bool temposync;

@@ -30,6 +30,15 @@ namespace dsp
 		posInfo.isPlaying = isPlaying;
 	}
 
+	inline void copyPlayHead(PosInfo& dest, const PosInfo& src) noexcept
+	{
+		dest.bpm = src.bpm;
+		dest.timeInSamples = src.timeInSamples;
+		dest.timeInSeconds = src.timeInSeconds;
+		dest.ppqPosition = src.ppqPosition;
+		dest.isPlaying = src.isPlaying;
+	}
+
 	struct StandalonePlayHead
 	{
 		static constexpr double DefaultBPM = 90.;
