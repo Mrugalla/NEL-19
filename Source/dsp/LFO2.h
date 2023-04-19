@@ -142,7 +142,8 @@ namespace dsp
 
     struct LFO_Procedural
     {
-        static constexpr int NumLFOs = 5;
+        static constexpr double XFadeLengthMs = 120.;
+        static constexpr int NumLFOs = 3;
         using Mixer = XFadeMixer<NumLFOs>;
         using Wavetables = LFO::Wavetables;
         using LFOs = std::array<LFO, NumLFOs>;
@@ -155,7 +156,7 @@ namespace dsp
             phasePRM(0.f), widthPRM(0.f), wtPosPRM(0.f),
             latency(0.), sampleRate(1.), sampleRateInv(1.),
             quarterNoteLength(0.), bps(1.),
-            rateHz(0.), rateSync(0.), inc(0.),
+            rateHz(0.), rateSync(0.), bpm(0.), inc(0.),
             posEstimate(0)
         {}
 
@@ -165,7 +166,7 @@ namespace dsp
 			sampleRate = _sampleRate;
             sampleRateInv = 1. / sampleRate;
 
-            mixer.prepare(sampleRate, 80., blockSize);
+            mixer.prepare(sampleRate, XFadeLengthMs, blockSize);
             
             const auto fs = static_cast<float>(sampleRate);
             phasePRM.prepare(fs, blockSize, 20.f);
@@ -245,37 +246,51 @@ namespace dsp
         LFOs lfos;
         PRM phasePRM, widthPRM, wtPosPRM;
         double latency, sampleRate, sampleRateInv, quarterNoteLength, bps;
-        double rateHz, rateSync, inc;
+        double rateHz, rateSync, bpm, inc;
         Int64 posEstimate;
         
-        void xFadeIfLoop(Int64 timeInSamples) noexcept
+        const bool isLooping(Int64 timeInSamples) const noexcept
         {
             const auto error = std::abs(timeInSamples - posEstimate);
-            if (error > 1)
-            {
-                mixer.init();
-                inc = 0.;
-            }
+            return error > 1;
+        }
+
+        const bool isNotLooping(Int64 timeInSamples) const noexcept
+        {
+            return !isLooping(timeInSamples);
         }
 
         void updateLFO(const PosInfo& transport, double _rateHz, double _rateSync, 
             int numSamples, bool temposync) noexcept
         {
-			xFadeIfLoop(transport.timeInSamples);
-            updateSpeed(transport.bpm, _rateHz, _rateSync, temposync);
+			updateSpeed(transport.bpm, _rateHz, _rateSync, transport.timeInSamples, temposync);
             
             if (transport.isPlaying)
             {
                 updatePosition(lfos[mixer.idx], transport.ppqPosition, temposync);
-                
                 posEstimate = transport.timeInSamples + numSamples;
             }
             else
 				posEstimate = transport.timeInSamples;
         }
 
+        bool keepsSpeed(double nBpm, double nInc) const noexcept
+        {
+            return nInc == inc && bpm == nBpm;
+        }
+
+        bool changesSpeed(double nBpm, double nInc) const noexcept
+        {
+            return !keepsSpeed(nBpm, nInc);
+        }
+
+        const bool shallXFade(double nBpm, double nInc, Int64 timeInSamples) const noexcept
+        {
+            return isLooping(timeInSamples) || (changesSpeed(nBpm, nInc) && !mixer.stillFading());
+        }
+
         void updateSpeed(double nBpm, double _rateHz, double _rateSync,
-            bool temposync) noexcept
+            Int64 timeInSamples, bool temposync) noexcept
         {
             const auto nBps = nBpm / 60.;
             const auto nQuarterNoteLength = sampleRate / nBps;
@@ -289,16 +304,17 @@ namespace dsp
             else
                 nInc = _rateHz * sampleRateInv;
 
-            if (nInc == inc)
-                return;
-            
-            mixer.init();
-            inc = nInc;
-            bps = nBps;
-            quarterNoteLength = nQuarterNoteLength;
-            rateSync = _rateSync;
-            rateHz = _rateHz;
-            lfos[mixer.idx].updateSpeed(inc);
+			if (shallXFade(nBpm, nInc, timeInSamples))
+			{
+                mixer.init();
+                inc = nInc;
+                bpm = nBpm;
+                bps = nBps;
+                quarterNoteLength = nQuarterNoteLength;
+                rateSync = _rateSync;
+                rateHz = _rateHz;
+                lfos[mixer.idx].updateSpeed(inc);
+			}
         }
 
         void updatePosition(LFO& lfo, double ppqPosition, bool temposync) noexcept
@@ -321,13 +337,3 @@ namespace dsp
 }
 
 #undef DebugPhasor
-
-
-/*
-
-todo:
-
-xFade when
-    bpm changed
-
-*/

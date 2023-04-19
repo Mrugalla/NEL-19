@@ -112,7 +112,8 @@ namespace dsp
         {
             Track() :
                 gain(0.),
-                destGain(0.)
+                destGain(0.),
+                fading(false)
             {}
 
             void disable() noexcept
@@ -138,7 +139,53 @@ namespace dsp
             void synthesizeGainValues(float* xBuf,
                 double inc, int numSamples) noexcept
             {
-                if(destGain == 1.)
+                if (!isFading())
+                {
+                    SIMD::fill(xBuf, static_cast<float>(gain), numSamples);
+                    fading = false;
+                    return;
+                }
+                
+                fading = true;
+                synthesizeGainValuesInternal(xBuf, inc, numSamples);
+                makeSmooth(xBuf, numSamples);
+            }
+            
+            void copy(float* const* dest, const float* const* src,
+                int numChannels, int numSamples) const noexcept
+            {
+                if (fading)
+                {
+                    const auto xBuf = src[2];
+                    for (auto ch = 0; ch < numChannels; ++ch)
+                        SIMD::multiply(dest[ch], src[ch], xBuf, numSamples);
+                }
+                else if (gain == 1.)
+                    for (auto ch = 0; ch < numChannels; ++ch)
+                        SIMD::copy(dest[ch], src[ch], numSamples);
+            }
+
+            void add(float* const* dest, const float* const* src,
+                int numChannels, int numSamples) const noexcept
+            {
+                if (fading)
+                {
+                    const auto xBuf = src[2];
+                    for (auto ch = 0; ch < numChannels; ++ch)
+                        SIMD::addWithMultiply(dest[ch], src[ch], xBuf, numSamples);
+                }
+                else if(gain == 1.)
+                    for (auto ch = 0; ch < numChannels; ++ch)
+					    SIMD::add(dest[ch], src[ch], numSamples);
+            }
+
+            double gain, destGain;
+            bool fading;
+        protected:
+            void synthesizeGainValuesInternal(float* xBuf,
+                double inc, int numSamples) noexcept
+            {
+                if (destGain == 1.)
                     for (auto s = 0; s < numSamples; ++s)
                     {
                         xBuf[s] = static_cast<float>(gain);
@@ -165,24 +212,12 @@ namespace dsp
                         }
                     }
             }
-            
-            void copy(float* const* dest, const float* const* src,
-                int numChannels, int numSamples) const noexcept
-            {
-                const auto xBuf = src[2];
-                for (auto ch = 0; ch < numChannels; ++ch)
-                    SIMD::multiply(dest[ch], src[ch], xBuf, numSamples);
-            }
 
-            void add(float* const* dest, const float* const* src,
-                int numChannels, int numSamples) const noexcept
+            void makeSmooth(float* xBuf, int numSamples) noexcept
             {
-                const auto xBuf = src[2];
-                for (auto ch = 0; ch < numChannels; ++ch)
-                    SIMD::addWithMultiply(dest[ch], src[ch], xBuf, numSamples);
+                for (auto s = 0; s < numSamples; ++s)
+                    xBuf[s] = std::cos(xBuf[s] * Pi + Pi) * .5f + .5f;
             }
-
-            double gain, destGain;
         };
 
         XFadeMixer() :
@@ -228,6 +263,11 @@ namespace dsp
         Track& operator[](int i) noexcept
         {
             return tracks[i];
+        }
+
+        bool stillFading() const noexcept
+        {
+			return tracks[idx].gain != 1.;
         }
 
     protected:
