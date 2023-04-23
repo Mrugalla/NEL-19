@@ -15,6 +15,8 @@ namespace modSys6
         using Just = juce::Justification;
         using String = juce::String;
         using Graphics = juce::Graphics;
+		using Colour = juce::Colour;
+        using Font = juce::Font;
         
         using Buffer = std::vector<std::vector<float>>;
 
@@ -188,9 +190,16 @@ namespace modSys6
                 tooltipDefault(""),
                 thicc(2.2f),
                 tooltipsEnabled(true),
-                font(juce::Font(juce::Typeface::createSystemTypefaceFor(BinaryData::nel19_ttf,
-                    BinaryData::nel19_ttfSize)))
+                font(juce::Font(juce::Typeface::createSystemTypefaceFor
+                (
+                    BinaryData::nel19_ttf, BinaryData::nel19_ttfSize))
+                ),
+                fontFlx(juce::Font(juce::Typeface::createSystemTypefaceFor
+                (
+                    BinaryData::felixhand_02_ttf, BinaryData::felixhand_02_ttfSize))
+                )
             {
+                fontFlx.setHeight(fontFlx.getHeight() * 1.25f);
             }
             
             void init(juce::PropertiesFile* p)
@@ -211,16 +220,16 @@ namespace modSys6
                 }
             }
 
-            bool setColour(const juce::String& i, juce::Colour col) {
+            bool setColour(const String& i, Colour col) {
                 for (auto c = 0; c < colours.size(); ++c)
                     if (i == colours[c].toString())
                         return setColour(c, col);
                 return false;
             }
             
-            bool setColour(ColourID i, juce::Colour col) noexcept { return setColour(static_cast<int>(i), col); }
+            bool setColour(ColourID i, Colour col) noexcept { return setColour(static_cast<int>(i), col); }
             
-            bool setColour(int i, juce::Colour col) noexcept
+            bool setColour(int i, Colour col) noexcept
             {
                 if (props->isValidFile())
                 {
@@ -236,11 +245,11 @@ namespace modSys6
                 return false;
             }
             
-            juce::Colour colour(ColourID i) const noexcept { return colour(static_cast<int>(i)); }
+            Colour colour(ColourID i) const noexcept { return colour(static_cast<int>(i)); }
             
-            juce::Colour colour(int i) const noexcept { return colours[i]; }
+            Colour colour(int i) const noexcept { return colours[i]; }
 
-            juce::String getTooltipsEnabledID() const { return "tooltips"; }
+            String getTooltipsEnabledID() const { return "tooltips"; }
             
             bool setTooltipsEnabled(bool e)
             {
@@ -258,7 +267,7 @@ namespace modSys6
                 return false;
             }
             
-            bool updateProperty(juce::String&& pID, const juce::var& var)
+            bool updateProperty(String&& pID, const juce::var& var)
             {
                 if (props->isValidFile())
                 {
@@ -274,11 +283,11 @@ namespace modSys6
             }
 
             juce::PropertiesFile* props;
-            std::array<juce::Colour, static_cast<int>(ColourID::NumCols)> colours;
-            juce::String tooltipDefault;
+            std::array<Colour, static_cast<int>(ColourID::NumCols)> colours;
+            String tooltipDefault;
             float thicc;
             bool tooltipsEnabled;
-            juce::Font font;
+            Font font, fontFlx;
 
             static Shared shared;
         };
@@ -1455,6 +1464,8 @@ namespace modSys6
 
                 void paint(juce::Graphics& g) override
                 {
+                    g.setFont(Shared::shared.fontFlx);
+
                     const auto thicc = Shared::shared.thicc;
                     const auto bounds = getLocalBounds().toFloat().reduced(thicc);
                     g.setColour(Shared::shared.colour(ColourID::Bg));
@@ -1608,6 +1619,7 @@ namespace modSys6
                 if (pType == ParameterType::Knob)
                 {
                     addAndMakeVisible(label);
+                    label.font = Shared::shared.fontFlx.withHeight(20.f);
                     modulatables.push_back(this);
                     addAndMakeVisible(modDial);
                 }
@@ -1662,6 +1674,8 @@ namespace modSys6
 
             void paint(juce::Graphics& g) override
             {
+                g.setFont(Shared::shared.fontFlx);
+                
                 switch (pType)
                 {
                 case ParameterType::Knob: return paintKnob(g);
@@ -1675,10 +1689,11 @@ namespace modSys6
                 const auto thicc2 = thicc * 2.f;
                 const auto thicc4 = thicc * 4.f;
                 const auto bounds = maxQuadIn(getLocalBounds().toFloat()).reduced(thicc2);
-                const juce::PathStrokeType strokeType(thicc, juce::PathStrokeType::JointStyle::curved, juce::PathStrokeType::EndCapStyle::rounded);
+                const Stroke strokeType(thicc, Stroke::JointStyle::curved, Stroke::EndCapStyle::rounded);
                 const auto radius = bounds.getWidth() * .5f;
                 const auto radiusInner = radius - thicc2;
-                juce::Point<float> centre(
+                juce::Point<float> centre
+                (
                     radius + bounds.getX(),
                     radius + bounds.getY()
                 );
@@ -1688,14 +1703,16 @@ namespace modSys6
                     g.setColour(col(Shared::shared.colour(ColourID::Interact)));
                     juce::Path outtaArc;
 
-                    outtaArc.addCentredArc(
+                    outtaArc.addCentredArc
+                    (
                         centre.x, centre.y,
                         radius, radius,
                         0.f,
                         -AngleWidth, AngleWidth,
                         true
                     );
-                    outtaArc.addCentredArc(
+                    outtaArc.addCentredArc
+                    (
                         centre.x, centre.y,
                         radiusInner, radiusInner,
                         0.f,
@@ -1725,7 +1742,8 @@ namespace modSys6
                     if (modDial.isSelected())
                     {
                         juce::Path modPath;
-                        modPath.addCentredArc(
+                        modPath.addCentredArc
+                        (
                             centre.x, centre.y,
                             radius, radius,
                             0.f,
@@ -1752,7 +1770,6 @@ namespace modSys6
                 
 				auto col = Shared::shared.colour(ColourID::Hover);
                 
-
                 if (isMouseOverOrDragging())
                 {
                     g.setColour(col);
@@ -2128,10 +2145,11 @@ namespace modSys6
             }
             
         protected:
-            juce::String* tooltipPtr;
+            String* tooltipPtr;
 
-            void paint(juce::Graphics& g) override
+            void paint(Graphics& g) override
             {
+                g.setFont(Shared::shared.fontFlx.withHeight(24.f));
                 g.setColour(Shared::shared.colour(ColourID::Txt));
                 g.drawFittedText
                 (
@@ -2191,15 +2209,18 @@ namespace modSys6
                 label(u, "", ColourID::Darken, ColourID::Transp, ColourID::Txt),
                 freezeIdx(0)
             {
+                label.font = Shared::shared.fontFlx.withHeight(18.f);
                 setInterceptsMouseClicks(false, false);
                 startTimerHz(6);
                 addChildComponent(label);
             }
+            
             void update(juce::String&& txt, juce::Point<int> pt)
             {
                 setCentrePosition(pt);
                 update(std::move(txt));
             }
+            
             void update(juce::String&& txt)
             {
                 label.setText(txt);
@@ -2209,11 +2230,13 @@ namespace modSys6
                 setSize(txtBounds.x, txtBounds.y);
                 label.repaint();
             }
+            
             void kill()
             {
                 freezeIdx = FreezeTimeInMs + 1;
                 label.setVisible(false);
             }
+            
         protected:
             Label label;
             int freezeIdx;
@@ -2226,7 +2249,10 @@ namespace modSys6
                 g.fillRoundedRectangle(getLocalBounds().toFloat().reduced(t), t);
             }
 
-            void resized() override { label.setBounds(getLocalBounds()); }
+            void resized() override
+            {
+                label.setBounds(getLocalBounds());
+            }
 
             void timerCallback() override
             {

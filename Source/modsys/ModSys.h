@@ -1041,7 +1041,7 @@ namespace modSys6
 			params.push_back(new Param(PID::DryWetMix, makeRange::biasXL(0.f, 1.f, 0.f), 1.f, valToStrRatio, strToValRatio));
 			params.push_back(new Param(PID::WetGain, makeRange::biasXL(-120.f, 4.5f, .9f), 0.f, valToStrDb, strToValDb));
 			params.push_back(new Param(PID::StereoConfig, makeRange::toggle(), 1.f, valToStrLRMS, strToValLRMS));
-			params.push_back(new Param(PID::Feedback, makeRange::lin(-1.f, 1.f), 0.f, valToStrPercent, strToValPercent, Unit::Percent));
+			params.push_back(new Param(PID::Feedback, makeRange::lin(0.f, 1.f), 0.f, valToStrPercent, strToValPercent, Unit::Percent));
 			params.push_back(new Param(PID::Damp, makeRange::quad(40.f, 8000.f, 2), 180.f, valToStrHz, strToValHz, Unit::Hz));
 			params.push_back(new Param(PID::HQ, makeRange::toggle(), 1.f, valToStrHQ, strToValHQ, Unit::Power));
 			params.push_back(new Param(PID::Lookahead, makeRange::toggle(), 1.f, valToStrLookahead, strToValLookahead, Unit::Power));

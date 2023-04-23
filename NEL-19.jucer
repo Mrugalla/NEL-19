@@ -9,8 +9,6 @@
               cppLanguageStandard="20">
   <MAINGROUP id="V2oOlh" name="NEL">
     <GROUP id="{FF8BE835-9B90-31CB-45F4-D4B15FDEFD04}" name="Source">
-      <FILE id="NmGc3V" name="BenchmarkProcessBlock.h" compile="0" resource="0"
-            file="Source/BenchmarkProcessBlock.h"/>
       <GROUP id="{8EC0EF39-024B-4AE6-4857-5AD651D74232}" name="modsys">
         <FILE id="nECyrZ" name="ModSys.h" compile="0" resource="0" file="Source/modsys/ModSys.h"/>
         <FILE id="IhYJlR" name="ModSysGUI.cpp" compile="1" resource="0" file="Source/modsys/ModSysGUI.cpp"/>
@@ -78,6 +76,8 @@
       <FILE id="RWsf1L" name="Interpolation.h" compile="0" resource="0" file="Source/Interpolation.h"/>
       <FILE id="xxe5Fr" name="NELG.h" compile="0" resource="0" file="Source/NELG.h"/>
       <FILE id="KltU2P" name="nel19.ttf" compile="0" resource="1" file="Source/Font/nel19.ttf"/>
+      <FILE id="MjTAx9" name="felixhand_02.ttf" compile="0" resource="1"
+            file="Source/Font/felixhand_02.ttf"/>
       <FILE id="bs2nAY" name="PluginEditor.cpp" compile="1" resource="0"
             file="Source/PluginEditor.cpp"/>
       <FILE id="XbM1I1" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>
@@ -85,6 +85,8 @@
             file="Source/PluginProcessor.cpp"/>
       <FILE id="Cw0VJG" name="PluginProcessor.h" compile="0" resource="0"
             file="Source/PluginProcessor.h"/>
+      <FILE id="NmGc3V" name="BenchmarkProcessBlock.h" compile="0" resource="0"
+            file="Source/BenchmarkProcessBlock.h"/>
     </GROUP>
   </MAINGROUP>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"

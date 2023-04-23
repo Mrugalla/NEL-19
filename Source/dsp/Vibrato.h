@@ -159,7 +159,7 @@ namespace vibrato
 					const auto r = rHead[s];
 					const auto fb = fbBuf[s];
 
-					const auto pair = getDelayPair(smpls, ring, interpolate, lp, r, fb, delaySizeInt, s);
+					const auto pair = getDelayPair(smpls, ring, interpolate, lp, r, -fb, delaySizeInt, s);
 
 					ring[w] = pair.sIn;
 					smpls[s] = pair.sOut;
