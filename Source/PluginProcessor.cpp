@@ -415,10 +415,10 @@ void Nel19AudioProcessor::processBlockVibrato(AudioBufferD& bufferOut, const juc
             {
                 const auto modMixed = mod0[s] + modsMixInfo.buf[s] * (mod1[s] - mod0[s]);
                 const auto modGained = modMixed * depthBuf[s];
-                //const auto modOut = modGained;
                 const auto modShifted = modGained - 1.f;
 				const auto modOut = modShifted + depthInfo.buf[s] * (modGained - modShifted);
-                mAll[s] = visualizer = modOut;
+                mAll[s] = modOut;
+                visualizer = modGained;
             }
         }
     }

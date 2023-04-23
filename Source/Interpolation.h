@@ -85,9 +85,13 @@ namespace interpolation
 		auto i0 = i1 - 1;
 		auto i2 = i1 + 1;
 		auto i3 = i1 + 2;
-		if (i3 >= size) i3 -= size;
-		if (i2 >= size) i2 -= size;
-		if (i0 < 0) i0 += size;
+		
+		if (i3 >= size)
+			i3 -= size;
+		if (i2 >= size)
+			i2 -= size;
+		if (i0 < 0)
+			i0 += size;
 
 		const auto t = readHead - iFloor;
 		const auto v0 = buffer[i0];

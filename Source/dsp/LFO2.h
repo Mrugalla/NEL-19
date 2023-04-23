@@ -237,9 +237,6 @@ namespace dsp
                     track.add(samples, xSamples, numChannels, numSamples);
                 }
             }
-
-            for(auto ch = 0; ch < numChannels; ++ch)
-				SIMD::multiply(samples[ch], .999, numSamples);
         }
 
     protected:

@@ -130,7 +130,7 @@ namespace vibrato
 			delaySizeInt = s;
 			ringBuffer.setSize(2, delaySizeInt, false, true, false);
 			delaySize = static_cast<double>(delaySizeInt);
-			delayMax = delaySize - 1.;
+			delayMax = delaySize - 4.;
 			delayMid = delaySize * .5;
 		}
 
@@ -226,11 +226,13 @@ namespace vibrato
 			for (auto ch = 0; ch < numChannels; ++ch)
 			{
 				auto buf = vibBuf[ch];
-				// map buffer [-1, 1] to [0, 2]
-				juce::FloatVectorOperations::add(buf, 1., numSamples);
-				// map buffer [0, 2] to [0, delayMax]
-				juce::FloatVectorOperations::multiply(buf, .5 * delayMax, numSamples);
-					
+				// map buffer [-1, 1] to [-delayMax, delayMax]
+				juce::FloatVectorOperations::multiply(buf, delayMax, numSamples);
+				// map buffer [-delayMax, delayMax] to [0, delaySize]
+				juce::FloatVectorOperations::add(buf, delaySize, numSamples);
+				// map buffer [0, delayMax * 2] to [0, delayMax]
+				juce::FloatVectorOperations::multiply(buf, .5, numSamples);
+
 				synthesizeReadHead(buf, numSamples, wHead);
 			}
 		}
