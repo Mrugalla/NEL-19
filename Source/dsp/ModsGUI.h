@@ -13,7 +13,7 @@ namespace modSys6
         struct WavetableView :
             public Comp
         {
-            using Tables = dsp::Wavetable3D<WTSize, NumTables>;
+            using Tables = dsp::Wavetable3D<double, WTSize, NumTables>;
 
             WavetableView(Utils& u, juce::String&& _tooltip, const Tables& _tables) :
                 Comp(u, std::move(_tooltip), CursorType::Default),
@@ -50,7 +50,7 @@ namespace modSys6
                     auto tablePhase = iX * NumWaveCyclesF;
                     while (tablePhase >= 1.f)
                         --tablePhase;
-                    const auto smpl = tables(tablesPhase, tablePhase) * -1.f;
+                    const auto smpl = static_cast<float>(tables(tablesPhase, tablePhase)) * -1.f;
                     const auto col = juce::Colours::transparentBlack
                         .interpolatedWith(Shared::shared.colour(ColourID::Mod), window);
                     g.setColour(col);
@@ -434,7 +434,7 @@ namespace modSys6
                     auto noteOn = true;
                     for (auto x = 0.f; x < bW; ++x)
                     {
-                        const auto val = envGen(noteOn);
+                        const auto val = static_cast<float>(envGen(noteOn));
                         if(envGen.state == vibrato::EnvGen::State::D)
                             if (val - sus < .001f)
                                 noteOn = false;

@@ -5,21 +5,22 @@
 namespace dsp
 {
 	using String = juce::String;
+	static constexpr double Pi = 3.1415926535897932384626433832795;
 
-	template<size_t Size>
+	template<typename Float, size_t Size>
 	struct Wavetable
 	{
-		using Func = std::function<float(float x)>;
+		using Func = std::function<Float(Float x)>;
 
-		void makeTableWeierstrasz(float a, float b, int N)
+		void makeTableWeierstrasz(Float a, Float b, int N)
 		{
-			fill([N, b, a](float x)
+			fill([N, b, a](Float x)
 			{
-				auto smpl = 0.f;
+				auto smpl = 0.;
 				for (auto n = 0; n < N; ++n)
 				{
-					const auto nF = static_cast<float>(n);
-					smpl += std::pow(a, nF) * std::cos(std::pow(b, nF) * x * 3.14159265359f);
+					const auto nF = static_cast<Float>(n);
+					smpl += std::pow(a, nF) * std::cos(std::pow(b, nF) * x * Pi);
 				}
 				return smpl;
 			}, true, true);
@@ -27,51 +28,48 @@ namespace dsp
 
 		void makeTableTriangle(int n)
 		{
-			const auto pi = 3.14159265359f;
-			const auto tri = [&](float x, float fc, float phase)
+			const auto tri = [&](Float x, Float fc, Float phase)
 			{
-				return 1.f - 2.f * std::acos(std::cos(fc * x * pi + phase * pi)) / pi;
+				return static_cast<Float>(1) - static_cast<Float>(2) * std::acos(std::cos(fc * x * Pi + phase * Pi)) / Pi;
 			};
 
-			fill([tri, n](float x)
+			fill([tri, n](Float x)
 			{
-					const auto nF = static_cast<float>(n + 1);
-				const auto n8 = static_cast<float>(n) / 8.f;
-				return tri(x, 1.f, 0.f) + tri(x, nF, n8) / nF;
+				const auto nF = static_cast<Float>(n + 1);
+				const auto n8 = static_cast<Float>(n) / static_cast<Float>(8);
+				return tri(x, static_cast<Float>(1), static_cast<Float>(0)) + tri(x, nF, n8) / nF;
 
 			}, true, true);
 		}
 
 		void makeTableSinc(bool window, int N)
 		{
-			const auto pi = 3.14159265359f;
-
-			const auto wndw = window ? [](float xpi)
+			const auto wndw = window ? [](Float xpi)
 			{
-				if (xpi == 0.f) return 1.f;
+				if (xpi == static_cast<Float>(0)) return static_cast<Float>(1);
 				return std::sin(xpi) / xpi;
 			} :
-			[](float)
+			[](Float)
 			{
-				return 1.f;
+				return static_cast<Float>(1);
 			};
-			const auto sinc = [](float xPiA)
+			const auto sinc = [](Float xPiA)
 			{
-				if (xPiA == 0.f) return 1.f;
-				return 2.f * std::sin(xPiA) / xPiA - 1.f;
+				if (xPiA == static_cast<Float>(0.f)) return static_cast<Float>(1);
+				return static_cast<Float>(2) * std::sin(xPiA) / xPiA - static_cast<Float>(1);
 			};
 
-			fill([pi, wndw, sinc, N](float x)
+			fill([wndw, sinc, N](Float x)
 			{
-				const auto xpi = x * pi;
-				const auto tablesInv = 1.f / static_cast<float>(N);
+				const auto xpi = x * Pi;
+				const auto tablesInv = static_cast<Float>(1) / static_cast<Float>(N);
 
-				auto smpl = 0.f;
+				auto smpl = static_cast<Float>(0);
 				for (auto n = 0; n < N; ++n)
 				{
 					const auto nF = static_cast<float>(n);
-					const auto x2 = (nF + 2) * x * .5f;
-					const auto a2 = 2.f * nF + 1.f;
+					const auto x2 = (nF + static_cast<Float>(2)) * x * static_cast<Float>(.5);
+					const auto a2 = static_cast<Float>(2) * nF + static_cast<Float>(1);
 
 					smpl += wndw(xpi) * sinc(x2 * a2) * tablesInv;
 				}
@@ -86,38 +84,38 @@ namespace dsp
 
 		void fill(const Func& func, bool removeDC, bool normalize)
 		{
-			static constexpr float SizeInv = 1.f / static_cast<float>(Size);
+			static constexpr Float SizeInv = static_cast<Float>(1.) / static_cast<Float>(Size);
 
 			// SYNTHESIZE WAVE
 			for (auto s = 0; s < Size; ++s)
 			{
-				auto x = 2.f * static_cast<float>(s) * SizeInv - 1.f;
+				auto x = static_cast<Float>(2) * static_cast<Float>(s) * SizeInv - static_cast<Float>(1);
 				table[s] = func(x);
 			}
 
 			if (removeDC)
 			{
-				auto sum = 0.f;
+				auto sum = static_cast<Float>(0);
 				for (const auto& s : table)
 					sum += s;
 				sum *= SizeInv;
-				if (sum != 0.f)
+				if (sum != static_cast<Float>(0))
 					for (auto& s : table)
 						s -= sum;
 			}
 
 			if (normalize)
 			{
-				auto max = 0.f;
+				auto max = static_cast<Float>(0);
 				for (const auto& s : table)
 				{
 					const auto a = std::abs(s);
 					if (max < a)
 						max = a;
 				}
-				if (max != 0.f && max != 1.f)
+				if (max != static_cast<Float>(0) && max != static_cast<Float>(1))
 				{
-					const auto g = 1.f / max;
+					const auto g = static_cast<Float>(1) / max;
 					for (auto& s : table)
 						s *= g;
 				}
@@ -128,9 +126,9 @@ namespace dsp
 				table[s] = table[s - Size];
 		}
 
-		float operator[](float x) const noexcept
+		Float operator[](Float x) const noexcept
 		{
-			static constexpr float SizeF = static_cast<float>(Size);
+			static constexpr Float SizeF = static_cast<Float>(Size);
 			x = x * SizeF;
 			const auto xFloor = std::floor(x);
 			const auto i0 = static_cast<int>(xFloor);
@@ -139,21 +137,21 @@ namespace dsp
 			return table[i0] + frac * (table[i1] - table[i0]);
 		}
 
-		float operator[](int idx) const noexcept
+		Float operator[](int idx) const noexcept
 		{
 			return table[idx];
 		}
 
 	protected:
-		std::array<float, Size + 2> table;
+		std::array<Float, Size + 2> table;
 	};
 
-	template<size_t WTSize, size_t NumTables>
+	template<typename Float, size_t WTSize, size_t NumTables>
 	struct Wavetable2D
 	{
-		using Func = std::function<float(float x)>;
-		static constexpr float MaxTablesF = static_cast<float>(NumTables - 1);
-		using Table = Wavetable<WTSize>;
+		static constexpr Float MaxTablesF = static_cast<Float>(NumTables - 1);
+		using Table = Wavetable<Float, WTSize>;
+		using Func = Table::Func;
 		using Tables = std::array<Table, NumTables + 1>;
 
 		Wavetable2D() :
@@ -171,17 +169,17 @@ namespace dsp
 				tables[i] = tables[i - NumTables];
 		}
 
-		float operator()(int tablesIdx, int tableIdx) const noexcept
+		Float operator()(int tablesIdx, int tableIdx) const noexcept
 		{
 			return tables[tablesIdx][tableIdx];
 		}
 
-		float operator()(int tablesIdx, float tablePhase) const noexcept
+		Float operator()(int tablesIdx, Float tablePhase) const noexcept
 		{
 			return tables[tablesIdx][tablePhase];
 		}
 
-		float operator()(float tablesPhase, int tableIdx) const noexcept
+		Float operator()(Float tablesPhase, int tableIdx) const noexcept
 		{
 			const auto x = tablesPhase * MaxTablesF;
 			const auto xFloor = std::floor(x);
@@ -194,7 +192,7 @@ namespace dsp
 			return v0 + frac * (v1 - v0);
 		}
 
-		float operator()(float tablesPhase, float tablePhase) const noexcept
+		Float operator()(Float tablesPhase, Float tablePhase) const noexcept
 		{
 			const auto x = tablesPhase * MaxTablesF;
 			const auto xFloor = std::floor(x);
@@ -215,24 +213,24 @@ namespace dsp
 		Tables tables;
 	};
 
-	template<size_t WTSize, size_t NumTables>
+	template<typename Float, size_t WTSize, size_t NumTables>
 	struct Wavetable3D
 	{
-		using Func = std::function<float(float x)>;
+		using Table = Wavetable2D<Float, WTSize, NumTables>;
+		using Func = Table::Func;
 		using Funcs = std::array<Func, NumTables>;
-		using Tables = Wavetable3D<WTSize, NumTables>;
 
 		void makeTablesWeierstrasz()
 		{
 			name = "Weierstrasz";
-			tables[0].makeTableWeierstrasz(0.f, 0.f, 1);
-			tables[1].makeTableWeierstrasz(.0625f, 7.f, 8);
-			tables[2].makeTableWeierstrasz(.125f, 5.f, 5);
-			tables[3].makeTableWeierstrasz(.1875f, 4.f, 4);
-			tables[4].makeTableWeierstrasz(.25f, 3.f, 3);
-			tables[5].makeTableWeierstrasz(.3125f, 3.f, 4);
-			tables[6].makeTableWeierstrasz(.375f, 3.f, 3);
-			tables[7].makeTableWeierstrasz(.4375f, 2.f, 6);
+			tables[0].makeTableWeierstrasz(static_cast<Float>(0), static_cast<Float>(0.), 1);
+			tables[1].makeTableWeierstrasz(static_cast<Float>(.0625), static_cast<Float>(7.), 8);
+			tables[2].makeTableWeierstrasz(static_cast<Float>(.125), static_cast<Float>(5.), 5);
+			tables[3].makeTableWeierstrasz(static_cast<Float>(.1875), static_cast<Float>(4.), 4);
+			tables[4].makeTableWeierstrasz(static_cast<Float>(.25), static_cast<Float>(3.), 3);
+			tables[5].makeTableWeierstrasz(static_cast<Float>(.3125), static_cast<Float>(3.), 4);
+			tables[6].makeTableWeierstrasz(static_cast<Float>(.375), static_cast<Float>(3.), 3);
+			tables[7].makeTableWeierstrasz(static_cast<Float>(.4375), static_cast<Float>(2.), 6);
 		}
 
 		void makeTablesTriangles()
@@ -261,27 +259,27 @@ namespace dsp
 			tables.finishFills();
 		}
 
-		float operator()(float tablesPhase, float tablePhase) const noexcept
+		Float operator()(Float tablesPhase, Float tablePhase) const noexcept
 		{
 			return tables(tablesPhase, tablePhase);
 		}
 
-		float operator()(float tablesPhase, int tableIdx) const noexcept
+		Float operator()(Float tablesPhase, int tableIdx) const noexcept
 		{
 			return tables(tablesPhase, tableIdx);
 		}
 
-		float operator()(int tablesIdx, float tablePhase) const noexcept
+		Float operator()(int tablesIdx, Float tablePhase) const noexcept
 		{
 			return tables(tablesIdx, tablePhase);
 		}
 
-		float operator()(int tablesIdx, int tableIdx) const noexcept
+		Float operator()(int tablesIdx, int tableIdx) const noexcept
 		{
 			return tables(tablesIdx, tableIdx);
 		}
 
-		Wavetable2D<WTSize, NumTables> tables;
+		Table tables;
 		String name;
 	};
 
@@ -300,5 +298,5 @@ namespace dsp
 
 	static constexpr int LFOTableSize = 1 << 11;
 	static constexpr int LFONumTables = 8;
-	using LFOTables = Wavetable3D<LFOTableSize, LFONumTables>;
+	using LFOTables = Wavetable3D<double, LFOTableSize, LFONumTables>;
 }

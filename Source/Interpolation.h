@@ -51,7 +51,8 @@ namespace interpolation
 		return sum;
 	}
 
-	inline float lerp(const float* buffer, const float x, const int size)
+	template<typename Float>
+	inline Float lerp(const Float* buffer, const Float x, const int size)
 	{
 		const auto iFloor = std::floor(x);
 		const auto i0 = static_cast<int>(iFloor);
@@ -64,7 +65,8 @@ namespace interpolation
 		return x0 + xFrac * (x1 - x0);
 	}
 
-	inline float lerp(const float* buffer, const float x)
+	template<typename Float>
+	inline Float lerp(const Float* buffer, const Float x)
 	{
 		const auto iFloor = std::floor(x);
 		const auto i0 = static_cast<int>(iFloor);
@@ -75,7 +77,8 @@ namespace interpolation
 		return x0 + xFrac * (x1 - x0);
 	}
 
-	inline float cubicHermiteSpline(const float* buffer, const float readHead, const int size) noexcept
+	template<typename Float>
+	inline Float cubicHermiteSpline(const Float* buffer, const Float readHead, const int size) noexcept
 	{
 		const auto iFloor = std::floor(readHead);
 		auto i1 = static_cast<int>(iFloor);
@@ -93,14 +96,15 @@ namespace interpolation
 		const auto v3 = buffer[i3];
 
 		const auto c0 = v1;
-		const auto c1 = .5f * (v2 - v0);
-		const auto c2 = v0 - 2.5f * v1 + 2.f * v2 - .5f * v3;
-		const auto c3 = 1.5f * (v1 - v2) + .5f * (v3 - v0);
+		const auto c1 = static_cast<Float>(.5) * (v2 - v0);
+		const auto c2 = v0 - static_cast<Float>(2.5) * v1 + static_cast<Float>(2.) * v2 - static_cast<Float>(.5) * v3;
+		const auto c3 = static_cast<Float>(1.5) * (v1 - v2) + static_cast<Float>(.5) * (v3 - v0);
 
 		return ((c3 * t + c2) * t + c1) * t + c0;
 	}
 	
-	inline float cubicHermiteSpline(const float* buffer, const float readHead) noexcept
+	template<typename Float>
+	inline Float cubicHermiteSpline(const Float* buffer, const Float readHead) noexcept
 	{
 		const auto iFloor = std::floor(readHead);
 		const auto i0 = static_cast<int>(iFloor);
@@ -115,9 +119,9 @@ namespace interpolation
 		const auto v3 = buffer[i3];
 
 		const auto c0 = v1;
-		const auto c1 = .5f * (v2 - v0);
-		const auto c2 = v0 - 2.5f * v1 + 2.f * v2 - .5f * v3;
-		const auto c3 = 1.5f * (v1 - v2) + .5f * (v3 - v0);
+		const auto c1 = static_cast<Float>(.5) * (v2 - v0);
+		const auto c2 = v0 - static_cast<Float>(2.5) * v1 + static_cast<Float>(2.) * v2 - static_cast<Float>(.5) * v3;
+		const auto c3 = static_cast<Float>(1.5) * (v1 - v2) + static_cast<Float>(.5) * (v3 - v0);
 
 		return ((c3 * t + c2) * t + c1) * t + c0;
 	}

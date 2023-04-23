@@ -11,7 +11,7 @@ namespace smooth
 	// Block
 
 	template<typename Float>
-	Block<Float>::Block(float startVal) :
+	Block<Float>::Block(Float startVal) :
 		curVal(startVal)
 	{
 	}
@@ -176,7 +176,7 @@ namespace smooth
 	}
 
 	template<typename Float>
-	Smooth<Float>::Smooth(float startVal) :
+	Smooth<Float>::Smooth(Float startVal) :
 		block(startVal),
 		lowpass(startVal),
 		cur(startVal),

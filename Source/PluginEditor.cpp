@@ -138,15 +138,17 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     paramRandomizer.add(&stereoConfig);
 
     visualizer.onPaint = modSys6::gui::makeVibratoVisualizerOnPaint2();
-    visualizer.onUpdate = [&p = this->audioProcessor](modSys6::gui::Buffer& b)
+    visualizer.onUpdate = [&p = audioProcessor](modSys6::gui::Buffer& b)
     {
         const auto& vals = p.visualizerValues;
         bool needsUpdate = false;
         for (auto ch = 0; ch < b.size(); ++ch)
         {
-            if (b[ch][0] != vals[ch])
+            const auto val = static_cast<float>(vals[ch]);
+
+            if (b[ch][0] != val)
             {
-                b[ch][0] = vals[ch];
+                b[ch][0] = val;
                 needsUpdate = true;
             }
         }

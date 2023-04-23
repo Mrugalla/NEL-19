@@ -12,9 +12,12 @@ namespace oversampling
 	static constexpr int NumChannels = 2;
 	
 	using String = juce::String;
-	using AudioBuffer = juce::AudioBuffer<float>;
+	using AudioBufferF = juce::AudioBuffer<float>;
+	using AudioBufferD = juce::AudioBuffer<double>;
 
-	inline void zeroStuff(float* const* samplesDest, const float* const* samplesSrc, int numChannels, int numSamples) noexcept
+	template<typename Float>
+	inline void zeroStuff(Float* const* samplesDest, const Float* const* samplesSrc,
+		int numChannels, int numSamples) noexcept
 	{
 		for (auto ch = 0; ch < numChannels; ++ch)
 		{
@@ -25,12 +28,13 @@ namespace oversampling
 			{
 				const auto s2 = s * 2;
 				dest[s2] = src[s];
-				dest[s2 + 1] = 0.f;
+				dest[s2 + 1] = static_cast<Float>(0);
 			}
 		}
 	}
 
-	inline void zeroStuff(float* const* samples, int numChannels, int numSamples) noexcept
+	template<typename Float>
+	inline void zeroStuff(Float* const* samples, int numChannels, int numSamples) noexcept
 	{
 		for (auto ch = 0; ch < numChannels; ++ch)
 		{
@@ -40,19 +44,22 @@ namespace oversampling
 			{
 				const auto s2 = s * 2;
 				smpls[s2] = smpls[s];
-				smpls[s2 + 1] = 0.f;
+				smpls[s2 + 1] = static_cast<Float>(0);
 			}
 		}
 	}
 
-	inline void decimate(float* const* samples, int numChannels, int numSamples) noexcept
+	template<typename Float>
+	inline void decimate(Float* const* samples, int numChannels, int numSamples) noexcept
 	{
 		for (auto ch = 0; ch < numChannels; ++ch)
 			for (auto s = 0; s < numSamples; ++s)
 				samples[ch][s] = samples[ch][s * 2];
 	}
 
-	inline void decimate(float* const* samplesDest, const float* const* samplesSrc, int numChannels, int numSamples) noexcept
+	template<typename Float>
+	inline void decimate(Float* const* samplesDest, const Float* const* samplesSrc,
+		int numChannels, int numSamples) noexcept
 	{
 		for (auto ch = 0; ch < numChannels; ++ch)
 			for (auto s = 0; s < numSamples; ++s)
@@ -64,8 +71,8 @@ namespace oversampling
 		Processor() :
 			buffer(),
 			//
-			filterUp4(176400.f, 22050.f, 44100.f, true), //  17 samples
-			filterDown4(176400.f, 22050.f, 44100.f),
+			filterUp4(176400., 22050., 44100., true), //  17 samples
+			filterDown4(176400., 22050., 44100.),
 			filterUp2(),
 			filterDown2(),
 			//
@@ -104,7 +111,7 @@ namespace oversampling
 		}
 		
 		////////////////////////////////////////
-		AudioBuffer& upsample(AudioBuffer& input) noexcept
+		AudioBufferD& upsample(AudioBufferD& input) noexcept
 		{
 			if (enabled)
 			{
@@ -125,14 +132,14 @@ namespace oversampling
 				filterUp4.processBlockUp(samplesUp, numChannels, numSamples4x);
 
 				for(auto ch = 0; ch < numChannels; ++ch)
-					juce::FloatVectorOperations::multiply(samplesUp[ch], 2.f, numSamples4x);
+					juce::FloatVectorOperations::multiply(samplesUp[ch], 2., numSamples4x);
 				
 				return buffer;
 			}
 			return input;
 		}
 		
-		void downsample(AudioBuffer& outBuf) noexcept
+		void downsample(AudioBufferD& outBuf) noexcept
 		{
 			auto samplesUp = buffer.getArrayOfWritePointers();
 			auto samplesOut = outBuf.getArrayOfWritePointers();
@@ -168,10 +175,10 @@ namespace oversampling
 		}
 		
 	protected:
-		AudioBuffer buffer;
+		AudioBufferD buffer;
 
-		ConvolutionFilter filterUp4, filterDown4;
-		LowkeyChebyshevFilter<float> filterUp2, filterDown2;
+		ConvolutionFilter<double> filterUp4, filterDown4;
+		LowkeyChebyshevFilter<double> filterUp2, filterDown2;
 
 		double FsUp;
 		int blockSizeUp;
@@ -185,12 +192,12 @@ namespace oversampling
 		OversamplerWithShelf() :
 			filters(),
 			coefficients(),
-			cutoff(1.f),
-			q(1.f),
-			gain(0.f)
+			cutoff(1.),
+			q(1.),
+			gain(0.)
 		{}
 
-		void prepareToPlay(const double sampleRate, const int _blockSize, bool enabled)
+		void prepareToPlay(double sampleRate, const int _blockSize, bool enabled)
 		{
 			processor.prepareToPlay(sampleRate, _blockSize, enabled);
 
@@ -199,10 +206,10 @@ namespace oversampling
 			spec.maximumBlockSize = _blockSize;
 			spec.numChannels = 2;
 
-			cutoff = 20000.f;
-			gain = juce::Decibels::decibelsToGain(14.436f * .5f);
-			q = .229f;
-			coefficients = juce::dsp::IIR::Coefficients<float>::makeHighShelf(sampleRate, cutoff, q, gain);
+			cutoff = 20000.;
+			gain = juce::Decibels::decibelsToGain(14.436 * .5);
+			q = .229;
+			coefficients = juce::dsp::IIR::Coefficients<double>::makeHighShelf(sampleRate, cutoff, q, gain);
 
 			for (auto& filter : filters)
 			{
@@ -213,21 +220,21 @@ namespace oversampling
 		}
 		
 		/* processing methods */
-		AudioBuffer& upsample(juce::AudioBuffer<float>& input) noexcept
+		AudioBufferD& upsample(AudioBufferD& input) noexcept
 		{
 			return processor.upsample(input);
 		}
 		
-		void downsample(juce::AudioBuffer<float>& outBuf) noexcept
+		void downsample(AudioBufferD& outBuf) noexcept
 		{
 			processor.downsample(outBuf);
 			
 			for (auto ch = 0; ch < outBuf.getNumChannels(); ++ch)
 			{
 				auto& filter = filters[ch];
-				float* samples[] = { outBuf.getWritePointer(ch) };
-				juce::dsp::AudioBlock<float> block(samples, 1, outBuf.getNumSamples());
-				juce::dsp::ProcessContextReplacing<float> context(block);
+				double* samples[] = { outBuf.getWritePointer(ch) };
+				juce::dsp::AudioBlock<double> block(samples, 1, outBuf.getNumSamples());
+				juce::dsp::ProcessContextReplacing<double> context(block);
 				filter.process(context);
 			}
 		}
@@ -244,10 +251,9 @@ namespace oversampling
 		}
 		
 		Processor processor;
-
-		std::array<juce::dsp::IIR::Filter<float>, 2> filters;
-		juce::ReferenceCountedObjectPtr<juce::dsp::IIR::Coefficients<float>> coefficients;
-		float cutoff, q, gain;
+		std::array<juce::dsp::IIR::Filter<double>, 2> filters;
+		juce::ReferenceCountedObjectPtr<juce::dsp::IIR::Coefficients<double>> coefficients;
+		double cutoff, q, gain;
 	};
 }
 

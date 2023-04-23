@@ -75,7 +75,7 @@ ich studiere.
 #include "dsp/MidSideEncoder.h"
 #include "dsp/Modulator.h"
 #include "dsp/Vibrato.h"
-#include "dsp/Smooth.h"
+#include "dsp/PRM.h"
 #include "oversampling/Oversampling.h"
 #include <JuceHeader.h>
 #include "modsys/ModSys.h"
@@ -87,9 +87,19 @@ struct Nel19AudioProcessor :
     public juce::Timer
 {
     using ChannelSet = juce::AudioChannelSet;
-    
-    using Smooth = smooth::Smooth<float>;
+    using AudioBufferF = juce::AudioBuffer<float>;
+	using AudioBufferD = juce::AudioBuffer<double>;
+
+    using Smooth = smooth::Smooth<double>;
+    using PRM = dsp::PRM<double>;
+    using PRMInfo = dsp::PRMInfo<double>;
     static constexpr int NumActiveMods = 2;
+
+
+    bool supportsDoublePrecisionProcessing() const override
+    {
+        return true;
+    }
 
     Nel19AudioProcessor();
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
@@ -97,8 +107,12 @@ struct Nel19AudioProcessor :
    #ifndef JucePlugin_PreferredChannelConfigurations
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
    #endif
-    void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
-    void processBlockBypassed(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) override;
+
+    void processBlock(AudioBufferF&, juce::MidiBuffer&) override;
+    void processBlockBypassed(AudioBufferF& buffer, juce::MidiBuffer&) override;
+
+    void processBlock(AudioBufferD&, juce::MidiBuffer&) override;
+    void processBlockBypassed(AudioBufferD& buffer, juce::MidiBuffer&) override;
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override;
     const juce::String getName() const override;
@@ -119,6 +133,7 @@ struct Nel19AudioProcessor :
     void forcePrepare();
 
     juce::ApplicationProperties appProperties;
+    AudioBufferD audioBufferD;
 
     drywet::Processor dryWet;
 
@@ -127,17 +142,16 @@ struct Nel19AudioProcessor :
     oversampling::OversamplerWithShelf oversampling;
     
     std::array<vibrato::Modulator, NumActiveMods> modulators;
-    juce::AudioBuffer<float> modsBuffer;
+    AudioBufferD modsBuffer;
     std::array<vibrato::ModType, NumActiveMods> modType;
     
     vibrato::Processor vibrat;
     
-    std::array<float, 2> visualizerValues;
+    std::array<double, 2> visualizerValues;
 private:
-    Smooth depthSmooth, modsMixSmooth;
-    std::vector<float> depthBuf, modsMixBuf;
+    PRM depth, modsMix;
 
-    void processBlockVibrato(juce::AudioBuffer<float>&, const juce::MidiBuffer&, bool) noexcept;
+    void processBlockVibrato(AudioBufferD&, const juce::MidiBuffer&, bool) noexcept;
     
     void timerCallback() override;
 

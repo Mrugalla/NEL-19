@@ -5,7 +5,7 @@
 
 namespace drywet
 {
-	using AudioBuffer = juce::AudioBuffer<float>;
+	using AudioBufferD = juce::AudioBuffer<double>;
 
 	struct FFDelay
 	{
@@ -22,7 +22,7 @@ namespace drywet
 			rHead.resize(blockSize);
 		}
 		
-		void operator()(float* const* samplesDry, int numChannels, int numSamples) noexcept
+		void operator()(double* const* samplesDry, int numChannels, int numSamples) noexcept
 		{
 			synthesizeHeads(numSamples);
 			auto ringBuf = ringBuffer.getArrayOfWritePointers();
@@ -43,7 +43,8 @@ namespace drywet
 			}
 		}
 		
-		void operator()(float* const* samplesDest, const float* const* samplesSrc, int numChannels, int numSamples) noexcept
+		void operator()(double* const* samplesDest, const double* const* samplesSrc,
+			int numChannels, int numSamples) noexcept
 		{
 			synthesizeHeads(numSamples);
 			auto ringBuf = ringBuffer.getArrayOfWritePointers();
@@ -67,7 +68,7 @@ namespace drywet
 	
 	protected:
 		dsp::WHead wHead;
-		AudioBuffer ringBuffer;
+		AudioBufferD ringBuffer;
 		std::vector<int> rHead;
 
 		void synthesizeHeads(int numSamples) noexcept
@@ -104,15 +105,15 @@ namespace drywet
 		{
 		}
 		
-		void prepare(float sampleRate, int blockSize, int latency)
+		void prepare(double sampleRate, int blockSize, int latency)
 		{
-			mixSmooth.makeFromDecayInMs(10.f, sampleRate);
-			gainWetSmooth.makeFromDecayInMs(4.f, sampleRate);
+			mixSmooth.makeFromDecayInMs(10., sampleRate);
+			gainWetSmooth.makeFromDecayInMs(4., sampleRate);
 			buffers.setSize(kNumChannels, blockSize, false, true, false);
 			delay.prepare(blockSize, latency);
 		}
 		
-		void saveDry(const float* const* samples, float mixVal, int numChannels, int numSamples,
+		void saveDry(const double* const* samples, double mixVal, int numChannels, int numSamples,
 			bool lookaheadEnabled) noexcept
 		{
 			auto bufs = buffers.getArrayOfWritePointers();
@@ -124,7 +125,7 @@ namespace drywet
 			}
 			{ // MAKING EQUAL LOUDNESS CURVES
 				for (auto s = 0; s < numSamples; ++s)
-					bufs[kMixDry][s] = std::sqrt(1.f - bufs[kMix][s]);
+					bufs[kMixDry][s] = std::sqrt(1. - bufs[kMix][s]);
 				for (auto s = 0; s < numSamples; ++s)
 					bufs[kMixWet][s] = std::sqrt(bufs[kMix][s]);
 			}
@@ -138,7 +139,7 @@ namespace drywet
 			}
 		}
 		
-		void processWet(float* const* samples, float _gainWet, int numChannels, int numSamples) noexcept
+		void processWet(double* const* samples, double _gainWet, int numChannels, int numSamples) noexcept
 		{
 			auto bufs = buffers.getArrayOfWritePointers();
 
@@ -163,7 +164,7 @@ namespace drywet
 			}
 		}
 	
-		void processBypass(float* const* samples, int numChannels, int numSamples,
+		void processBypass(double* const* samples, int numChannels, int numSamples,
 			bool lookaheadEnabled) noexcept
 		{
 			if (lookaheadEnabled)
@@ -177,11 +178,11 @@ namespace drywet
 		}
 
 	protected:
-		smooth::Smooth<float> mixSmooth;
+		smooth::Smooth<double> mixSmooth;
 		FFDelay delay;
-		AudioBuffer buffers;
-		float gainWet, gainWetVal;
-		smooth::Smooth<float> gainWetSmooth;
+		AudioBufferD buffers;
+		double gainWet, gainWetVal;
+		smooth::Smooth<double> gainWetSmooth;
 	};
 }
 

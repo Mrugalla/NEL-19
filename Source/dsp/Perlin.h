@@ -11,10 +11,9 @@
 
 namespace perlin
 {
-	static constexpr float Pi = 3.14159265359f;
-	using PRMInfo = dsp::PRMInfo;
-	using PRM = dsp::PRM;
-	using PhasorF = dsp::Phasor<float>;
+	static constexpr double Pi = 3.1415926535897932384626433832795;
+	using PRMInfo = dsp::PRMInfoD;
+	using PRM = dsp::PRMD;
 	using PhasorD = dsp::Phasor<double>;
 
 	template<typename Float>
@@ -29,7 +28,7 @@ namespace perlin
 		return static_cast<Float>(1) / msInSamples(ms, Fs);
 	}
 
-	inline void generateProceduralNoise(float* noise, int size, unsigned int seed)
+	inline void generateProceduralNoise(double* noise, int size, unsigned int seed)
 	{
 		std::random_device rd;
 		std::mt19937 mt(rd());
@@ -42,23 +41,23 @@ namespace perlin
 		}
 	}
 
-	inline float getInterpolatedNN(const float* noise, float phase) noexcept
+	inline double getInterpolatedNN(const double* noise, double phase) noexcept
 	{
 		return noise[static_cast<int>(std::round(phase)) + 1];
 	}
 
-	inline float getInterpolatedLerp(const float* noise, float phase) noexcept
+	inline double getInterpolatedLerp(const double* noise, double phase) noexcept
 	{
-		return interpolation::lerp(noise, phase + 1.5f);
+		return interpolation::lerp(noise, phase + 1.5);
 	}
 
-	inline float getInterpolatedSpline(const float* noise, float phase) noexcept
+	inline double getInterpolatedSpline(const double* noise, double phase) noexcept
 	{
 		return interpolation::cubicHermiteSpline(noise, phase);
 	}
 
 	using PlayHeadPos = juce::AudioPlayHead::CurrentPositionInfo;
-	using InterpolationFunc = float(*)(const float*, float) noexcept;
+	using InterpolationFunc = double(*)(const double*, double) noexcept;
 	using InterpolationFuncs = std::array<InterpolationFunc, 3>;
 	using SIMD = juce::FloatVectorOperations;
 
@@ -75,14 +74,13 @@ namespace perlin
 		static constexpr int NoiseSize = 1 << NumOctaves;
 		static constexpr int NoiseSizeMax = NoiseSize - 1;
 
-		using NoiseArray = std::array<float, NoiseSize + NoiseOvershoot>;
-		using GainBuffer = std::array<float, NumOctaves + 2>;
+		using NoiseArray = std::array<double, NoiseSize + NoiseOvershoot>;
+		using GainBuffer = std::array<double, NumOctaves + 2>;
 
 		Perlin() :
 			// misc
 			interpolationFuncs{ &getInterpolatedNN, &getInterpolatedLerp, &getInterpolatedSpline },
-			sampleRateInv(1.),
-			fs(1.f),
+			sampleRateInv(1), sampleRate(1.),
 			// phase
 			phasor(),
 			phaseBuffer(),
@@ -91,11 +89,10 @@ namespace perlin
 		}
 
 		/* sampleRate, blockSize */
-		void prepare(float _sampleRate, int blockSize)
+		void prepare(double _sampleRate, int blockSize)
 		{
-			fs = _sampleRate;
-			const auto fsInv = 1.f / fs;
-			sampleRateInv = static_cast<double>(fsInv);
+			sampleRate = _sampleRate;
+			sampleRateInv = 1. / sampleRate;
 			phaseBuffer.resize(blockSize);
 		}
 
@@ -132,7 +129,7 @@ namespace perlin
 		/* samples, noise, gainBuffer,
 		octavesInfo, phsInfo, widthInfo, shape,
 		numChannels, numSamples */
-		void operator()(float* const* samples, const float* noise, const float* gainBuffer,
+		void operator()(double* const* samples, const double* noise, const double* gainBuffer,
 			const PRMInfo& octavesInfo, const PRMInfo& phsInfo, const PRMInfo& widthInfo, Shape shape,
 			int numChannels, int numSamples) noexcept
 		{
@@ -146,12 +143,11 @@ namespace perlin
 
 		// misc
 		InterpolationFuncs interpolationFuncs;
-		double sampleRateInv;
-		float fs;
+		double sampleRateInv, sampleRate;
 
 		// phase
 		PhasorD phasor;
-		std::vector<float> phaseBuffer;
+		std::vector<double> phaseBuffer;
 		int noiseIdx;
 
 	protected:
@@ -165,7 +161,7 @@ namespace perlin
 					if (phaseInfo.retrig)
 						noiseIdx = (noiseIdx + 1) & NoiseSizeMax;
 
-					phaseBuffer[s] = static_cast<float>(phaseInfo.phase) + phsInfo.val + static_cast<float>(noiseIdx);
+					phaseBuffer[s] = phaseInfo.phase + phsInfo.val + static_cast<double>(noiseIdx);
 				}
 			else
 				for (auto s = 0; s < numSamples; ++s)
@@ -174,13 +170,13 @@ namespace perlin
 					if (phaseInfo.retrig)
 						noiseIdx = (noiseIdx + 1) & NoiseSizeMax;
 
-					phaseBuffer[s] = static_cast<float>(phaseInfo.phase) + phsInfo[s] + static_cast<float>(noiseIdx);
+					phaseBuffer[s] = phaseInfo.phase + phsInfo[s] + static_cast<double>(noiseIdx);
 				}
 		}
 
 		/* smpls, octavesInfo, noise, gainBuffer, shape, numSamples */
-		void processOctaves(float* smpls, const PRMInfo& octavesInfo,
-			const float* noise, const float* gainBuffer, Shape shape, int numSamples) noexcept
+		void processOctaves(double* smpls, const PRMInfo& octavesInfo,
+			const double* noise, const double* gainBuffer, Shape shape, int numSamples) noexcept
 		{
 			if (!octavesInfo.smoothing)
 				processOctavesNotSmoothing(smpls, noise, gainBuffer, octavesInfo.val, shape, numSamples);
@@ -188,20 +184,20 @@ namespace perlin
 				processOctavesSmoothing(smpls, octavesInfo.buf, noise, gainBuffer, shape, numSamples);
 		}
 
-		float getInterpolatedSample(const float* noise, float phase, Shape shape) noexcept
+		double getInterpolatedSample(const double* noise, double phase, Shape shape) noexcept
 		{
 			return interpolationFuncs[static_cast<int>(shape)](noise, phase);
 		}
 
 		/* smpls, noise, gainBuffer, octaves, shape, numSamples */
-		void processOctavesNotSmoothing(float* smpls, const float* noise,
-			const float* gainBuffer, float octaves, Shape shape, int numSamples) noexcept
+		void processOctavesNotSmoothing(double* smpls, const double* noise,
+			const double* gainBuffer, double octaves, Shape shape, int numSamples) noexcept
 		{
 			const auto octFloor = std::floor(octaves);
 
 			for (auto s = 0; s < numSamples; ++s)
 			{
-				auto sample = 0.f;
+				auto sample = 0.;
 				for (auto o = 0; o < octFloor; ++o)
 				{
 					const auto phase = getPhaseOctaved(phaseBuffer[s], o);
@@ -212,12 +208,12 @@ namespace perlin
 				smpls[s] = sample;
 			}
 
-			auto gain = 0.f;
+			auto gain = 0.;
 			for (auto o = 0; o < octFloor; ++o)
 				gain += gainBuffer[o];
 
 			const auto octFrac = octaves - octFloor;
-			if (octFrac != 0.f)
+			if (octFrac != 0.)
 			{
 				const auto octFloorInt = static_cast<int>(octFloor);
 
@@ -231,18 +227,18 @@ namespace perlin
 				gain += octFrac * gainBuffer[octFloorInt];
 			}
 
-			SIMD::multiply(smpls, 1.f / std::sqrt(gain), numSamples);
+			SIMD::multiply(smpls, 1. / std::sqrt(gain), numSamples);
 		}
 
 		/* smpls, octavesBuf, noise, gainBuffer, shape, numSamples */
-		void processOctavesSmoothing(float* smpls, const float* octavesBuf,
-			const float* noise, const float* gainBuffer, Shape shape, int numSamples) noexcept
+		void processOctavesSmoothing(double* smpls, const double* octavesBuf,
+			const double* noise, const double* gainBuffer, Shape shape, int numSamples) noexcept
 		{
 			for (auto s = 0; s < numSamples; ++s)
 			{
 				const auto octFloor = std::floor(octavesBuf[s]);
 
-				auto sample = 0.f;
+				auto sample = 0.;
 				for (auto o = 0; o < octFloor; ++o)
 				{
 					const auto phase = getPhaseOctaved(phaseBuffer[s], o);
@@ -252,12 +248,12 @@ namespace perlin
 
 				smpls[s] = sample;
 
-				auto gain = 0.f;
+				auto gain = 0.;
 				for (auto o = 0; o < octFloor; ++o)
 					gain += gainBuffer[o];
 
 				const auto octFrac = octavesBuf[s] - octFloor;
-				if (octFrac != 0.f)
+				if (octFrac != 0.)
 				{
 					const auto octFloorInt = static_cast<int>(octFloor);
 
@@ -273,12 +269,12 @@ namespace perlin
 		}
 
 		/* samples, octavesInfo, widthInfo, noise, gainBuffer, shape, numSamples */
-		void processWidth(float* const* samples, const PRMInfo& octavesInfo,
-			const PRMInfo& widthInfo, const float* noise, const float* gainBuffer,
+		void processWidth(double* const* samples, const PRMInfo& octavesInfo,
+			const PRMInfo& widthInfo, const double* noise, const double* gainBuffer,
 			Shape shape, int numSamples) noexcept
 		{
 			if (!widthInfo.smoothing)
-				if (widthInfo.val == 0.f)
+				if (widthInfo.val == 0.)
 					return SIMD::copy(samples[1], samples[0], numSamples);
 				else
 					SIMD::add(phaseBuffer.data(), widthInfo.val, numSamples);
@@ -288,18 +284,18 @@ namespace perlin
 			processOctaves(samples[1], octavesInfo, noise, gainBuffer, shape, numSamples);
 		}
 
-		float getPhaseOctaved(float phaseInfo, int o) const noexcept
+		double getPhaseOctaved(double phaseInfo, int o) const noexcept
 		{
 			const auto ox2 = 1 << o;
-			const auto oPhase = phaseInfo * static_cast<float>(ox2);
+			const auto oPhase = phaseInfo * static_cast<double>(ox2);
 			const auto oPhaseFloor = std::floor(oPhase);
 			const auto oPhaseInt = static_cast<int>(oPhaseFloor) & NoiseSizeMax;
-			return oPhase - oPhaseFloor + static_cast<float>(oPhaseInt);
+			return oPhase - oPhaseFloor + static_cast<double>(oPhaseInt);
 		}
 
 		// debug:
 #if JUCE_DEBUG
-		void discontinuityJassert(float* smpls, int numSamples, float threshold = .1f)
+		void discontinuityJassert(double* smpls, int numSamples, double threshold = .1)
 		{
 			auto lastSample = smpls[0];
 			for (auto s = 1; s < numSamples; ++s)
@@ -310,19 +306,19 @@ namespace perlin
 			}
 		}
 
-		void controlRange(float* const* samples, int numChannels, int numSamples) noexcept
+		void controlRange(double* const* samples, int numChannels, int numSamples) noexcept
 		{
 			for (auto ch = 0; ch < numChannels; ++ch)
 				for (auto s = 0; s < numSamples; ++s)
 				{
-					oopsie(std::abs(samples[ch][s]) >= 1.f);
-					oopsie(std::abs(samples[ch][s]) <= -1.f);
+					oopsie(std::abs(samples[ch][s]) >= 1.);
+					oopsie(std::abs(samples[ch][s]) <= -1.);
 				}
 		}
 #endif
 	};
 
-	using AudioBuffer = juce::AudioBuffer<float>;
+	using AudioBuffer = juce::AudioBuffer<double>;
 	using Shape = Perlin::Shape;
 
 	struct Perlin2
@@ -340,16 +336,16 @@ namespace perlin
 			perlins(),
 			perlinIndex(0),
 			// parameters
-			octavesPRM(1.f),
-			widthPRM(0.f),
-			phsPRM(0.f),
+			octavesPRM(1.),
+			widthPRM(0.),
+			phsPRM(0.),
 			rateBeats(-1.),
 			rateHz(-1.),
 			rateInv(0.),
 			// crossfade
 			xFadeBuffer(),
-			xPhase(0.f),
-			xInc(0.f),
+			xPhase(0.),
+			xInc(0.),
 			crossfading(false),
 			lastBlockWasTemposync(false),
 			seed(),
@@ -364,7 +360,7 @@ namespace perlin
 				noise[Perlin::NoiseSize + s] = noise[s];
 
 			for (auto o = 0; o < gainBuffer.size(); ++o)
-				gainBuffer[o] = 1.f / static_cast<float>(1 << o);
+				gainBuffer[o] = 1. / static_cast<double>(1 << o);
 		}
 
 		void setSeed(int _seed)
@@ -373,29 +369,29 @@ namespace perlin
 			generateProceduralNoise(noise.data(), Perlin::NoiseSize, static_cast<unsigned int>(_seed));
 		}
 
-		void prepare(float fs, int blockSize, int _latency)
+		void prepare(double fs, int blockSize, int _latency)
 		{
 			latency = _latency;
 
-			sampleRateInv = 1. / static_cast<double>(fs);
+			sampleRateInv = 1. / fs;
 
 			prevBuffer.setSize(2, blockSize, false, false, false);
 			for (auto& perlin : perlins)
 				perlin.prepare(fs, blockSize);
-			xInc = msInInc(420.f, fs);
+			xInc = msInInc(420., fs);
 			xFadeBuffer.resize(blockSize);
-			octavesPRM.prepare(fs, blockSize, 10.f);
-			widthPRM.prepare(fs, blockSize, 20.f);
-			phsPRM.prepare(fs, blockSize, 20.f);
+			octavesPRM.prepare(fs, blockSize, 10.);
+			widthPRM.prepare(fs, blockSize, 20.);
+			phsPRM.prepare(fs, blockSize, 20.);
 		}
 
 		/* samples, numChannels, numSamples, playHeadPos,
 		rateHz, rateBeats, octaves, width, phs,
 		shape, temposync, procedural */
-		void operator()(float* const* samples, int numChannels, int numSamples,
+		void operator()(double* const* samples, int numChannels, int numSamples,
 			const PlayHeadPos& playHeadPos,
 			double _rateHz, double _rateBeats,
-			float octaves, float width, float phs,
+			double octaves, double width, double phs,
 			Shape shape, bool temposync, bool procedural) noexcept
 		{
 			if (temposync)
@@ -448,8 +444,8 @@ namespace perlin
 		double rateBeats, rateHz;
 		double rateInv;
 		// crossfade
-		std::vector<float> xFadeBuffer;
-		float xPhase, xInc;
+		std::vector<double> xFadeBuffer;
+		double xPhase, xInc;
 		bool crossfading, lastBlockWasTemposync;
 		// seed
 		std::atomic<int> seed;
@@ -547,7 +543,6 @@ namespace perlin
 			
 			perlins[perlinIndex].updatePositionSyncProcedural(ppq, rateInv);
 			
-
 			processCurPosEstimate(numSamples);
 		}
 
@@ -565,14 +560,14 @@ namespace perlin
 
 		void initCrossfade() noexcept
 		{
-			xPhase = 0.f;
+			xPhase = 0.;
 			crossfading = true;
 			perlinIndex = 1 - perlinIndex;
 		}
 
 		/* samples, octavesBuf, phsBuf, widthBuf,
 		octaves, width, phs, numChannels, numSamples */
-		void processCrossfade(float* const* samples, const PRMInfo& octavesInfo,
+		void processCrossfade(double* const* samples, const PRMInfo& octavesInfo,
 			const PRMInfo& phsInfo, const PRMInfo& widthInfo,
 			Shape shape, int numChannels, int numSamples) noexcept
 		{
@@ -596,10 +591,10 @@ namespace perlin
 				{
 					xFadeBuffer[s] = xPhase;
 					xPhase += xInc;
-					if (xPhase > 1.f)
+					if (xPhase > 1.)
 					{
 						crossfading = false;
-						xPhase = 1.f;
+						xPhase = 1.;
 					}
 				}
 
@@ -615,10 +610,10 @@ namespace perlin
 
 						const auto xFade = xFadeBuffer[s];
 						const auto xPi = xFade * Pi;
-						const auto xPrev = std::cos(xPi) + 1.f;
-						const auto xCur = std::cos(xPi + Pi) + 1.f;
+						const auto xPrev = std::cos(xPi) + 1.;
+						const auto xCur = std::cos(xPi + Pi) + 1.;
 
-						smpls[s] = (prev * xPrev + cur * xCur) * .5f;
+						smpls[s] = (prev * xPrev + cur * xCur) * .5;
 					}
 				}
 			}

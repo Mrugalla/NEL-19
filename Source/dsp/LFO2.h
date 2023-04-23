@@ -9,9 +9,7 @@
 
 namespace dsp
 {
-	static constexpr float Pi = 3.141592653589f;
-
-    struct LFO
+	struct LFO
     {
         using Wavetables = dsp::LFOTables;
 
@@ -45,8 +43,8 @@ namespace dsp
         /* samples, wavetables,
         phase[-.5, .5], width[0, .5], wtPos[0,1],
         numChannels, numSamples */
-        void operator()(float* const* samples, const Wavetables& wavetables,
-            const PRMInfo& phaseInfo, const PRMInfo& widthInfo, const PRMInfo& wtPosInfo,
+        void operator()(double* const* samples, const Wavetables& wavetables,
+            const PRMInfoD& phaseInfo, const PRMInfoD& widthInfo, const PRMInfoD& wtPosInfo,
             int numChannels, int numSamples) noexcept
         {
             synthesizePhasor
@@ -71,8 +69,8 @@ namespace dsp
     protected:
         Phasor<double> phasor;
 
-        void synthesizePhasor(float* const* samples,
-            const PRMInfo& phaseInfo, const PRMInfo& widthInfo, int numChannels, int numSamples) noexcept
+        void synthesizePhasor(double* const* samples,
+            const PRMInfoD& phaseInfo, const PRMInfoD& widthInfo, int numChannels, int numSamples) noexcept
         {
             auto smplsL = samples[0];
 
@@ -80,13 +78,13 @@ namespace dsp
                 for (auto s = 0; s < numSamples; ++s)
                 {
                     const auto phase = phasor();
-                    smplsL[s] = static_cast<float>(phase.phase) + phaseInfo[s];
+                    smplsL[s] = phase.phase + phaseInfo[s];
                 }
             else
                 for (auto s = 0; s < numSamples; ++s)
                 {
                     const auto phase = phasor();
-                    smplsL[s] = static_cast<float>(phase.phase) + phaseInfo.val;
+                    smplsL[s] = phase.phase + phaseInfo.val;
                 }
 
             for (auto s = 0; s < numSamples; ++s)
@@ -108,15 +106,15 @@ namespace dsp
             wrapPhasor(smplsR, numSamples);
         }
 
-        void wrapPhasor(float* smpls, int numSamples) noexcept
+        void wrapPhasor(double* smpls, int numSamples) noexcept
         {
             for (auto s = 0; s < numSamples; ++s)
-                if (smpls[s] > 1.f)
+                if (smpls[s] > 1.)
                     --smpls[s];
         }
 
         void processWavetables(const Wavetables& wavetables,
-            float* const* samples, const PRMInfo& wtPosInfo,
+            double* const* samples, const PRMInfoD& wtPosInfo,
             int numChannels, int numSamples) noexcept
         {
             if (wtPosInfo.smoothing)
@@ -144,7 +142,7 @@ namespace dsp
     {
         static constexpr double XFadeLengthMs = 200.;
         static constexpr int NumLFOs = 3;
-        using Mixer = XFadeMixer<NumLFOs>;
+        using Mixer = XFadeMixer<NumLFOs, true>;
         using Wavetables = LFO::Wavetables;
         using LFOs = std::array<LFO, NumLFOs>;
         using Int64 = juce::int64;
@@ -170,19 +168,18 @@ namespace dsp
 
             mixer.prepare(sampleRate, XFadeLengthMs, blockSize);
             
-            const auto fs = static_cast<float>(sampleRate);
-            phasePRM.prepare(fs, blockSize, 20.f);
-            widthPRM.prepare(fs, blockSize, 20.f);
-            wtPosPRM.prepare(fs, blockSize, 14.f);
+            phasePRM.prepare(sampleRate, blockSize, 20.);
+            widthPRM.prepare(sampleRate, blockSize, 20.);
+            wtPosPRM.prepare(sampleRate, blockSize, 14.);
 
             for(auto& lfo: lfos)
                 lfo.prepare(sampleRateInv);
         }
 
-        void operator()(float* const* samples,
+        void operator()(double* const* samples,
             int numChannels, int numSamples,
             PosInfo& transport, double _rateHz, double _rateSync,
-            float phase, float width, float wtPos,
+            double phase, double width, double wtPos,
             bool temposync) noexcept
         {
             const auto phaseInfo = phasePRM(phase, numSamples);
@@ -190,7 +187,7 @@ namespace dsp
             const auto wtPosInfo = wtPosPRM(wtPos, numSamples);
             
 			updateLFO(transport, _rateHz, _rateSync, numSamples, temposync);
-
+            
             {
                 auto& track = mixer[0];
                 auto xSamples = mixer.getSamples(0);
@@ -240,13 +237,16 @@ namespace dsp
                     track.add(samples, xSamples, numChannels, numSamples);
                 }
             }
+
+            for(auto ch = 0; ch < numChannels; ++ch)
+				SIMD::multiply(samples[ch], .999, numSamples);
         }
 
     protected:
         Mixer mixer;
         const Wavetables& wavetables;
         LFOs lfos;
-        PRM phasePRM, widthPRM, wtPosPRM;
+        PRMD phasePRM, widthPRM, wtPosPRM;
         double latency, sampleRate, sampleRateInv, quarterNoteLength, bps;
         double rateHz, rateSync, bpm, inc;
         Int64 posEstimate;
@@ -256,6 +256,16 @@ namespace dsp
         {
             const auto error = std::abs(timeInSamples - posEstimate);
             return error > 1;
+        }
+
+        const bool keepsSpeed(double nBpm, double nInc) const noexcept
+        {
+            return nInc == inc && bpm == nBpm;
+        }
+
+        const bool changesSpeed(double nBpm, double nInc) const noexcept
+        {
+            return !keepsSpeed(nBpm, nInc);
         }
 
         void updateLFO(const PosInfo& transport, double _rateHz, double _rateSync, 
@@ -270,16 +280,6 @@ namespace dsp
             }
             else
 				posEstimate = transport.timeInSamples;
-        }
-
-        bool keepsSpeed(double nBpm, double nInc) const noexcept
-        {
-            return nInc == inc && bpm == nBpm;
-        }
-
-        bool changesSpeed(double nBpm, double nInc) const noexcept
-        {
-            return !keepsSpeed(nBpm, nInc);
         }
 
         void updateSpeed(double nBpm, double _rateHz, double _rateSync,
@@ -307,7 +307,7 @@ namespace dsp
                 rateHz = _rateHz;
                 
                 mixer.init();
-                lfos[mixer.idx].updateSpeed(inc);
+                lfos[mixer.idx].updateSpeed(inc);           
 			}
         }
 
@@ -317,9 +317,7 @@ namespace dsp
             if (temposync)
             {
                 const auto latencyLengthInQuarterNotes = latency / quarterNoteLength;
-                auto ppq = (ppqPosition - latencyLengthInQuarterNotes) * .25;
-                while (ppq < 0.f)
-                    ++ppq;
+                const auto ppq = (ppqPosition - latencyLengthInQuarterNotes) * .25;
                 lfoPhase = ppq / rateSync;
             }
             else

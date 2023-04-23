@@ -102,11 +102,11 @@ namespace dsp
         bool fading;
     };
 
-    template<size_t NumTracks>
+    template<size_t NumTracks, bool Smooth>
     struct XFadeMixer
     {
-        using AudioBuffer = juce::AudioBuffer<float>;
-        static constexpr float Pi = 3.141592653589f;
+        using AudioBuffer = juce::AudioBuffer<double>;
+		static constexpr double Pi = 3.1415926535897932384626433832795;
 
         struct Track
         {
@@ -137,21 +137,23 @@ namespace dsp
 				return destGain != gain;
             }
 
-            void synthesizeGainValues(float* xBuf, int numSamples) noexcept
+            void synthesizeGainValues(double* xBuf, int numSamples) noexcept
             {
                 if (!isFading())
                 {
-                    SIMD::fill(xBuf, static_cast<float>(gain), numSamples);
+                    SIMD::fill(xBuf, gain, numSamples);
                     fading = false;
                     return;
                 }
                 
                 fading = true;
                 synthesizeGainValuesInternal(xBuf, numSamples);
-                makeSmooth(xBuf, numSamples);
+                
+                if(Smooth)
+                    makeSmooth(xBuf, numSamples);
             }
             
-            void copy(float* const* dest, const float* const* src,
+            void copy(double* const* dest, const double* const* src,
                 int numChannels, int numSamples) const noexcept
             {
                 if (fading)
@@ -165,7 +167,7 @@ namespace dsp
                         SIMD::copy(dest[ch], src[ch], numSamples);
             }
 
-            void add(float* const* dest, const float* const* src,
+            void add(double* const* dest, const double* const* src,
                 int numChannels, int numSamples) const noexcept
             {
                 if (fading)
@@ -183,40 +185,40 @@ namespace dsp
         protected:
             bool fading;
             
-            void synthesizeGainValuesInternal(float* xBuf, int numSamples) noexcept
+            void synthesizeGainValuesInternal(double* xBuf, int numSamples) noexcept
             {
                 if (destGain == 1.)
                     for (auto s = 0; s < numSamples; ++s)
                     {
-                        xBuf[s] = static_cast<float>(gain);
+                        xBuf[s] = gain;
                         gain += inc;
                         if (gain >= 1.)
                         {
                             gain = 1.;
                             for (; s < numSamples; ++s)
-                                xBuf[s] = 1.f;
+                                xBuf[s] = gain;
                             return;
                         }
                     }
                 else
                     for (auto s = 0; s < numSamples; ++s)
                     {
-                        xBuf[s] = static_cast<float>(gain);
+                        xBuf[s] = gain;
                         gain -= inc;
                         if (gain < 0.)
                         {
                             gain = 0.;
                             for (; s < numSamples; ++s)
-                                xBuf[s] = 0.f;
+                                xBuf[s] = gain;
                             return;
                         }
                     }
             }
 
-            void makeSmooth(float* xBuf, int numSamples) noexcept
+            void makeSmooth(double* xBuf, int numSamples) const noexcept
             {
                 for (auto s = 0; s < numSamples; ++s)
-                    xBuf[s] = std::cos(xBuf[s] * Pi + Pi) * .5f + .5f;
+                    xBuf[s] = std::cos(xBuf[s] * Pi + Pi) * .5 + .5;
             }
         };
 
@@ -247,12 +249,12 @@ namespace dsp
             tracks[idx].enable();
         }
 
-        float* const* getSamples(int i) noexcept
+        double* const* getSamples(int i) noexcept
         {
             return &buffer.getArrayOfWritePointers()[i * 3];
         }
 
-        const float* const* getSamples(int i) const noexcept
+        const double* const* getSamples(int i) const noexcept
         {
             return &buffer.getArrayOfReadPointers()[i * 3];
         }

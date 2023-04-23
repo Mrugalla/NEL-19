@@ -1,41 +1,44 @@
 #pragma once
+#include <juce_audio_basics/juce_audio_basics.h>
 #include <array>
 #include <limits>
 #include "WHead.h"
 #include "PRM.h"
-#include <JuceHeader.h>
 
 namespace vibrato
 {
-	static constexpr float Pi = 3.14159265358979323846f;
-	static constexpr float PiHalf = Pi / 2.f;
+	//static constexpr double Pi = 3.1415926535897932384626433832795;
+	//static constexpr double PiHalf = Pi / 2.;
 
-	using AudioBuffer = juce::AudioBuffer<float>;
+	using AudioBufferD = juce::AudioBuffer<double>;
 	using WHead = dsp::WHead;
-	using PRMInfo = dsp::PRMInfo;
-	using PRM = dsp::PRM;
-	using LP = smooth::Lowpass<float>;
+	using PRMInfo = dsp::PRMInfo<double>;
+	using PRM = dsp::PRM<double>;
+	using LP = smooth::Lowpass<double>;
 
 	/* buffer, x, size */
-	using InterpolationFunc = float(*)(const float*, float, int) noexcept;
-	using FilterUpdateFunc = void(*)(LP&, float dampFc) noexcept;
+	using InterpolationFunc = double(*)(const double*, double, int) noexcept;
+	using FilterUpdateFunc = void(*)(LP&, double dampFc) noexcept;
 
-	inline float fastTanh2(float x) noexcept
+	template<typename Float>
+	inline Float fastTanh2(Float x) noexcept
 	{
-		return x / (1.f + std::abs(x));
+		return x / (static_cast<Float>(1) + std::abs(x));
 	}
 
-	inline float fastTanh(float x) noexcept
+	template<typename Float>
+	inline Float fastTanh(Float x) noexcept
 	{
 		const auto xx = x * x;
-		auto a = x * (27.f + xx);
-		auto b = 27.f + 9.f * xx;
+		auto a = x * (static_cast<Float>(27) + xx);
+		auto b = static_cast<Float>(27) + static_cast<Float>(9) * xx;
 		return a / b;
 	}
 
-	inline float mix(float a, float b, float m) noexcept
+	template<typename Float>
+	inline Float mix(Float a, Float b, Float m) noexcept
 	{
-		return std::sqrt(1.f - m) * a + std::sqrt(m) * b;
+		return std::sqrt(static_cast<Float>(1) - m) * a + std::sqrt(m) * b;
 	}
 
 	enum class InterpolationType
@@ -68,35 +71,35 @@ namespace vibrato
 		return InterpolationType::NumInterpolationTypes;
 	}
 
-	inline float lerp(const float* buffer, float x, int size) noexcept
+	inline double lerp(const double* buffer, double x, int size) noexcept
 	{
 		return interpolation::lerp(buffer, x, size);
 	}
 
-	inline float cubic(const float* buffer, float x, int size) noexcept
+	inline double cubic(const double* buffer, double x, int size) noexcept
 	{
 		return interpolation::cubicHermiteSpline(buffer, x, size);
 	}
 
-	inline void noUpdate(LP&, float) noexcept {} // yes, this is important
+	inline void noUpdate(LP&, double) noexcept {} // yes, this is important
 
-	inline void updateFilter(LP& lp, float dampFc) noexcept
+	inline void updateFilter(LP& lp, double dampFc) noexcept
 	{
 		lp.makeFromDecayInFc(dampFc);
 	}
 
-	inline float waveshape(float x) noexcept
+	inline double waveshape(double x) noexcept
 	{
-		return -.405548f * x * x * x + 1.34908f * x;
+		return -.405548 * x * x * x + 1.34908 * x;
 	}
 
 	struct SamplePair
 	{
-		float sIn, sOut;
+		double sIn, sOut;
 	};
 
-	inline SamplePair getDelayPair(float* smpls, const float* ring, const InterpolationFunc& interpolate,
-		LP& lp, float r, float feedback, int size, int s) noexcept
+	inline SamplePair getDelayPair(double* smpls, const double* ring, const InterpolationFunc& interpolate,
+		LP& lp, double r, double feedback, int size, int s) noexcept
 	{
 		const auto sOut = interpolate(ring, r, size);
 		const auto sLP = lp(sOut);
@@ -105,8 +108,8 @@ namespace vibrato
 		return { sIn, sOut };
 	}
 	
-	inline SamplePair getAllpassPair(float*, const float*, const InterpolationFunc&,
-		float, float, int, int) noexcept
+	inline SamplePair getAllpassPair(double*, const double*, const InterpolationFunc&,
+		double, double, int, int) noexcept
 	{
 		return { 0.f, 0.f };
 	}
@@ -117,7 +120,7 @@ namespace vibrato
 			interpolationFuncs{ &lerp, &cubic },
 			filterUpdateFuncs{ &noUpdate, &updateFilter },
 			ringBuffer(),
-			delaySize(0.f), delayMid(0.f), delayMax(0.f),
+			delaySize(0.), delayMid(0.), delayMax(0.),
 			delaySizeInt(0)
 		{
 		}
@@ -126,13 +129,13 @@ namespace vibrato
 		{
 			delaySizeInt = s;
 			ringBuffer.setSize(2, delaySizeInt, false, true, false);
-			delaySize = static_cast<float>(s);
-			delayMid = s * .5f;
-			delayMax = delaySize - 1.f;
+			delaySize = static_cast<double>(delaySizeInt);
+			delayMax = delaySize - 1.;
+			delayMid = delaySize * .5;
 		}
 
-		void operator()(float* const* samples, int numChannels, int numSamples,
-			float* const* vibBuf, const int* wHead, const float* fbBuf, const PRMInfo& dampFcInfo,
+		void operator()(double* const* samples, int numChannels, int numSamples,
+			double* const* vibBuf, const int* wHead, const double* fbBuf, const PRMInfo& dampFcInfo,
 			InterpolationType interpolationType) noexcept
 		{
 			synthesizeReadHead(numChannels, numSamples, vibBuf, wHead);
@@ -164,8 +167,8 @@ namespace vibrato
 			}
 		}
 
-		void processNoDepth(float* const* samples, int numChannels, int numSamples,
-			const int* wHead)
+		void processNoDepth(double* const* samples, int numChannels, int numSamples,
+			const int* wHead) noexcept
 		{
 			auto ringBuf = ringBuffer.getArrayOfWritePointers();
 
@@ -185,8 +188,8 @@ namespace vibrato
 			}
 		}
 		
-		void processFF(float* const* samples, int numChannels, int numSamples,
-			float* depthBuf, const int* wHead,
+		void processFF(double* const* samples, int numChannels, int numSamples,
+			double* depthBuf, const int* wHead,
 			InterpolationType interpolationType) noexcept
 		{
 			synthesizeReadHeadFF(numSamples, depthBuf, wHead);
@@ -214,38 +217,41 @@ namespace vibrato
 		std::array<InterpolationFunc, 2> interpolationFuncs;
 		std::array<FilterUpdateFunc, 2> filterUpdateFuncs;
 		std::array<LP, 2> lps;
-		AudioBuffer ringBuffer;
-		float delaySize, delayMid, delayMax;
+		AudioBufferD ringBuffer;
+		double delaySize, delayMid, delayMax;
 		int delaySizeInt;
 
-		void synthesizeReadHead(int numChannels, int numSamples, float* const* vibBuf, const int* wHead) noexcept
+		void synthesizeReadHead(int numChannels, int numSamples, double* const* vibBuf, const int* wHead) noexcept
 		{
 			for (auto ch = 0; ch < numChannels; ++ch)
 			{
 				auto buf = vibBuf[ch];
-				// map buffer [-1, 1] to [0, delaySize]
-				juce::FloatVectorOperations::multiply(buf, delayMid, numSamples);
-				juce::FloatVectorOperations::add(buf, delayMid, numSamples);
+				// map buffer [-1, 1] to [0, 2]
+				juce::FloatVectorOperations::add(buf, 1., numSamples);
+				// map buffer [0, 2] to [0, delayMax]
+				juce::FloatVectorOperations::multiply(buf, .5 * delayMax, numSamples);
+					
 				synthesizeReadHead(buf, numSamples, wHead);
 			}
 		}
 
-		void synthesizeReadHeadFF(int numSamples, float* depthBuf, const int* wHead) noexcept
+		void synthesizeReadHeadFF(int numSamples, double* depthBuf, const int* wHead) noexcept
 		{
-			// map from [0, 1] to [delaySizeHalf, 0]
+			// map from [0, 1] to [1, 0]
 			for (auto s = 0; s < numSamples; ++s)
-				depthBuf[s] = 1.f - depthBuf[s];
+				depthBuf[s] = 1. - depthBuf[s];
+			// map from [1, 0] to [delayMid, 0]
 			juce::FloatVectorOperations::multiply(depthBuf, delayMid, numSamples);
 			synthesizeReadHead(depthBuf, numSamples, wHead);
 		}
 
-		void synthesizeReadHead(float* buf, int numSamples, const int* wHead) noexcept
+		void synthesizeReadHead(double* buf, int numSamples, const int* wHead) noexcept
 		{
 			for (auto s = 0; s < numSamples; ++s)
 			{
 				const auto dly = buf[s];
-				auto rh = static_cast<float>(wHead[s]) - dly;
-				if (rh < 0.f)
+				auto rh = static_cast<double>(wHead[s]) - dly;
+				if (rh < 0.)
 					rh += delaySize;
 
 				buf[s] = rh;
@@ -266,26 +272,26 @@ namespace vibrato
 		{
 		}
 		
-		void prepare(float Fs, int blockSize, int _delaySize)
+		void prepare(double Fs, int blockSize, int _delaySize)
 		{
 			size = _delaySize;
 			wHead.prepare(blockSize, size);
 			vibrato.prepare(size);
 			delayFF.prepare(size);
-			feedbackPRM.prepare(Fs, blockSize, 8.f);
-			dampPRM.prepare(Fs, blockSize, 13.f);
+			feedbackPRM.prepare(Fs, blockSize, 8.);
+			dampPRM.prepare(Fs, blockSize, 13.);
 
-			fsInv = 1.f / Fs;
+			fsInv = 1. / Fs;
 		}
 
 		/* samples, numChannels, numSamples, vibBuf, depthBuf[0,1], feedback[-1,1], dampHz[1, N], lookaheadEnabled */
-		void operator()(float* const* samples, int numChannels, int numSamples,
-			float* const* vibBuf, float* depthBuf, float feedback, float dampHz, InterpolationType interpolationType,
+		void operator()(double* const* samples, int numChannels, int numSamples,
+			double* const* vibBuf, double* depthBuf, double feedback, double dampHz, InterpolationType interpolationType,
 			bool lookaheadEnabled) noexcept
 		{
 			wHead(numSamples);
 			
-			const bool isVibrating = depthBuf[0] != 0.f;
+			const bool isVibrating = depthBuf[0] != 0.;
 
 			if (isVibrating)
 			{
@@ -322,9 +328,9 @@ namespace vibrato
 				);
 		}
 		
-		float getSizeInMs(float Fs) const noexcept
+		double getSizeInMs(double Fs) const noexcept
 		{
-			return 1000.f * static_cast<float>(size) / Fs;
+			return 1000. * static_cast<double>(size) / Fs;
 		}
 		
 		int getLatency() const noexcept
@@ -336,7 +342,7 @@ namespace vibrato
 		PRM feedbackPRM, dampPRM;
 		WHead wHead;
 		Delay vibrato, delayFF;
-		float fsInv;
+		double fsInv;
 		int size;
 		
 		const size_t ringBufferSize() const noexcept

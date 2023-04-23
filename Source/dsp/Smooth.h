@@ -7,7 +7,7 @@ namespace smooth
 	struct Block
 	{
 		/* startVal */
-		Block(float = 0.f);
+		Block(Float = static_cast<Float>(0));
 
 		/* bufferOut, bufferIn, numSamples */
 		void operator()(Float*, Float*, int) noexcept;
@@ -73,7 +73,7 @@ namespace smooth
 		/* freqHz, Fs */
 		void makeFromFreqInHz(Float, Float) noexcept;
 
-		Smooth(float /*startVal*/ = 0.f);
+		Smooth(Float /*startVal*/ = static_cast<Float>(0));
 
 		/* bufferOut, bufferIn, numSamples */
 		void operator()(Float*, Float*, int) noexcept;
