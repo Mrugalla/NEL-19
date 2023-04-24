@@ -249,9 +249,7 @@ namespace vibrato
 	// of some ModType (like perlin, audiorate, dropout etc.)
 	class Modulator
 	{
-		static constexpr double SafetyCoeff = .99;
 		using Buffer = std::array<std::vector<double>, 4>;
-		using BeatsData = modSys6::BeatsData;
 		using Tables = dsp::LFOTables;
 
 		using PlayHead = juce::AudioPlayHead;
@@ -418,7 +416,7 @@ namespace vibrato
 						for (auto s = 0; s < numSamples; ++s)
 						{
 							bufNotes[s] = currentValue;
-							bufEnv[s] = env() * SafetyCoeff;
+							bufEnv[s] = env();
 						}
 					}	
 					else
@@ -431,7 +429,7 @@ namespace vibrato
 							if (ts > s)
 							{
 								bufNotes[s] = currentValue;
-								bufEnv[s] = env() * SafetyCoeff;
+								bufEnv[s] = env();
 							}
 							else
 							{
@@ -467,7 +465,7 @@ namespace vibrato
 									}
 								}
 								bufNotes[s] = currentValue;
-								bufEnv[s] = env(noteOn) * SafetyCoeff;
+								bufEnv[s] = env(noteOn);
 							}
 						}
 					}
@@ -1012,7 +1010,7 @@ namespace vibrato
 			{
 				temposync = _temposync;
 				rateHz = _rateHz;
-				rateSync = _rateSync;
+				rateSync = 1. / _rateSync;
 				wtPos = _wtPos;
 				phase = _phase;
 				width = _width;

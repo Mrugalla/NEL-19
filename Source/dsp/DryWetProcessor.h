@@ -146,7 +146,7 @@ namespace drywet
 			if (gainWet != _gainWet)
 			{
 				gainWet = _gainWet;
-				gainWetVal = juce::Decibels::decibelsToGain(gainWet);
+				gainWetVal = juce::Decibels::decibelsToGain(gainWet, -120.);
 			}
 			{
 				auto gainWetSmoothing = gainWetSmooth(bufs[kGainWet], gainWetVal, numSamples);

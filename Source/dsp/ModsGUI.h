@@ -752,25 +752,25 @@ namespace modSys6
 
             ModCompLFO(Utils& u, std::vector<Paramtr*>& modulatables, dsp::LFOTables& _tables, int mOff = 0) :
                 Comp(u, "", CursorType::Default),
-                layout(
-                    { 50, 50, 50, 50, 50 },
-                    { 80, 40 }
+                layout
+                (
+                    { 13, 8, 8, 13 },
+                    { 8, 3 }
                 ),
                 params
                 {
-                    Paramtr(u, "sync", "Switch between free running and temposync LFOs.", withOffset(PID::LFO0FreeSync, mOff), modulatables, ParameterType::Switch),
+                    Paramtr(u, "sync", "Switch between LFO rates in hz and temposync values.", withOffset(PID::LFO0FreeSync, mOff), modulatables, ParameterType::Switch),
                     Paramtr(u, "Rate", "Adjust the frequency of the LFO in hz.", withOffset(PID::LFO0RateFree, mOff), modulatables),
                     Paramtr(u, "Rate", "Adjust the frequency of the LFO in beats.", withOffset(PID::LFO0RateSync, mOff), modulatables),
-                    Paramtr(u, "WT", "Interpolate between the LFO's waveforms.", withOffset(PID::LFO0Waveform, mOff), modulatables),
+                    Paramtr(u, "WT", "Interpolate between the waveforms of the selected wavetable.", withOffset(PID::LFO0Waveform, mOff), modulatables),
                     Paramtr(u, "Phase", "Add a phase offset to the LFO.", withOffset(PID::LFO0Phase, mOff), modulatables),
-                    Paramtr(u, "Width", "Add a phase offset to the right/side channel.", withOffset(PID::LFO0Width, mOff), modulatables)
+                    Paramtr(u, "Width", "Add a phase offset to the right channel of the LFO.", withOffset(PID::LFO0Width, mOff), modulatables)
                 },
                 lfoWaveformParam(*u.getParam(PID::LFO0Waveform, mOff)),
                 tables(_tables),
                 tableView(u, "Here you can admire this LFO's current waveform.", tables),
                 wavetableBrowser(u),
                 browserButton(u, "Click here to explore the wavetable browser."),
-                btmText(""),
                 isSync(-1)
             {
                 addAndMakeVisible(tableView);
@@ -795,17 +795,16 @@ namespace modSys6
                 for (auto& p : params)
                     randomizer.add(&p);
                 randomizer.add([this](juce::Random& rand)
+                {
+                    auto val = static_cast<int>(std::floor(rand.nextFloat() * 3.f));
+                    switch (val)
                     {
-                        auto val = static_cast<int>(std::floor(rand.nextFloat() * 3.f));
-                        switch (val)
-                        {
-                        case 0: tables.makeTablesSinc(); break;
-                        case 1: tables.makeTablesTriangles(); break;
-                        case 2: tables.makeTablesWeierstrasz(); break;
-                        }
-                        tableView.repaint();
+                    case 0: tables.makeTablesSinc(); break;
+                    case 1: tables.makeTablesTriangles(); break;
+                    case 2: tables.makeTablesWeierstrasz(); break;
                     }
-                );
+                    tableView.repaint();
+                });
                 setVisible(true);
             }
             
@@ -819,7 +818,6 @@ namespace modSys6
             WTView tableView;
             Browser wavetableBrowser;
             Button browserButton;
-            juce::String btmText;
             int isSync;
 
             void mouseEnter(const juce::MouseEvent& evt) override
@@ -827,35 +825,33 @@ namespace modSys6
                 Comp::mouseEnter(evt);
             }
 
-            void paint(juce::Graphics& g) override
+            void paint(juce::Graphics&) override
             {
-                g.setColour(Shared::shared.colour(ColourID::Txt));
-                g.drawFittedText(btmText, getLocalBounds(), juce::Justification::bottomRight, 1);
             }
 
             void resized() override
             {
                 layout.setBounds(getLocalBounds().toFloat());
                 layout.place(params[IsSync],    0, 1, 1, 1, 0.f, true);
-                layout.place(params[RateFree],  0, 0, 1, 1, 0.f, true);
-                layout.place(params[RateSync],  0, 0, 1, 1, 0.f, true);
-                layout.place(params[Waveform],  1, 0, 1, 1, 0.f, true);
-                layout.place(params[Width],     2, 0, 1, 1, 0.f, true);
-                layout.place(params[Phase],     3, 0, 1, 1, 0.f, true);
+                layout.place(params[RateFree],  0, 0, 1, 1, 0.f, false);
+                layout.place(params[RateSync],  0, 0, 1, 1, 0.f, false);
+                layout.place(params[Waveform],  1, 0, 1, 1, 0.f, false);
+                layout.place(params[Width],     2, 0, 1, 1, 0.f, false);
+                layout.place(params[Phase],     2, 1, 1, 1, 0.f, false);
 
                 layout.place(browserButton,     1, 1, 1, 1, 0.f, true);
                 layout.place(tableView,         3, 0, 2, 2, 0.f, false);
-                layout.place(wavetableBrowser,  2, 0, 3, 2, 0.f, false);
+                layout.place(wavetableBrowser,  2, 0, 3, 2);
             }
 
             void timerCallback() override
             {
                 tableView.update(lfoWaveformParam.getValueSum());
 
-                if (this->utils.hasPlayHead())
+                if (utils.hasPlayHead())
                 {
                     params[IsSync].setVisible(true);
-                    const auto isSyncParam = this->utils.getParam(params[IsSync].getPID());
+                    const auto isSyncParam = utils.getParam(params[IsSync].getPID());
                     const auto _isSync = isSyncParam->getValueSum() < .5f ? 0 : 1;
                     if (isSync != _isSync)
                     {
@@ -863,29 +859,13 @@ namespace modSys6
                         params[RateSync].setVisible(isSync);
                         params[RateFree].setVisible(!isSync);
                     }
-                    else
-                    {
-                        const auto phaseParam = utils.getParam(params[Phase].getPID());
-                        if (phaseParam->getValSumDenorm() != 0.f)
-                        {
-                            if (btmText.isEmpty())
-                                btmText = "<procedrl>";
-                            repaint();
-                        }
-                        else
-                        {
-							if (!btmText.isEmpty())
-								btmText = "";
-                            repaint();
-                        }
-                    }
                 }
                 else
                 {
                     params[IsSync].setVisible(false);
                     params[RateSync].setVisible(false);
                     params[RateFree].setVisible(true);
-                    const auto isSyncParam = this->utils.getParam(params[IsSync].getPID());
+                    const auto isSyncParam = utils.getParam(params[IsSync].getPID());
                     if (isSyncParam->getValueSum() > .5f)
                         isSyncParam->setValueWithGesture(0.f);
                 }
@@ -896,7 +876,8 @@ namespace modSys6
             {
                 addChildComponent(wavetableBrowser);
                 
-                wavetableBrowser.addEntry(
+                wavetableBrowser.addEntry
+                (
                     "Weierstrasz",
                     "Modulate the vibrato with mesmerizing weierstrasz sinusoids.",
                     [this]()
@@ -906,7 +887,8 @@ namespace modSys6
                         wavetableBrowser.setVisible(false);
                     }
                 );
-                wavetableBrowser.addEntry(
+                wavetableBrowser.addEntry
+                (
                     "Triangles",
                     "Resample the signal with rich triangular textures.",
                     [this]()
@@ -916,7 +898,8 @@ namespace modSys6
                         wavetableBrowser.setVisible(false);
                     }
                 );
-                wavetableBrowser.addEntry(
+                wavetableBrowser.addEntry
+                (
                     "Sinc",
                     "Everyone loves a good sinc function.",
                     [this]()

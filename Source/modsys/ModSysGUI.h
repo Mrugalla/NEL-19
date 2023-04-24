@@ -1509,17 +1509,31 @@ namespace modSys6
                 void mouseDrag(const juce::MouseEvent& evt) override
                 {
                     if (!isSelected() || paramtr.isLocked()) return;
-                    const auto dragYNew = evt.position.y / this->utils.getDragSpeed();
+
+                    auto mms = juce::Desktop::getInstance().getMainMouseSource();
+                    mms.enableUnboundedMouseMovement(true, false);
+                    
+                    const auto dragYNew = evt.position.y / utils.getDragSpeed();
                     const auto sensitive = evt.mods.isShiftDown() ? SensitiveDrag : 1.f;
                     const auto dragMove = (dragYNew - dragY) * sensitive;
-                    const auto depth = juce::jlimit(-1.f, 1.f, this->utils.getConnecDepth(connecIdx) - dragMove);
-                    this->utils.setConnecDepth(connecIdx, depth);
+                    const auto depth = juce::jlimit(-1.f, 1.f, utils.getConnecDepth(connecIdx) - dragMove);
+                    utils.setConnecDepth(connecIdx, depth);
                     dragY = dragYNew;
                 }
                 
                 void mouseUp(const juce::MouseEvent& evt) override
                 {
-                    if (evt.mouseWasDraggedSinceMouseDown()) return;
+                    if (evt.mouseWasDraggedSinceMouseDown())
+                    {
+                        if (!isSelected() || paramtr.isLocked())
+                            return;
+                        
+                        auto mms = juce::Desktop::getInstance().getMainMouseSource();
+                        const juce::Point<int> centre(getWidth() / 2, getHeight() / 2);
+                        mms.setScreenPosition((getScreenPosition() + centre).toFloat());
+                        mms.enableUnboundedMouseMovement(false, true);
+                        return;
+                    }
                     else if (evt.mods.isLeftButtonDown()) return;
                     else if (!isSelected()) return;
                     // right clicks only
@@ -2584,7 +2598,7 @@ namespace modSys6
                 repaint();
             }
 
-            juce::String makeTooltip()
+            String makeTooltip()
             {
                 juce::Random rand;
                 static constexpr float count = 187.f;

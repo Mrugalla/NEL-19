@@ -27,8 +27,8 @@ Nel19AudioProcessor::Nel19AudioProcessor()
     modsBuffer(),
     modType
     {
-        vibrato::ModType::Perlin,
-        vibrato::ModType::LFO
+        vibrato::ModType::LFO,
+        vibrato::ModType::Perlin
     },
     vibrat(),
     visualizerValues{ 0., 0. },

@@ -3,12 +3,14 @@
 
 namespace modSys6
 {
+	using String = juce::String;
+
 	inline float nextLowestPowTwoX(float x) noexcept
 	{
 		return std::pow(2.f, std::floor(std::log2(x)));
 	}
 
-	inline bool stringNegates(const juce::String& t)
+	inline bool stringNegates(const String& t)
 	{
 		return t == "off"
 			|| t == "false"
@@ -36,7 +38,7 @@ namespace modSys6
 	static constexpr float piQuart = .785398163397f;
 	static constexpr float piInv = 1.f / pi;
 
-	inline juce::String toID(const juce::String& name)
+	inline String toID(const String& name)
 	{
 		return name.toLowerCase().removeCharacters(" ");
 	}
@@ -70,7 +72,7 @@ namespace modSys6
 	static constexpr int NumParamsPerMod = static_cast<int>(PID::Perlin1RateHz) - NumMSParams;
 	static constexpr int NumParams = static_cast<int>(PID::NumParams);
 	
-	inline juce::String toString(PID pID)
+	inline String toString(PID pID)
 	{
 		switch (pID)
 		{
@@ -170,7 +172,7 @@ namespace modSys6
 
 	enum class Unit { Percent, Hz, Beats, Degree, Octaves, Semi, Fine, Ms, Decibel, Power, PerlinShape, PerlinRandType, NumUnits };
 	
-	inline juce::String toString(Unit pID)
+	inline String toString(Unit pID)
 	{
 		switch (pID)
 		{
@@ -191,7 +193,7 @@ namespace modSys6
 	
 	static constexpr int NumModTypes = static_cast<int>(ModType::NumTypes);
 	
-	inline juce::String toString(ModType t)
+	inline String toString(ModType t)
 	{
 		switch (t)
 		{
@@ -219,38 +221,17 @@ namespace modSys6
 		
 	};
 	
-	inline juce::String toString(ModTypeContext mtc)
+	inline String toString(ModTypeContext mtc)
 	{
 		return toString(mtc.type) + juce::String(mtc.idx);
 	}
 
-	using ValToStrFunc = std::function<juce::String(float)>;
-	using StrToValFunc = std::function<float(const juce::String&)>;
-
-	enum class BeatType { Whole, Triplet, Dotted, NumTypes };
-	
-	inline juce::String toString(BeatType t)
-	{
-		switch (t)
-		{
-		case BeatType::Whole: return "";
-		case BeatType::Triplet: return "t";
-		case BeatType::Dotted: return ".";
-		default: return "";
-		}
-	}
-	
-	inline juce::String toString(float whole, BeatType t)
-	{
-		if(whole >= 1.f)
-			return "1/" + juce::String(whole) + toString(t);
-		else
-			return juce::String(1.f / whole) + "/1" + toString(t);
-	}
+	using ValToStrFunc = std::function<String(float)>;
+	using StrToValFunc = std::function<float(const String&)>;
 
 	enum class WaveForm { Sine, Triangle, Saw, Square, Noise, NumWaveForms };
 	
-	inline juce::String toString(WaveForm wf)
+	inline String toString(WaveForm wf)
 	{
 		switch (wf)
 		{
@@ -277,36 +258,11 @@ namespace modSys6
 		juce::Identifier mod{ "mod" };
 	};
 
-	namespace beats
-	{
-		struct Beat
-		{
-			Beat(float v, const juce::String& s) :
-				val(1.f / v),
-				str(s)
-			{}
-			const float val;
-			const juce::String str;
-		};
-		
-		inline void create(std::vector<Beat>& beats, const float min, const float max)
-		{
-			auto c = 1.f / min;
-			beats.push_back({ c, toString(c, BeatType::Whole) });
-			while (c > 1.f / max) {
-				c *= .5f;
-				beats.push_back({ c * 7.f / 4.f, toString(c, BeatType::Dotted) });
-				beats.push_back({ c * 5.f / 3.f, toString(c, BeatType::Triplet) });
-				beats.push_back({ c, toString(c, BeatType::Whole) });
-			}
-		}
-	}
-
-	using BeatsData = std::vector<modSys6::beats::Beat>;
+	using Range = juce::NormalisableRange<float>;
 
 	namespace makeRange
 	{
-		inline juce::NormalisableRange<float> bias(float start, float end, float bias) noexcept
+		inline Range bias(float start, float end, float bias) noexcept
 		{
 			if (bias > 0.f)
 				return
@@ -339,7 +295,7 @@ namespace modSys6
 			else return { start, end };
 		}
 
-		inline juce::NormalisableRange<float> biasXL(float start, float end, float bias) noexcept
+		inline Range biasXL(float start, float end, float bias) noexcept
 		{
 			// https://www.desmos.com/calculator/ps8q8gftcr
 			const auto a = bias * .5f + .5f;
@@ -375,7 +331,7 @@ namespace modSys6
 			else return { start, end };
 		}
 
-		inline juce::NormalisableRange<float> withCentre(float start, float end, float centre) noexcept
+		inline Range withCentre(float start, float end, float centre) noexcept
 		{
 			const auto r = end - start;
 			const auto v = (centre - start) / r;
@@ -383,7 +339,7 @@ namespace modSys6
 			return biasXL(start, end, 2.f * v - 1.f);
 		}
 
-		inline juce::NormalisableRange<float> quad(float min, float max, int numSteps) noexcept
+		inline Range quad(float min, float max, int numSteps) noexcept
 		{
 			return
 			{
@@ -408,17 +364,17 @@ namespace modSys6
 			};
 		}
 
-		inline juce::NormalisableRange<float> stepped(float start, float end, float steps = 1.f) noexcept
+		inline Range stepped(float start, float end, float steps = 1.f) noexcept
 		{
 			return { start, end, steps };
 		}
 
-		inline juce::NormalisableRange<float> temposync(int numSteps)
+		inline Range temposync(int numSteps)
 		{
 			return stepped(0.f, static_cast<float>(numSteps));
 		}
 
-		inline juce::NormalisableRange<float> beats(float minDenominator, float maxDenominator, bool withZero)
+		inline Range beats(float minDenominator, float maxDenominator, bool withZero)
 		{
 			std::vector<float> table;
 
@@ -491,12 +447,88 @@ namespace modSys6
 			return range;
 		}
 
-		inline juce::NormalisableRange<float> toggle() noexcept
+		inline Range beatsSlowToFast(float maxDenominator, float minDenominator, bool withZero)
+		{
+			std::vector<float> table;
+
+			const auto minV = std::log2(minDenominator);
+			const auto maxV = std::log2(maxDenominator);
+
+			const auto numWholeBeatsF = static_cast<float>(minV - maxV);
+			const auto numWholeBeatsInv = 1.f / numWholeBeatsF;
+
+			const auto numWholeBeats = static_cast<int>(numWholeBeatsF);
+			const auto numValues = numWholeBeats * 3 + 1 + (withZero ? 1 : 0);
+			table.reserve(numValues);
+			
+			if (withZero)
+				table.emplace_back(0.f);
+			for (auto i = 0; i < numWholeBeats; ++i)
+			{
+				const auto iF = static_cast<float>(i);
+				const auto x = iF * numWholeBeatsInv;
+
+				const auto curV = maxV + x * numWholeBeatsF;
+				const auto baseVal = std::pow(2.f, curV);
+
+				const auto valWhole = 1.f / baseVal;
+				const auto valDotted = valWhole * .75f;
+				const auto valTriplet = valWhole * .66666666667f;
+				
+				table.emplace_back(valWhole);
+				table.emplace_back(valDotted);
+				table.emplace_back(valTriplet);				
+			}
+			table.emplace_back(1.f / minDenominator);
+
+			for (auto i = (withZero ? 1 : 0); i < table.size(); ++i)
+				table[i] = 1.f / table[i];
+
+			static constexpr float Eps = 1.f - std::numeric_limits<float>::epsilon();
+			static constexpr float EpsInv = 1.f / Eps;
+
+			const auto numValuesF = static_cast<float>(numValues);
+			const auto numValuesInv = 1.f / numValuesF;
+			const auto numValsX = numValuesInv * EpsInv;
+			const auto normValsY = numValuesF * Eps;
+			
+			juce::NormalisableRange<float> range
+			{
+				table.front(), table.back(),
+				[table, normValsY](float, float, float normalized)
+				{
+					const auto valueIdx = normalized * normValsY;
+					return table[static_cast<int>(valueIdx)];
+				},
+				[table, numValsX](float, float, float denormalized)
+				{
+					for (auto i = 0; i < table.size(); ++i)
+						if (denormalized <= table[i])
+							return static_cast<float>(i) * numValsX;
+					return 0.f;
+				},
+				[table, numValsX](float start, float end, float denormalized)
+				{
+					auto closest = table.front();
+					for (auto i = 0; i < table.size(); ++i)
+					{
+						const auto diff = std::abs(table[i] - denormalized);
+						if (diff < std::abs(closest - denormalized))
+							closest = table[i];
+					}
+					return juce::jlimit(start, end, closest);
+				}
+			};
+
+			return range;
+		}
+
+		inline Range toggle() noexcept
 		{
 			return stepped(0.f, 1.f);
 		}
 
-		inline juce::NormalisableRange<float> lin(float start, float end) noexcept
+		inline Range lin(float start, float end) noexcept
 		{
 			const auto range = end - start;
 
@@ -523,7 +555,7 @@ namespace modSys6
 	struct Param :
 		public juce::AudioProcessorParameter
 	{
-		Param(const PID pID, const juce::NormalisableRange<float>& _range, const float _valDenormDefault,
+		Param(const PID pID, const Range& _range, const float _valDenormDefault,
 			const ValToStrFunc& _valToStr, const StrToValFunc& _strToVal,
 			const Unit _unit = Unit::NumUnits, const ModTypeContext _attachedMod = ModTypeContext(ModType::None, -1)) :
 
@@ -541,7 +573,7 @@ namespace modSys6
 		{
 		}
 		
-		Param(const int pID, const juce::NormalisableRange<float>& _range, const float _valDenormDefault,
+		Param(const int pID, const Range& _range, const float _valDenormDefault,
 			const ValToStrFunc& _valToStr, const StrToValFunc& _strToVal,
 			const Unit _unit, const ModTypeContext _attachedMod = ModTypeContext(ModType::None, -1)) :
 
@@ -580,25 +612,25 @@ namespace modSys6
 
 		float getDefaultValue() const override { return range.convertTo0to1(valDenormDefault); }
 
-		juce::String getName(int) const override { return toString(id); }
+		String getName(int) const override { return toString(id); }
 
 		// units of param (hz, % etc.)
-		juce::String getLabel() const override { return toString(unit); }
+		String getLabel() const override { return toString(unit); }
 
 		// string of norm val
-		juce::String getText(float norm, int) const override
+		String getText(float norm, int) const override
 		{
 			return valToStr(range.snapToLegalValue(range.convertFrom0to1(norm)));
 		}
 
 		// string to norm val
-		float getValueForText(const juce::String& text) const override
+		float getValueForText(const String& text) const override
 		{
 			const auto val = juce::jlimit(range.start, range.end, strToVal(text));
 			return range.convertTo0to1(val);
 		}
 		// string to denorm val
-		float getValForTextDenorm(const juce::String& text) const { return strToVal(text); }
+		float getValForTextDenorm(const String& text) const { return strToVal(text); }
 
 		void processBlockInit() noexcept
 		{
@@ -624,13 +656,9 @@ namespace modSys6
 			auto v = getValue();
 			return getName(10) + ": " + juce::String(v) + "; " + getText(v, 10) + "; attached to " + toString(attachedMod);
 		}
-		void dbg()
-		{
-			DBG(_toString());
-		}
 
 		const PID id;
-		const juce::NormalisableRange<float> range;
+		const Range range;
 		const ModTypeContext attachedMod;
 	protected:
 		const float valDenormDefault;
@@ -644,7 +672,7 @@ namespace modSys6
 
 	struct Params
 	{
-		int getDigitFromString(const juce::String& txt) noexcept
+		int getDigitFromString(const String& txt) noexcept
 		{
 			for (auto t = 0; t < txt.length(); ++t)
 			{
@@ -655,12 +683,10 @@ namespace modSys6
 			return -1;
 		}
 
-		Params(juce::AudioProcessor& audioProcessor, BeatsData& beatsData) :
+		Params(juce::AudioProcessor& audioProcessor) :
 			params()
 		{
-			beats::create(beatsData, 1.f / 64.f, 8.f);
-
-			const auto strToValDivision = [](const juce::String& txt, const float altVal)
+			const auto strToValDivision = [](const String& txt, const float altVal)
 			{
 				if (txt.contains(":") || txt.contains("/"))
 				{
@@ -699,7 +725,6 @@ namespace modSys6
 						return juce::String(v).substring(0, 1) + " mhz";
 				}
 			};
-			const ValToStrFunc valToStrBeats = [&bts = beatsData](float v) { return bts[static_cast<int>(v)].str; };
 			const ValToStrFunc valToStrPhase = [](float v) { return juce::String(std::floor(v * 180.f)) + " " + toString(Unit::Degree); };
 			const ValToStrFunc valToStrPhase360 = [](float v) { return juce::String(std::floor(v * 360.f)) + " " + toString(Unit::Degree); };
 			const ValToStrFunc valToStrOct = [](float v) { return juce::String(std::round(v)) + " " + toString(Unit::Octaves); };
@@ -715,7 +740,14 @@ namespace modSys6
 			const ValToStrFunc valToStrFreeSync = [](float v) { return v > .5f ? juce::String("sync") : juce::String("free"); };
 			const ValToStrFunc valToStrPolarity = [](float v) { return v > .5f ? juce::String("on") : juce::String("off"); };
 			const ValToStrFunc valToStrMs = [](float v) { return juce::String(std::floor(v * 10.f) * .1f) + " " + toString(Unit::Ms); };
-			const ValToStrFunc valToStrDb = [](float v) { return juce::String(std::floor(v * 100.f) * .01f) + " " + toString(Unit::Decibel); };
+			const ValToStrFunc valToStrDb = [](float v)
+			{
+				v = std::round(v * 100.f) * .01f;
+				if(v > -120.f)
+					return juce::String(v) + " " + toString(Unit::Decibel);
+				else
+					return juce::String("-inf ") + toString(Unit::Decibel);;
+			};
 			const ValToStrFunc valToStrEmpty = [](float) { return juce::String(""); };
 			const ValToStrFunc valToStrSeed = [](float v)
 			{
@@ -755,6 +787,36 @@ namespace modSys6
 
 				return juce::String(numerator) + " / " + juce::String(denominator) + modeStr;
 			};
+			const ValToStrFunc valToStrBeatsSlowToFast = [](float v)
+			{
+				enum Mode { Whole, Triplet, Dotted, NumModes };
+
+				if (v == 0.f)
+					return juce::String("0");
+
+				v = 1.f / v;
+
+				const auto denormFloor = nextLowestPowTwoX(v);
+				const auto denormFrac = v - denormFloor;
+				const auto modeVal = denormFrac / denormFloor;
+				const auto mode = modeVal >= .5f ? Mode::Dotted :
+					modeVal >= .333f ? Mode::Triplet :
+					Mode::Whole;
+				const auto modeStr = mode == Mode::Whole ? juce::String("") :
+					mode == Mode::Triplet ? juce::String("t") :
+					juce::String(".");
+
+				auto denominator = 1.f / denormFloor;
+				auto numerator = 1.f;
+				if (denominator < 1.f)
+				{
+					numerator = denormFloor;
+					denominator = 1.f;
+				}
+
+				return juce::String(numerator) + " / " + juce::String(denominator) + modeStr;
+			};
+
 			const ValToStrFunc valToStrPower = [](float v)
 			{
 				return juce::String((v > .5f ? "Enabled" : "Disabled"));
@@ -786,13 +848,6 @@ namespace modSys6
 
 				return val2;
 			};
-			const StrToValFunc strToValBeats = [&bts = beatsData](const juce::String& txt)
-			{
-				for (auto b = 0; b < bts.size(); ++b)
-					if (bts[b].str == txt)
-						return static_cast<float>(b);
-				return 0.f;
-			};
 			const StrToValFunc strToValPhase = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Degree)).getFloatValue() / 180.f; };
 			const StrToValFunc strToValPhase360 = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Degree)).getFloatValue() / 360.f; };
 			const StrToValFunc strToValOct = [](const juce::String& txt) { return std::round(txt.trimCharactersAtEnd(toString(Unit::Octaves)).getFloatValue()); };
@@ -810,7 +865,12 @@ namespace modSys6
 			const StrToValFunc strToValFreeSync = [](const juce::String& txt) { return txt[0] == 'f' ? 0.f : 1.f; };
 			const StrToValFunc strToValPolarity = [](const juce::String& txt) { return txt[0] == '0' ? 0.f : 1.f; };
 			const StrToValFunc strToValMs = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Ms)).getFloatValue(); };
-			const StrToValFunc strToValDb = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Decibel)).getFloatValue(); };
+			const StrToValFunc strToValDb = [](const juce::String& txt)
+			{
+				if (txt == "inf" || txt == "-inf")
+					return -120.f;
+				return txt.trimCharactersAtEnd(toString(Unit::Decibel)).getFloatValue();
+			};
 			const StrToValFunc strToValSeed = [](const juce::String& str) { return str.getFloatValue(); };
 			const StrToValFunc strToValBeats2 = [](const juce::String& txt)
 			{
@@ -825,6 +885,20 @@ namespace modSys6
 				else if (mode == Mode::Dotted)
 					val *= 1.75f;
 				return val;
+			};
+			const StrToValFunc strToValBeatsSlowToFast = [](const juce::String& txt)
+			{
+				enum Mode { Beats, Triplet, Dotted, NumModes };
+				const auto lastChr = txt[txt.length() - 1];
+				const auto mode = lastChr == 't' ? Mode::Triplet : lastChr == '.' ? Mode::Dotted : Mode::Beats;
+
+				const auto text = mode == Mode::Beats ? txt : txt.substring(0, txt.length() - 1);
+				auto val = txt.getFloatValue();
+				if (mode == Mode::Triplet)
+					val *= 1.666666666667f;
+				else if (mode == Mode::Dotted)
+					val *= 1.75f;
+				return 1.f / val;
 			};
 			const StrToValFunc strToValPower = [](const juce::String& txt)
 			{
@@ -938,10 +1012,10 @@ namespace modSys6
 						}
 						else if (name.contains("Freq Sync"))
 						{
-							range = juce::NormalisableRange<float>(0.f, static_cast<float>(beatsData.size() - 1));
-							valDenormDefault = 12.f;
-							valToStr = valToStrBeats;
-							strToVal = strToValBeats;
+							range = makeRange::beats(1.f, 16.f, false);
+							valDenormDefault = 1.f;
+							valToStr = valToStrBeats2;
+							strToVal = strToValBeats2;
 							unit = Unit::Beats;
 							attachedMod.type = ModType::LFO;
 						}
@@ -994,7 +1068,7 @@ namespace modSys6
 			{
 				const auto offset = m * NumParamsPerMod;
 				params.push_back(new Param(withOffset(PID::Perlin0RateHz, offset), makeRange::withCentre(1.f / 1000.f, 40.f, 2.f), .420f, valToStrHz, strToValHz, Unit::Hz));
-				params.push_back(new Param(withOffset(PID::Perlin0RateBeats, offset), makeRange::beats(32.f, .5f, false), .25f, valToStrBeats2, strToValBeats2, Unit::Beats));
+				params.push_back(new Param(withOffset(PID::Perlin0RateBeats, offset), makeRange::beatsSlowToFast(.25f, 32.f, false), 4.f, valToStrBeatsSlowToFast, strToValBeatsSlowToFast, Unit::Beats));
 				params.push_back(new Param(withOffset(PID::Perlin0Octaves, offset), makeRange::lin(1.f, 7.f), 3.f, valToStrOct, strToValOct, Unit::Octaves));
 				params.push_back(new Param(withOffset(PID::Perlin0Width, offset), makeRange::quad(0.f, 2.f, 1), 0.f, valToStrPercent, strToValPercent, Unit::Percent));
 				params.push_back(new Param(withOffset(PID::Perlin0RateType, offset), makeRange::toggle(), 0.f, valToStrPower, strToValPower, Unit::Power));
@@ -1028,9 +1102,9 @@ namespace modSys6
 
 				static constexpr float LFOPhaseStep = 5.f / 360.f;
 
-				params.push_back(new Param(withOffset(PID::LFO0FreeSync, offset), makeRange::toggle(), 1.f, valToStrFreeSync, strToValFreeSync, Unit::NumUnits));
+				params.push_back(new Param(withOffset(PID::LFO0FreeSync, offset), makeRange::toggle(), 0.f, valToStrFreeSync, strToValFreeSync, Unit::NumUnits));
 				params.push_back(new Param(withOffset(PID::LFO0RateFree, offset), makeRange::quad(.2f, 40.f, 2), 4.f, valToStrHz, strToValHz, Unit::Hz));
-				params.push_back(new Param(withOffset(PID::LFO0RateSync, offset), makeRange::beats(32.f, .5f, false), .25f, valToStrBeats2, strToValBeats2, Unit::Beats));
+				params.push_back(new Param(withOffset(PID::LFO0RateSync, offset), makeRange::beatsSlowToFast(.25f, 32.f, false), 8.f, valToStrBeatsSlowToFast, strToValBeatsSlowToFast, Unit::Beats));
 				params.push_back(new Param(withOffset(PID::LFO0Waveform, offset), makeRange::lin(0.f, 1.f), 0.f, valToStrPercent, strToValPercent, Unit::Percent));
 				params.push_back(new Param(withOffset(PID::LFO0Phase, offset), makeRange::stepped(-.5f, .5f, LFOPhaseStep), 0.f, valToStrPhase360, strToValPhase, Unit::Degree));
 				params.push_back(new Param(withOffset(PID::LFO0Width, offset), makeRange::stepped(0.f, .5f, LFOPhaseStep), 0.f, valToStrPhase360, strToValPhase, Unit::Degree));
@@ -1111,7 +1185,7 @@ namespace modSys6
 				p->processBlockFinish();
 		}
 
-		int getParamIdx(const juce::String& name) const noexcept
+		int getParamIdx(const String& name) const noexcept
 		{
 			for (auto p = 0; p < params.size(); ++p)
 			{
@@ -1143,15 +1217,6 @@ namespace modSys6
 		bool operator==(ModTypeContext other) const noexcept
 		{
 			return other.type == mtc.type && other.idx == mtc.idx;
-		}
-		
-		void dbg()
-		{
-			juce::String txt(toString(mtc) + "\n");
-			for (auto p = 0; p < params.size() - 1; ++p)
-				txt += "    " + params[p]->_toString() + "\n";
-			txt += "    " + params.back()->_toString();
-			DBG(txt);
 		}
 
 		bool hasParam(Param* param)
@@ -1202,12 +1267,6 @@ namespace modSys6
 					mods.back().params.push_back(param);
 				}
 			}
-		}
-		
-		void dbg()
-		{
-			for (auto& m : mods)
-				m.dbg();
 		}
 
 		void processBlock(int numSamples) noexcept
@@ -1264,7 +1323,7 @@ namespace modSys6
 		
 		bool isEnabled() const noexcept { return enabled > 0.f; }
 		
-		juce::String toString() const
+		String toString() const
 		{
 			if (enabled != 1.f) return "disabled";
 			return "m: " + juce::String(mIdx) + "; p: " + juce::String(pIdx);
@@ -1358,14 +1417,14 @@ namespace modSys6
 
 		std::array<Connec, 32> connex;
 
-		juce::String toString() const
+		String toString() const
 		{
-			juce::String str("Connex:\n");
+			String str("Connex:\n");
 			for (auto c = 0; c < connex.size(); ++c)
 				if (!connex[c].isEnabled())
 					return str;
 				else
-					str += "c: " + juce::String(c) + "; " + connex[c].toString() + "\n";
+					str += "c: " + String(c) + "; " + connex[c].toString() + "\n";
 			return str;
 		}
 	};
@@ -1374,8 +1433,7 @@ namespace modSys6
 	{
 		ModSys(juce::AudioProcessor& audioProcessor, std::function<void()>&& _updatePatch) :
 			state(),
-			beatsData(),
-			params(audioProcessor, beatsData),
+			params(audioProcessor),
 			mods(params),
 			connex(),
 			hasPlayHead(true),
@@ -1431,11 +1489,6 @@ namespace modSys6
 				if (params[p]->id == pID)
 					return p;
 			return -1;
-		}
-
-		const BeatsData& getBeatsData() const noexcept
-		{
-			return beatsData;
 		}
 
 		int getModIdx(ModTypeContext mtc) const noexcept
@@ -1525,7 +1578,6 @@ namespace modSys6
 
 		juce::ValueTree state;
 	protected:
-		BeatsData beatsData;
 		Params params;
 		Mods mods;
 		Connex connex;
