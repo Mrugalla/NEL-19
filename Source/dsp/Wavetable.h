@@ -12,70 +12,66 @@ namespace dsp
 	{
 		using Func = std::function<Float(Float x)>;
 
-		void makeTableWeierstrasz(Float a, Float b, int N)
+		void makeTableWeierstrass(Float wt)
 		{
-			fill([N, b, a](Float x)
+			auto weierstrass = [](Float a, Float b, Float x, int N)
 			{
-				auto smpl = 0.;
-				for (auto n = 0; n < N; ++n)
-				{
-					const auto nF = static_cast<Float>(n);
-					smpl += std::pow(a, nF) * std::cos(std::pow(b, nF) * x * Pi);
-				}
-				return smpl;
-			}, true, true);
-		}
-
-		void makeTableTriangle(int n)
-		{
-			const auto tri = [&](Float x, Float fc, Float phase)
-			{
-				return static_cast<Float>(1) - static_cast<Float>(2) * std::acos(std::cos(fc * x * Pi + phase * Pi)) / Pi;
-			};
-
-			fill([tri, n](Float x)
-			{
-				const auto nF = static_cast<Float>(n + 1);
-				const auto n8 = static_cast<Float>(n) / static_cast<Float>(8);
-				return tri(x, static_cast<Float>(1), static_cast<Float>(0)) + tri(x, nF, n8) / nF;
-
-			}, true, true);
-		}
-
-		void makeTableSinc(bool window, int N)
-		{
-			const auto wndw = window ? [](Float xpi)
-			{
-				if (xpi == static_cast<Float>(0)) return static_cast<Float>(1);
-				return std::sin(xpi) / xpi;
-			} :
-			[](Float)
-			{
-				return static_cast<Float>(1);
-			};
-			const auto sinc = [](Float xPiA)
-			{
-				if (xPiA == static_cast<Float>(0.f)) return static_cast<Float>(1);
-				return static_cast<Float>(2) * std::sin(xPiA) / xPiA - static_cast<Float>(1);
-			};
-
-			fill([wndw, sinc, N](Float x)
-			{
-				const auto xpi = x * Pi;
-				const auto tablesInv = static_cast<Float>(1) / static_cast<Float>(N);
-
 				auto smpl = static_cast<Float>(0);
 				for (auto n = 0; n < N; ++n)
 				{
-					const auto nF = static_cast<float>(n);
-					const auto x2 = (nF + static_cast<Float>(2)) * x * static_cast<Float>(.5);
-					const auto a2 = static_cast<Float>(2) * nF + static_cast<Float>(1);
-
-					smpl += wndw(xpi) * sinc(x2 * a2) * tablesInv;
+					const auto nF = static_cast<Float>(n);
+					smpl += std::pow(a, nF) * std::cos(std::pow(b, nF) * x);
 				}
 				return smpl;
+			};
 
+			fill([weierstrass, wt](Float x)
+			{
+				const auto xpi = x * static_cast<Float>(Pi);
+				const auto a = wt * static_cast<Float>(.5);
+				const auto b = static_cast<Float>(1) + static_cast<Float>(2) * sqrt(wt);
+
+				return weierstrass(a, b, xpi, 32);
 			}, false, true);
+		}
+
+		void makeTableTriangle(Float wt)
+		{
+			fill([wt](Float x)
+			{
+				const auto wt2 = static_cast<Float>(2) * wt;
+				
+				if (x < static_cast<Float>(-1) + wt)
+					return static_cast<Float>(2) * (x + 1) / wt2;
+
+				if(x < static_cast<Float>(1) - wt)
+					return -2.f * x / (2.f - wt2);
+				else
+					return static_cast<Float>(2) * (x - 1) / wt2;
+
+			}, false, false);
+		}
+
+		void makeTableSinc(Float wt)
+		{
+			const auto sinc = [](Float x)
+			{
+				if (x == static_cast<Float>(0))
+					return static_cast<Float>(1);
+				return std::sin(x) / x;
+			};
+
+			fill([sinc, wt](Float x)
+			{
+				const auto xpi = x * static_cast<Float>(Pi);
+				const auto W = static_cast<Float>(Pi) * wt;
+
+				const auto s0 = sinc(static_cast<Float>(3) * xpi);
+				const auto s1 = sinc(static_cast<Float>(4) * xpi);
+
+				return s0 + W * (s1 - s0);
+
+			}, false, false);
 		}
 
 		Wavetable() :
@@ -216,35 +212,39 @@ namespace dsp
 	template<typename Float, size_t WTSize, size_t NumTables>
 	struct Wavetable3D
 	{
+		static constexpr Float NumTablesInv = static_cast<Float>(1) / static_cast<Float>(NumTables);
+
 		using Table = Wavetable2D<Float, WTSize, NumTables>;
 		using Func = Table::Func;
 		using Funcs = std::array<Func, NumTables>;
 
-		void makeTablesWeierstrasz()
+		void makeTablesWeierstrass()
 		{
-			name = "Weierstrasz";
-			tables[0].makeTableWeierstrasz(static_cast<Float>(0), static_cast<Float>(0.), 1);
-			tables[1].makeTableWeierstrasz(static_cast<Float>(.0625), static_cast<Float>(7.), 8);
-			tables[2].makeTableWeierstrasz(static_cast<Float>(.125), static_cast<Float>(5.), 5);
-			tables[3].makeTableWeierstrasz(static_cast<Float>(.1875), static_cast<Float>(4.), 4);
-			tables[4].makeTableWeierstrasz(static_cast<Float>(.25), static_cast<Float>(3.), 3);
-			tables[5].makeTableWeierstrasz(static_cast<Float>(.3125), static_cast<Float>(3.), 4);
-			tables[6].makeTableWeierstrasz(static_cast<Float>(.375), static_cast<Float>(3.), 3);
-			tables[7].makeTableWeierstrasz(static_cast<Float>(.4375), static_cast<Float>(2.), 6);
+			name = "Weierstrass";
+			auto wt = NumTablesInv * static_cast<Float>(.5);
+			for (auto n = 0; n < NumTables; ++n, wt += NumTablesInv)
+			{
+				tables[n].makeTableWeierstrass(wt);
+			}
 		}
 
 		void makeTablesTriangles()
 		{
 			name = "Triangle";
-			for (auto n = 0; n < NumTables; ++n)
-				tables[n].makeTableTriangle(n);
+			auto wt = NumTablesInv * static_cast<Float>(.5);
+			for (auto n = 0; n < NumTables; ++n, wt += NumTablesInv)
+			{
+				tables[n].makeTableTriangle(wt);
+			}
+				
 		}
 
 		void makeTablesSinc()
 		{
 			name = "Sinc";
-			for (auto n = 0; n < NumTables; ++n)
-				tables[n].makeTableSinc(true, n + 1);
+			auto wt = NumTablesInv * static_cast<Float>(.5);
+			for (auto n = 0; n < NumTables; ++n, wt += NumTablesInv)
+				tables[n].makeTableSinc(wt);
 		}
 
 		Wavetable3D() :
@@ -283,13 +283,13 @@ namespace dsp
 		String name;
 	};
 
-	enum TableType { Weierstrasz, Tri, Sinc, NumTypes };
+	enum TableType { Weierstrass, Tri, Sinc, NumTypes };
 
 	inline String toString(TableType t)
 	{
 		switch (t)
 		{
-		case TableType::Weierstrasz: return "Weierstrasz";
+		case TableType::Weierstrass: return "Weierstrass";
 		case TableType::Tri: return "Triangle";
 		case TableType::Sinc: return "Sinc";
 		default: return "";
@@ -297,6 +297,6 @@ namespace dsp
 	}
 
 	static constexpr int LFOTableSize = 1 << 11;
-	static constexpr int LFONumTables = 8;
+	static constexpr int LFONumTables = 1 << 5 + 1;
 	using LFOTables = Wavetable3D<double, LFOTableSize, LFONumTables>;
 }

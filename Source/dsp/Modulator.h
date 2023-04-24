@@ -1058,7 +1058,7 @@ namespace vibrato
 			
 			type(ModType::Perlin)
 		{
-			tables.makeTablesWeierstrasz();
+			tables.makeTablesWeierstrass();
 		}
 
 		void loadPatch(juce::ValueTree& state, int mIdx)
@@ -1068,8 +1068,8 @@ namespace vibrato
 			if (child.isValid())
 			{
 				const auto tableType = child.getProperty(id).toString();
-				if (tableType == toString(dsp::TableType::Weierstrasz))
-					tables.makeTablesWeierstrasz();
+				if (tableType == toString(dsp::TableType::Weierstrass))
+					tables.makeTablesWeierstrass();
 				else if (tableType == toString(dsp::TableType::Tri))
 					tables.makeTablesTriangles();
 				else if (tableType == toString(dsp::TableType::Sinc))

@@ -1549,6 +1549,8 @@ namespace modSys6
 		
 		bool disableConnection(int cIdx) noexcept
 		{
+			if (cIdx == -1)
+				return false;
 			//const auto param = params[connex[cIdx].getPIdx()];
 			connex[cIdx].disable();
 			return true;	

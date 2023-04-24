@@ -588,6 +588,7 @@ namespace modSys6
                 }
                 return false;
             }
+            
             void disableConnection(int cIdx) noexcept
             {
                 if(modSys.disableConnection(cIdx))
@@ -1438,7 +1439,7 @@ namespace modSys6
                 
                 bool updateSetSelected(int selectedModIdx) noexcept
                 {
-                    const auto c = this->utils.getConnecIdxWith(selectedModIdx, paramtr.getPID());
+                    const auto c = utils.getConnecIdxWith(selectedModIdx, paramtr.getPID());
                     if (connecIdx != c)
                     {
                         select(c);
@@ -1502,13 +1503,26 @@ namespace modSys6
                 void mouseDown(const juce::MouseEvent& evt) override
                 {
                     if (paramtr.isLocked()) return;
-                    dragY = evt.position.y / this->utils.getDragSpeed();
-                    updateSetSelected(this->utils.getSelectedModIdx());
+                    dragY = evt.position.y / utils.getDragSpeed();
+                    updateSetSelected(utils.getSelectedModIdx());
                 }
                 
                 void mouseDrag(const juce::MouseEvent& evt) override
                 {
-                    if (!isSelected() || paramtr.isLocked()) return;
+                    if (paramtr.isLocked()) return;
+
+                    if (!isSelected())
+                    {
+                        const auto mtc = utils.getSelectedMod();
+                        const auto pID = paramtr.getPID();
+                        const auto param = utils.getParam(pID);
+                        const auto pValue = param->getValue();
+                        const auto depth = 0.f;
+                        utils.enableConnection(mtc, pID, depth);
+                    }
+
+                    if (!isSelected())
+                        return;
 
                     auto mms = juce::Desktop::getInstance().getMainMouseSource();
                     mms.enableUnboundedMouseMovement(true, false);
@@ -1534,7 +1548,15 @@ namespace modSys6
                         mms.enableUnboundedMouseMovement(false, true);
                         return;
                     }
-                    else if (evt.mods.isLeftButtonDown()) return;
+                    else if (evt.mods.isLeftButtonDown())
+                    {
+                        if (evt.mods.isAltDown())
+                        {
+                            if (isSelected())
+                                utils.disableConnection(connecIdx);
+                            repaintWithChildren(getParentComponent());
+                        }
+                    }
                     else if (!isSelected()) return;
                     // right clicks only
                     if (paramtr.isLocked()) return;
@@ -1542,12 +1564,21 @@ namespace modSys6
                         tryRemove = true;
                     else
                     {
-                        this->utils.disableConnection(connecIdx);
+                        utils.disableConnection(connecIdx);
                         tryRemove = false;
                     }
                     repaintWithChildren(getParentComponent());
                 }
                 
+				void mouseDoubleClick(const juce::MouseEvent& evt) override
+				{
+					if (paramtr.isLocked())
+                        return;
+					if (isSelected())
+						utils.disableConnection(connecIdx);
+					repaintWithChildren(getParentComponent());
+				}
+
                 void mouseExit(const juce::MouseEvent&) override
                 {
                     tryRemove = false;
@@ -2001,7 +2032,7 @@ namespace modSys6
                 repaint();
             }
 
-            juce::Colour col(juce::Colour c)
+            Colour col(Colour c)
             {
                 return lockr.col(c);
             }
@@ -2075,7 +2106,7 @@ namespace modSys6
 
             void mouseDown(const juce::MouseEvent& evt) override
             {
-                this->utils.selectMod(mtc);
+                utils.selectMod(mtc);
                 draggerfall.startDraggingComponent(this, evt);
             }
             
@@ -2091,10 +2122,10 @@ namespace modSys6
                 if (hoveredParameter != nullptr)
                 {
                     const auto pID = hoveredParameter->getPID();
-                    const auto param = this->utils.getParam(pID);
+                    const auto param = utils.getParam(pID);
                     const auto pValue = param->getValue();
                     const auto depth = 1.f - pValue;
-                    this->utils.enableConnection(mtc, pID, depth);
+                    utils.enableConnection(mtc, pID, depth);
                     hoveredParameter = nullptr;
                 }
                 setBounds(origin);

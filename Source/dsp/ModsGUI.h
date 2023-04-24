@@ -20,6 +20,7 @@ namespace modSys6
                 tables(_tables),
                 tablesPhase(0.f)
             {}
+            
             void update(float _tablesPhase)
             {
                 if (tablesPhase != _tablesPhase)
@@ -28,6 +29,7 @@ namespace modSys6
                     repaint();
                 }
             }
+            
         protected:
             const Tables& tables;
             float tablesPhase;
@@ -746,7 +748,7 @@ namespace modSys6
             public Comp,
             public juce::Timer
         {
-            using WTView = WavetableView<dsp::LFOTableSize, dsp::LFONumTables, 3, (1 << 7) + 1>;
+            using WTView = WavetableView<dsp::LFOTableSize, dsp::LFONumTables, 3, (1 << 8) + 1>;
 
             enum { IsSync, RateFree, RateSync, Waveform, Phase, Width, NumParams };
 
@@ -771,6 +773,7 @@ namespace modSys6
                 tableView(u, "Here you can admire this LFO's current waveform.", tables),
                 wavetableBrowser(u),
                 browserButton(u, "Click here to explore the wavetable browser."),
+                slowIdx(0),
                 isSync(-1)
             {
                 addAndMakeVisible(tableView);
@@ -786,7 +789,7 @@ namespace modSys6
                 params[Waveform].setVisible(true);
                 params[Width].setVisible(true);
                 params[Phase].setVisible(true);
-                startTimerHz(4);
+                startTimerHz(60);
                 initWavetableBrowser();
             }
             
@@ -801,7 +804,7 @@ namespace modSys6
                     {
                     case 0: tables.makeTablesSinc(); break;
                     case 1: tables.makeTablesTriangles(); break;
-                    case 2: tables.makeTablesWeierstrasz(); break;
+                    case 2: tables.makeTablesWeierstrass(); break;
                     }
                     tableView.repaint();
                 });
@@ -818,6 +821,7 @@ namespace modSys6
             WTView tableView;
             Browser wavetableBrowser;
             Button browserButton;
+            int slowIdx;
             int isSync;
 
             void mouseEnter(const juce::MouseEvent& evt) override
@@ -840,13 +844,18 @@ namespace modSys6
                 layout.place(params[Phase],     2, 1, 1, 1, 0.f, false);
 
                 layout.place(browserButton,     1, 1, 1, 1, 0.f, true);
-                layout.place(tableView,         3, 0, 2, 2, 0.f, false);
+                layout.place(tableView,         2, 0, 3, 2, 0.f, false);
                 layout.place(wavetableBrowser,  2, 0, 3, 2);
             }
 
             void timerCallback() override
             {
                 tableView.update(lfoWaveformParam.getValueSum());
+
+                ++slowIdx;
+                if (slowIdx < 8)
+                    return;
+                slowIdx = 0;
 
                 if (utils.hasPlayHead())
                 {
@@ -879,10 +888,10 @@ namespace modSys6
                 wavetableBrowser.addEntry
                 (
                     "Weierstrasz",
-                    "Modulate the vibrato with mesmerizing weierstrasz sinusoids.",
+                    "Modulate the vibrato with mesmerizing weierstrass sinusoids.",
                     [this]()
                     {
-                        tables.makeTablesWeierstrasz();
+                        tables.makeTablesWeierstrass();
                         tableView.repaint();
                         wavetableBrowser.setVisible(false);
                     }
