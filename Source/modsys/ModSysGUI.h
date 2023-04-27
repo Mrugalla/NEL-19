@@ -1515,8 +1515,6 @@ namespace modSys6
                     {
                         const auto mtc = utils.getSelectedMod();
                         const auto pID = paramtr.getPID();
-                        const auto param = utils.getParam(pID);
-                        const auto pValue = param->getValue();
                         const auto depth = 0.f;
                         utils.enableConnection(mtc, pID, depth);
                     }
@@ -1570,7 +1568,7 @@ namespace modSys6
                     repaintWithChildren(getParentComponent());
                 }
                 
-				void mouseDoubleClick(const juce::MouseEvent& evt) override
+				void mouseDoubleClick(const juce::MouseEvent&) override
 				{
 					if (paramtr.isLocked())
                         return;
@@ -1578,6 +1576,25 @@ namespace modSys6
 						utils.disableConnection(connecIdx);
 					repaintWithChildren(getParentComponent());
 				}
+
+                void mouseWheelMove(const juce::MouseEvent& evt, const juce::MouseWheelDetails& wheel) override
+                {
+                    if (paramtr.isLocked() || evt.mods.isAnyMouseButtonDown()) return;
+                    
+                    const bool reversed = wheel.isReversed ? -1.f : 1.f;
+                    const bool isTrackPad = wheel.deltaY * wheel.deltaY < .0549316f;
+                    if (isTrackPad)
+                        dragY = reversed * wheel.deltaY;
+                    else
+                    {
+                        const auto deltaYPos = wheel.deltaY > 0.f ? 1.f : -1.f;
+                        dragY = reversed * WheelDefaultSpeed * deltaYPos;
+                    }
+                    if (evt.mods.isShiftDown())
+                        dragY *= SensitiveDrag;
+                    auto depth = juce::jlimit(-1.f, 1.f, utils.getConnecDepth(connecIdx) + dragY);
+                    utils.setConnecDepth(connecIdx, depth);
+                }
 
                 void mouseExit(const juce::MouseEvent&) override
                 {

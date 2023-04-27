@@ -297,6 +297,6 @@ namespace dsp
 	}
 
 	static constexpr int LFOTableSize = 1 << 11;
-	static constexpr int LFONumTables = 1 << 5 + 1;
+	static constexpr int LFONumTables = (1 << 5) + 1;
 	using LFOTables = Wavetable3D<double, LFOTableSize, LFONumTables>;
 }

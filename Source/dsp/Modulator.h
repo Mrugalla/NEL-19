@@ -79,7 +79,7 @@ namespace vibrato
 		return toString(t) + juce::String(i);
 	}
 	
-	inline ModType getModType(const juce::String& str)
+	inline ModType getModType(const String& str)
 	{
 		for (auto i = 0; i < static_cast<int>(ModType::NumMods); ++i)
 		{

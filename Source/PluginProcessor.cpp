@@ -138,17 +138,10 @@ void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize)
 {
     audioBufferD.setSize(2, maxBufferSize, false, true, false);
 
-    auto user = appProperties.getUserSettings();
+    using PID = modSys6::PID;
 
-    double delaySizeMs = 13.;;
-    {
-        const juce::String id(vibrato::toString(vibrato::ObjType::DelaySize));
-        delaySizeMs = modSys.state.getProperty(id, delaySizeMs);
-        if (delaySizeMs <= 0. || std::isnan(delaySizeMs) || std::isinf(delaySizeMs))
-            delaySizeMs = user->getDoubleValue(id, delaySizeMs);
-        if (delaySizeMs <= 0. || std::isnan(delaySizeMs) || std::isinf(delaySizeMs))
-            delaySizeMs = 13.;
-    }
+    //const auto delaySizeMs = 13.;
+    const auto delaySizeMs = static_cast<double>(modSys.getParam(PID::BufferSize)->getValSumDenorm());
     const auto delaySizeD = std::round(sampleRate * delaySizeMs / 1000.);
 	auto delaySize = static_cast<int>(delaySizeD);
     if (delaySize % 2 != 0)
@@ -156,8 +149,6 @@ void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize)
     const auto delaySizeHalf = delaySize / 2;
     
     dryWet.prepare(sampleRate, maxBufferSize, delaySizeHalf);
-    
-    using PID = modSys6::PID;
 
     const auto lookaheadEnabled = modSys.getParam(PID::Lookahead)->getValueSum() > .5f;
 
@@ -506,15 +497,13 @@ void Nel19AudioProcessor::savePatch()
         }
         for (auto m = 0; m < NumActiveMods; ++m)
         {
-            const auto typeID = modTypeID + static_cast<juce::String>(m);
-            modTypeState.setProperty(typeID, vibrato::toString(modType[m]), nullptr);
+            const auto typeID = modTypeID + static_cast<String>(m);
+			const auto typeStr = vibrato::toString(modType[m]);
+            modTypeState.setProperty(typeID, typeStr, nullptr);
         }
     }
-    {
-        const juce::Identifier id(vibrato::toString(vibrato::ObjType::DelaySize));
-        const auto bufferSize = vibrat.getSizeInMs(static_cast<double>(oversampling.getSampleRateUpsampled()));
-        modSys.state.setProperty(id, bufferSize, nullptr);
-    }
+    for (auto m = 0; m < NumActiveMods; ++m)
+        modulators[m].savePatch(modSys.state, m);
 }
 
 void Nel19AudioProcessor::setStateInformation(const void* data, int sizeInBytes)
@@ -555,15 +544,6 @@ void Nel19AudioProcessor::loadPatch()
     for (auto m = 0; m < modulators.size(); ++m)
         modulators[m].loadPatch(modSys.state, m);
     
-    {
-        const juce::Identifier id(vibrato::toString(vibrato::ObjType::DelaySize));
-        const auto sizeStr = modSys.state.getProperty(id, "").toString();
-        if (sizeStr.isNotEmpty())
-        {
-            const auto bufferSize = sizeStr.getFloatValue();
-            modSys.state.setProperty(id, bufferSize, nullptr);
-        }
-    }
     prepareToPlay(getSampleRate(), getBlockSize());
 
     //benchmark::processBlock(*this);
@@ -584,12 +564,17 @@ void Nel19AudioProcessor::timerCallback()
 #else
 	const bool oversamplingChanged = false;
 #endif
+	const auto bufferSize = static_cast<int>(std::round(modSys.getParam(PID::BufferSize)->getValSumDenorm()));
+    const auto bufferSizeVibrato = static_cast<int>(std::round(vibrat.getSizeInMs(oversampling.getSampleRateUpsampled())));
+    //DBG(bufferSize << " :: " << bufferSizeVibrato);
+    const bool bufferSizeChanged = bufferSize != bufferSizeVibrato;
+    
     const auto curLatency = getLatencySamples();
     const auto latencyWithoutOversampling = curLatency - oversampling.getLatency();
     const auto hasLatency = latencyWithoutOversampling != 0;
     const bool lookaheadChanged = (modSys.getParam(PID::Lookahead)->getValueSum() > .5f) != hasLatency;
     
-    if (oversamplingChanged || lookaheadChanged)
+    if (oversamplingChanged || lookaheadChanged || bufferSizeChanged)
         forcePrepare();
 }
 

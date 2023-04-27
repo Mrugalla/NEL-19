@@ -63,7 +63,7 @@ namespace modSys6
 		Pitchbend1Smooth,
 		LFO1FreeSync, LFO1RateFree, LFO1RateSync, LFO1Waveform, LFO1Phase, LFO1Width,
 
-		Depth, ModsMix, DryWetMix, WetGain, StereoConfig, Feedback, Damp, HQ, Lookahead,
+		Depth, ModsMix, DryWetMix, WetGain, StereoConfig, Feedback, Damp, HQ, Lookahead, BufferSize,
 
 		NumParams
 	};
@@ -160,6 +160,7 @@ namespace modSys6
 		case PID::Damp: return "Damp";
 		case PID::HQ: return "HQ";
 		case PID::Lookahead: return "Lookahead";
+		case PID::BufferSize: return "BufferSize";
 
 		default: return "";
 		}
@@ -374,15 +375,15 @@ namespace modSys6
 			return stepped(0.f, static_cast<float>(numSteps));
 		}
 
-		inline Range beats(float minDenominator, float maxDenominator, bool withZero)
+		inline Range beats(double minDenominator, double maxDenominator, bool withZero)
 		{
 			std::vector<float> table;
 
 			const auto minV = std::log2(minDenominator);
 			const auto maxV = std::log2(maxDenominator);
 
-			const auto numWholeBeatsF = static_cast<float>(minV - maxV);
-			const auto numWholeBeatsInv = 1.f / numWholeBeatsF;
+			const auto numWholeBeatsF = static_cast<double>(minV - maxV);
+			const auto numWholeBeatsInv = 1. / numWholeBeatsF;
 
 			const auto numWholeBeats = static_cast<int>(numWholeBeatsF);
 			const auto numValues = numWholeBeats * 3 + 1 + (withZero ? 1 : 0);
@@ -396,17 +397,17 @@ namespace modSys6
 				const auto x = iF * numWholeBeatsInv;
 
 				const auto curV = minV - x * numWholeBeatsF;
-				const auto baseVal = std::pow(2.f, curV);
+				const auto baseVal = std::pow(2., curV);
 
-				const auto valWhole = 1.f / baseVal;
-				const auto valTriplet = valWhole * 1.666666666667f;
-				const auto valDotted = valWhole * 1.75f;
+				const auto valWhole = 1. / baseVal;
+				const auto valTriplet = valWhole * 1.66666666666666666667;
+				const auto valDotted = valWhole * 1.75;
 
-				table.emplace_back(valWhole);
-				table.emplace_back(valTriplet);
-				table.emplace_back(valDotted);
+				table.emplace_back(static_cast<float>(valWhole));
+				table.emplace_back(static_cast<float>(valTriplet));
+				table.emplace_back(static_cast<float>(valDotted));
 			}
-			table.emplace_back(1.f / maxDenominator);
+			table.emplace_back(static_cast<float>(1. / maxDenominator));
 
 			static constexpr float Eps = 1.f - std::numeric_limits<float>::epsilon();
 			static constexpr float EpsInv = 1.f / Eps;
@@ -447,15 +448,15 @@ namespace modSys6
 			return range;
 		}
 
-		inline Range beatsSlowToFast(float maxDenominator, float minDenominator, bool withZero)
+		inline Range beatsSlowToFast(double maxDenominator, double minDenominator, bool withZero)
 		{
 			std::vector<float> table;
 
 			const auto minV = std::log2(minDenominator);
 			const auto maxV = std::log2(maxDenominator);
 
-			const auto numWholeBeatsF = static_cast<float>(minV - maxV);
-			const auto numWholeBeatsInv = 1.f / numWholeBeatsF;
+			const auto numWholeBeatsF = static_cast<double>(minV - maxV);
+			const auto numWholeBeatsInv = 1. / numWholeBeatsF;
 
 			const auto numWholeBeats = static_cast<int>(numWholeBeatsF);
 			const auto numValues = numWholeBeats * 3 + 1 + (withZero ? 1 : 0);
@@ -465,21 +466,21 @@ namespace modSys6
 				table.emplace_back(0.f);
 			for (auto i = 0; i < numWholeBeats; ++i)
 			{
-				const auto iF = static_cast<float>(i);
+				const auto iF = static_cast<double>(i);
 				const auto x = iF * numWholeBeatsInv;
 
 				const auto curV = maxV + x * numWholeBeatsF;
-				const auto baseVal = std::pow(2.f, curV);
+				const auto baseVal = std::pow(2., curV);
 
-				const auto valWhole = 1.f / baseVal;
-				const auto valDotted = valWhole * .75f;
-				const auto valTriplet = valWhole * .66666666667f;
+				const auto valWhole = 1. / baseVal;
+				const auto valDotted = valWhole * .75;
+				const auto valTriplet = valWhole * 2. / 3.;
 				
-				table.emplace_back(valWhole);
-				table.emplace_back(valDotted);
-				table.emplace_back(valTriplet);				
+				table.emplace_back(static_cast<float>(valWhole));
+				table.emplace_back(static_cast<float>(valDotted));
+				table.emplace_back(static_cast<float>(valTriplet));
 			}
-			table.emplace_back(1.f / minDenominator);
+			table.emplace_back(static_cast<float>(1. / minDenominator));
 
 			for (auto i = (withZero ? 1 : 0); i < table.size(); ++i)
 				table[i] = 1.f / table[i];
@@ -548,6 +549,29 @@ namespace modSys6
 				{
 					return juce::jlimit(min, max, x);
 				}
+			};
+		}
+
+		inline Range bufferSizes(const std::vector<float>& bufferSizes)
+		{
+			return
+			{
+					bufferSizes.front(), bufferSizes.back(),
+					[bufferSizes](float, float, float normalized)
+					{
+						const auto idx = static_cast<int>(std::round(normalized * static_cast<float>(bufferSizes.size() - 1)));
+						return bufferSizes[idx];
+					},
+					[bufferSizes](float, float, float denormalized)
+					{
+						for (auto i = 0; i < bufferSizes.size(); ++i)
+							if (denormalized <= bufferSizes[i])
+								{
+									return static_cast<float>(i) / static_cast<float>(bufferSizes.size() - 1);
+								}
+						return bufferSizes.front();
+					},
+					nullptr
 			};
 		}
 	}
@@ -933,7 +957,7 @@ namespace modSys6
 				return v < .5f ? juce::String("Random") :
 					juce::String("Procedural");
 			};
-			StrToValFunc strToValRandType = [](const juce::String& str)
+			StrToValFunc strToValRandType = [](const String& str)
 			{
 				const auto text = str.toLowerCase();
 				if (text == "rand" || text == "random" || text == "randomise" || text == "randomize")
@@ -949,7 +973,7 @@ namespace modSys6
 				return v < .5f ? juce::String("1x") :
 					juce::String("4x");
 			};
-			StrToValFunc strToValHQ = [](const juce::String& str)
+			StrToValFunc strToValHQ = [](const String& str)
 			{
 				const auto text = str.toLowerCase();
 				if (text == "1x" || text == "1" || text == "low" || text == "lo" || text == "off" || text == "false")
@@ -965,7 +989,7 @@ namespace modSys6
 				return v < .5f ? juce::String("Off") :
 					juce::String("On");
 			};
-			StrToValFunc strToValLookahead = [](const juce::String& str)
+			StrToValFunc strToValLookahead = [](const String& str)
 			{
 				const auto text = str.toLowerCase();
 				if (text == "off" || text == "false" || text == "0" || text == "Nopezies")
@@ -974,6 +998,24 @@ namespace modSys6
 					return 1.f;
 
 				return 1.f;
+			};
+
+			ValToStrFunc valToStrBufferSize = [](float v)
+			{
+				if(v < 1000.f)
+					return String(std::floor(v)) + " ms";
+				v /= 1000.f;
+				return String(std::floor(v)) + "k ms";
+			};
+			StrToValFunc strToValBufferSize = [](const String& str)
+			{
+				auto nStr = str.removeCharacters("ms").removeCharacters(" ");
+				if (nStr[nStr.length() - 1] == 'k')
+				{
+					auto val = nStr.removeCharacters("k").getFloatValue();
+					return val * 1000.f;
+				}
+				return str.getFloatValue();
 			};
 
 			for (auto p = 0; p < NumMSParams; ++p)
@@ -1068,7 +1110,7 @@ namespace modSys6
 			{
 				const auto offset = m * NumParamsPerMod;
 				params.push_back(new Param(withOffset(PID::Perlin0RateHz, offset), makeRange::withCentre(1.f / 1000.f, 40.f, 2.f), .420f, valToStrHz, strToValHz, Unit::Hz));
-				params.push_back(new Param(withOffset(PID::Perlin0RateBeats, offset), makeRange::beatsSlowToFast(.25f, 32.f, false), 4.f, valToStrBeatsSlowToFast, strToValBeatsSlowToFast, Unit::Beats));
+				params.push_back(new Param(withOffset(PID::Perlin0RateBeats, offset), makeRange::beatsSlowToFast(.25, 64., false), 4.f, valToStrBeatsSlowToFast, strToValBeatsSlowToFast, Unit::Beats));
 				params.push_back(new Param(withOffset(PID::Perlin0Octaves, offset), makeRange::lin(1.f, 7.f), 3.f, valToStrOct, strToValOct, Unit::Octaves));
 				params.push_back(new Param(withOffset(PID::Perlin0Width, offset), makeRange::quad(0.f, 2.f, 1), 0.f, valToStrPercent, strToValPercent, Unit::Percent));
 				params.push_back(new Param(withOffset(PID::Perlin0RateType, offset), makeRange::toggle(), 0.f, valToStrPower, strToValPower, Unit::Power));
@@ -1104,7 +1146,7 @@ namespace modSys6
 
 				params.push_back(new Param(withOffset(PID::LFO0FreeSync, offset), makeRange::toggle(), 0.f, valToStrFreeSync, strToValFreeSync, Unit::NumUnits));
 				params.push_back(new Param(withOffset(PID::LFO0RateFree, offset), makeRange::quad(.2f, 40.f, 2), 4.f, valToStrHz, strToValHz, Unit::Hz));
-				params.push_back(new Param(withOffset(PID::LFO0RateSync, offset), makeRange::beatsSlowToFast(.25f, 32.f, false), 8.f, valToStrBeatsSlowToFast, strToValBeatsSlowToFast, Unit::Beats));
+				params.push_back(new Param(withOffset(PID::LFO0RateSync, offset), makeRange::beatsSlowToFast(.25, 64., false), 8.f, valToStrBeatsSlowToFast, strToValBeatsSlowToFast, Unit::Beats));
 				params.push_back(new Param(withOffset(PID::LFO0Waveform, offset), makeRange::lin(0.f, 1.f), 0.f, valToStrPercent, strToValPercent, Unit::Percent));
 				params.push_back(new Param(withOffset(PID::LFO0Phase, offset), makeRange::stepped(-.5f, .5f, LFOPhaseStep), 0.f, valToStrPhase360, strToValPhase, Unit::Degree));
 				params.push_back(new Param(withOffset(PID::LFO0Width, offset), makeRange::stepped(0.f, .5f, LFOPhaseStep), 0.f, valToStrPhase360, strToValPhase, Unit::Degree));
@@ -1119,6 +1161,7 @@ namespace modSys6
 			params.push_back(new Param(PID::Damp, makeRange::quad(40.f, 8000.f, 2), 180.f, valToStrHz, strToValHz, Unit::Hz));
 			params.push_back(new Param(PID::HQ, makeRange::toggle(), 1.f, valToStrHQ, strToValHQ, Unit::Power));
 			params.push_back(new Param(PID::Lookahead, makeRange::toggle(), 1.f, valToStrLookahead, strToValLookahead, Unit::Power));
+			params.push_back(new Param(PID::BufferSize, makeRange::bufferSizes({1.f, 4.f, 12.f, 24.f, 69.f, 420.f, 2000.f}), 0, valToStrBufferSize, strToValBufferSize));
 
 			for (auto param : params)
 				audioProcessor.addParameter(param);

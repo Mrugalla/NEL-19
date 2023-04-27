@@ -887,7 +887,7 @@ namespace modSys6
                 
                 wavetableBrowser.addEntry
                 (
-                    "Weierstrasz",
+                    "Weierstrass",
                     "Modulate the vibrato with mesmerizing weierstrass sinusoids.",
                     [this]()
                     {

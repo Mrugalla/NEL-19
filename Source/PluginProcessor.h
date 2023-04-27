@@ -89,6 +89,7 @@ struct Nel19AudioProcessor :
     using ChannelSet = juce::AudioChannelSet;
     using AudioBufferF = juce::AudioBuffer<float>;
 	using AudioBufferD = juce::AudioBuffer<double>;
+    using String = juce::String;
 
     using Smooth = smooth::Smooth<double>;
     using PRM = dsp::PRM<double>;

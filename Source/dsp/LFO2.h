@@ -295,17 +295,21 @@ namespace dsp
                 nInc = _rateHz * sampleRateInv;
 
             if (isLooping(timeInSamples) || (changesSpeed(nBpm, nInc) && !mixer.stillFading()))
-			{
-                inc = nInc;
-                bpm = nBpm;
-                bps = nBps;
-                quarterNoteLength = nQuarterNoteLength;
-                rateSync = _rateSync;
-                rateHz = _rateHz;
-                
-                mixer.init();
-                lfos[mixer.idx].updateSpeed(inc);           
-			}
+                initXFade(nInc, nBpm, nBps, nQuarterNoteLength, _rateSync, _rateHz);
+        }
+
+        void initXFade(double nInc, double nBpm, double nBps,
+            double nQuarterNoteLength, double _rateSync, double _rateHz) noexcept
+        {
+            inc = nInc;
+            bpm = nBpm;
+            bps = nBps;
+            quarterNoteLength = nQuarterNoteLength;
+            rateSync = _rateSync;
+            rateHz = _rateHz;
+
+            mixer.init();
+            lfos[mixer.idx].updateSpeed(inc);
         }
 
         void updatePosition(LFO& lfo, double ppqPosition, bool temposync) noexcept

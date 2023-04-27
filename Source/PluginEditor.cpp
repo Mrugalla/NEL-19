@@ -87,6 +87,9 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
         modSys6::gui::ModComp(utils, modulatables, audioProcessor.modulators[1].getTables(), modSys6::NumParamsPerMod)
     },
 
+    visualizer(utils, "Visualizes the sum of the vibrato's modulators.", p.getChannelCountOfBus(false, 0), 1),
+
+	bufferSizes(utils, "Buffer Sizes", "Switch between different buffer sizes for the vibrato.", modSys6::PID::BufferSize, modulatables, modSys6::gui::ParameterType::Knob),
     modsDepth(utils, "Depth", "Modulate the depth of the vibrato.", modSys6::PID::Depth, modulatables, modSys6::gui::ParameterType::Knob),
     modsMix(utils, "Mods\nMix", "Interpolate between the vibrato's modulators.", modSys6::PID::ModsMix, modulatables, modSys6::gui::ParameterType::Knob),
     dryWetMix(utils, "Mix", "Define the dry/wet ratio of the effect.", modSys6::PID::DryWetMix, modulatables, modSys6::gui::ParameterType::Knob),
@@ -94,23 +97,12 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     stereoConfig(utils, "StereoConfig", "Configurate if effect is applied to l/r or m/s", modSys6::PID::StereoConfig, modulatables, modSys6::gui::ParameterType::Switch),
 	feedback(utils, "Feedback", "Dial in some feedback to this vibrato's delay.", modSys6::PID::Feedback, modulatables, modSys6::gui::ParameterType::Knob),
 	damp(utils, "Damp", "This is a lowpass filter in the feedback path.", modSys6::PID::Damp, modulatables, modSys6::gui::ParameterType::Knob),
-
-    depthModes
-    {
-        modSys6::gui::Button(utils, makeNotifyDepthModes(depthModes, 0), "Click here to resize the internal delay"),
-        modSys6::gui::Button(utils, makeNotifyDepthModes(depthModes, 1), "Click here to resize the internal delay"),
-        modSys6::gui::Button(utils, makeNotifyDepthModes(depthModes, 2), "Click here to resize the internal delay"),
-        modSys6::gui::Button(utils, makeNotifyDepthModes(depthModes, 3), "Click here to resize the internal delay"),
-        modSys6::gui::Button(utils, makeNotifyDepthModes(depthModes, 4), "Click here to resize the internal delay")
-    },
 	
     macro0Dragger(utils, modSys6::ModType::Macro, 0, modulatables),
     macro1Dragger(utils, modSys6::ModType::Macro, 1, modulatables),
     macro2Dragger(utils, modSys6::ModType::Macro, 2, modulatables),
     macro3Dragger(utils, modSys6::ModType::Macro, 3, modulatables),
-
-    visualizer(utils, "Visualizes the sum of the vibrato's modulators.", p.getChannelCountOfBus(false, 0), 1),
-
+    
     paramRandomizer(utils, modulatables, "MainRandomizer"),
 	hq(utils, "HQ", "Strong vibrato causes less 'grainy' sidelobes with 4x oversampling.", modSys6::PID::HQ, modulatables, modSys6::gui::ParameterType::Switch),
 	lookahead(utils, "Lookahead", "Lookahead aligns the average position of the vibrato with the dry signal.", modSys6::PID::Lookahead, modulatables, modSys6::gui::ParameterType::Switch),
@@ -175,6 +167,7 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
 
     addAndMakeVisible(visualizer);
 
+	addAndMakeVisible(bufferSizes);
     addAndMakeVisible(modsDepth);
     addAndMakeVisible(modsMix);
     addAndMakeVisible(dryWetMix);
@@ -182,69 +175,6 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     addAndMakeVisible(stereoConfig);
 	addAndMakeVisible(feedback);
 	addAndMakeVisible(damp);
-
-    {
-        const auto fs = static_cast<float>(audioProcessor.oversampling.getSampleRateUpsampled());
-        const auto curDelaySizeMs = std::round(audioProcessor.vibrat.getSizeInMs(fs));
-        
-        enum { One, Four, Twenty, FourTwenty, TwoSec, NumModes };
-
-        const auto getTime = [](int i)
-        {
-			switch (i)
-			{
-			case One: return 1.f;
-			case Four: return 4.f;
-			case Twenty: return 20.f;
-			case FourTwenty: return 420.f;
-			case TwoSec: return 2000.f;
-			default: return 4.f;
-			}
-		};
-
-        const auto getString = [](int i)
-        {
-            switch (i)
-            {
-            case One: return "1";
-            case Four: return "4";
-            case Twenty: return "20";
-            case FourTwenty: return "420";
-            case TwoSec: return "2k";
-            default: return "4";
-            }
-        };
-
-        for (auto i = 0; i < depthModes.size(); ++i)
-        {
-            auto& dMode = depthModes[i];
-            addAndMakeVisible(dMode);
-            
-            dMode.onPaint = modSys6::gui::makeTextButtonOnPaint(getString(i), juce::Justification::centred, 1);
-
-            dMode.setState
-            (
-                std::abs(curDelaySizeMs - getTime(i)) < 1.f ? 1 : 0
-            );
-
-            dMode.onClick = [&, i]()
-            {
-                for (auto& d : depthModes)
-                    d.setState(0);
-
-                juce::Identifier vibDelaySizeID(vibrato::toString(vibrato::ObjType::DelaySize));
-                audioProcessor.modSys.state.setProperty(vibDelaySizeID, getTime(i), nullptr);
-                audioProcessor.forcePrepare();
-
-				auto& dMode = depthModes[i];
-                dMode.setState(1);
-
-                for (auto& d : depthModes)
-                    d.repaint();
-            };
-        }
-    }
-    
 
     addAndMakeVisible(macro0Dragger);
     addAndMakeVisible(macro1Dragger);
@@ -353,19 +283,7 @@ void Nel19AudioProcessorEditor::resized()
         }
     }
     
-    {
-        const auto area = layoutMainParams(0, 0, 2, 1);
-		const auto w = area.getWidth() / static_cast<float>(depthModes.size());
-        const auto h = area.getHeight();
-		const auto y = area.getY();
-        auto x = area.getX();
-		for (auto i = 0; i < depthModes.size(); ++i)
-		{
-			auto& depthMode = depthModes[i];
-            depthMode.setBounds(juce::Rectangle<float>(x, y, w, h).toNearestInt());
-			x += w;
-		}
-    }
+	layoutMainParams.place(bufferSizes, 0, 0, 2, 1);
     layoutMainParams.place(modsDepth, 0, 1, 2, 1);
     layoutMainParams.place(modsMix, 0, 2, 2, 1);
     layoutMainParams.place(gainWet, 0, 3, 1, 1);
