@@ -565,8 +565,17 @@ namespace modSys6
             int getParamIdx(PID p) noexcept { return modSys.getParamIdx(p); }
             int getModIdx(ModTypeContext mtc) const noexcept { return modSys.getModIdx(mtc); }
             int getSelectedModIdx() const noexcept { return getModIdx(selectedMod); }
-            int getConnecIdxWith(int mIdx, int pIdx) const noexcept { return modSys.getConnecIdxWith(mIdx, pIdx); }
-            int getConnecIdxWith(int mIdx, PID pID) const noexcept { return modSys.getConnecIdxWith(mIdx, pID); }
+            
+            int getConnecIdxWith(int mIdx, int pIdx) const noexcept
+            {
+                return modSys.getConnecIdxWith(mIdx, pIdx);
+            }
+            
+            int getConnecIdxWith(int mIdx, PID pID) const noexcept
+            {
+                //oopsie(pID == PID::LFO0Waveform);
+                return modSys.getConnecIdxWith(mIdx, pID);
+            }
 
             float getConnecDepth(int cIdx) const noexcept
             {
@@ -1463,7 +1472,7 @@ namespace modSys6
                 int connecIdx;
                 bool tryRemove;
 
-                void paint(juce::Graphics& g) override
+                void paint(Graphics& g) override
                 {
                     g.setFont(Shared::shared.fontFlx);
 
@@ -1471,7 +1480,7 @@ namespace modSys6
                     const auto bounds = getLocalBounds().toFloat().reduced(thicc);
                     g.setColour(Shared::shared.colour(ColourID::Bg));
                     g.fillEllipse(bounds);
-                    juce::String txt;
+                    String txt;
                     if (isSelected())
                         if (tryRemove)
                         {
