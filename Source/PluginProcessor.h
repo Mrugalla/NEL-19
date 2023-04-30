@@ -89,14 +89,15 @@ struct Nel19AudioProcessor :
     using ChannelSet = juce::AudioChannelSet;
     using AudioBufferF = juce::AudioBuffer<float>;
 	using AudioBufferD = juce::AudioBuffer<double>;
+    using MidiBuffer = juce::MidiBuffer;
     using String = juce::String;
+    using SIMD = juce::FloatVectorOperations;
 
     using Smooth = smooth::Smooth<double>;
     using PRM = dsp::PRM<double>;
     using PRMInfo = dsp::PRMInfo<double>;
     static constexpr int NumActiveMods = 2;
-
-
+    
     bool supportsDoublePrecisionProcessing() const override
     {
         return true;
@@ -134,11 +135,12 @@ struct Nel19AudioProcessor :
     void forcePrepare();
 
     juce::ApplicationProperties appProperties;
+    dsp::StandalonePlayHead standalonePlayHead;
     AudioBufferD audioBufferD;
 
     drywet::Processor dryWet;
 
-    modSys6::ModSys modSys;
+    modSys6::Params params;
     
     oversampling::OversamplerWithShelf oversampling;
     

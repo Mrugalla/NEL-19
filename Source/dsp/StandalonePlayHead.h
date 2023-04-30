@@ -1,5 +1,6 @@
 #pragma once
 #include "juce_audio_basics/juce_audio_basics.h"
+#include "juce_events/juce_events.h"
 
 #define DebugLoop false
 #define DebugIsPlaying false
@@ -128,6 +129,37 @@ namespace dsp
 		double bpmPhase;
 #endif
 	};
+
+	inline void synthesizeTransport(PosInfo& transport,
+		const juce::AudioPlayHead::PositionInfo& phx) noexcept
+	{
+		const auto isPlaying = phx.getIsPlaying();
+		const auto bpm = phx.getBpm();
+		const auto timeInSamples = phx.getTimeInSamples();
+		const auto timeSecs = phx.getTimeInSeconds();
+		const auto ppqPosition = phx.getPpqPosition();
+
+		transport.isPlaying = isPlaying;
+		transport.bpm = bpm.hasValue() ? *bpm : dsp::StandalonePlayHead::DefaultBPM;
+		transport.timeInSamples = timeInSamples.hasValue() ? *timeInSamples : 0;
+		transport.timeInSeconds = timeSecs.hasValue() ? *timeSecs : 0;
+		transport.ppqPosition = ppqPosition.hasValue() ? *ppqPosition : 0;
+	}
+
+	inline void synthesizeTransport(PlayHead* playHead,
+		StandalonePlayHead& standalonePlayHead, int numSamples) noexcept
+	{
+		if (juce::JUCEApplicationBase::isStandaloneApp() || playHead == nullptr)
+			standalonePlayHead(numSamples);
+		else
+		{
+			const auto phx = playHead->getPosition();
+			if (phx.hasValue())
+				dsp::synthesizeTransport(standalonePlayHead.posInfo, *phx);
+			else
+				standalonePlayHead(numSamples);
+		}
+	}
 }
 
 #undef DebugLoop

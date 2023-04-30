@@ -1017,7 +1017,7 @@ namespace vibrato
 			}
 			
 			void operator()(Buffer& buffer, int numChannels, int numSamples,
-				PosInfo& transport) noexcept
+				const PosInfo& transport) noexcept
 			{
 				double* samples[] = { buffer[0].data(), buffer[1].data() };
 
@@ -1046,7 +1046,6 @@ namespace vibrato
 	public:
 		Modulator() :
 			buffer(),
-			standalonePlayHead(),
 			tables(),
 			perlin(),
 			audioRate(),
@@ -1093,7 +1092,6 @@ namespace vibrato
 		
 		void prepare(double sampleRate, int maxBlockSize, int latency, int oversamplingFactor)
 		{
-			standalonePlayHead.prepare(sampleRate);
 			for(auto& b: buffer)
 				b.resize(maxBlockSize + 4, 0.f); // compensate for potential spline interpolation
 			perlin.prepare(sampleRate, maxBlockSize, latency);
@@ -1146,27 +1144,17 @@ namespace vibrato
 		}
 
 		void processBlock(const double* const* samples, const juce::MidiBuffer& midi,
-			juce::AudioPlayHead* playHead, int numChannels, int numSamples) noexcept
+			const PosInfo& transport, int numChannels, int numSamples) noexcept
 		{
-			if (juce::JUCEApplicationBase::isStandaloneApp())
-			{
-				standalonePlayHead(numSamples);
-			}
-			else
-			{
-				if (playHead)
-					playHead->getCurrentPosition(standalonePlayHead.posInfo);
-			}
-
 			switch (type)
 			{
-			case ModType::Perlin: return perlin(buffer, numChannels, numSamples, standalonePlayHead.posInfo);
+			case ModType::Perlin: return perlin(buffer, numChannels, numSamples, transport);
 			case ModType::AudioRate: return audioRate(buffer, midi, numChannels, numSamples);
 			case ModType::Dropout: return dropout(buffer, numChannels, numSamples);
 			case ModType::EnvFol: return envFol(buffer, samples, numChannels, numSamples);
 			case ModType::Macro: return macro(buffer, numChannels, numSamples);
 			case ModType::Pitchwheel: return pitchbend(buffer, numChannels, numSamples, midi);
-			case ModType::LFO: return lfo(buffer, numChannels, numSamples, standalonePlayHead.posInfo);
+			case ModType::LFO: return lfo(buffer, numChannels, numSamples, transport);
 			}
 		}
 		
@@ -1182,7 +1170,6 @@ namespace vibrato
 
 		Buffer buffer;
 	protected:
-		dsp::StandalonePlayHead standalonePlayHead;
 		Tables tables;
 
 		Perlin perlin;

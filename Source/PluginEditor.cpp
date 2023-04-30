@@ -1,38 +1,14 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
-modSys6::gui::Notify makeNotify(Nel19AudioProcessorEditor* comp)
+gui::Notify makeNotify(Nel19AudioProcessorEditor* comp)
 {
     return [c = comp](int t, const void*)
     {
-        if (t == modSys6::gui::NotificationType::ColourChanged)
+        if (t == gui::NotificationType::ColourChanged)
         {
-            modSys6::gui::makeCursor(*c, modSys6::gui::CursorType::Default);
+            gui::makeCursor(*c, gui::CursorType::Default);
             c->repaint();
-        }
-        return false;
-    };
-}
-
-modSys6::gui::Notify makeNotifyDepthModes(std::array<modSys6::gui::Button, 5>& buttons, int i)
-{
-    return [&btns = buttons, i](int t, const void*)
-    {
-        if (t == modSys6::gui::NotificationType::PatchUpdated)
-        {
-            for (auto& btn : btns)
-                btn.setState(0);
-            
-            auto& btn = btns[i];
-            
-            auto& p = btn.utils.audioProcessor;
-            const auto fs = static_cast<float>(p.oversampling.getSampleRateUpsampled());
-            const auto sizeInMs = std::round(p.vibrat.getSizeInMs(fs));
-
-            btn.setState
-            (
-                sizeInMs == (i == 0 ? 1.f : i == 1 ? 4.f : i == 2 ? 20.f : i == 3 ? 420.f : 2000.f) ? 1 : 0
-            );
         }
         return false;
     };
@@ -66,46 +42,46 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
         { 2, 2, 2, 2, 2, 13 },
         { 1 }
     ),
-    utils(p.modSys, *this, p.appProperties.getUserSettings(), p),
+    utils(*this, p.appProperties.getUserSettings(), p),
     notify(utils.events, makeNotify(this)),
 
-    nelLabel(utils, "<< NEL >>", modSys6::gui::ColourID::Transp, modSys6::gui::ColourID::Transp, modSys6::gui::ColourID::Txt),
+    nelLabel(utils, "<< NEL >>", gui::ColourID::Transp, gui::ColourID::Transp, gui::ColourID::Txt),
 
     tooltips(utils),
     buildDate(utils),
     
     modulatables(),
 
-    macro0(utils, "M0", "Modulate parameters with this macro.", modSys6::PID::MSMacro0, modulatables, modSys6::gui::ParameterType::Knob),
-    macro1(utils, "M1", "Modulate parameters with this macro.", modSys6::PID::MSMacro1, modulatables, modSys6::gui::ParameterType::Knob),
-    macro2(utils, "M2", "Modulate parameters with this macro.", modSys6::PID::MSMacro2, modulatables, modSys6::gui::ParameterType::Knob),
-    macro3(utils, "M3", "Modulate parameters with this macro.", modSys6::PID::MSMacro3, modulatables, modSys6::gui::ParameterType::Knob),
+    macro0(utils, "M0", "Modulate parameters with this macro.", modSys6::PID::MSMacro0, modulatables, gui::ParameterType::Knob),
+    macro1(utils, "M1", "Modulate parameters with this macro.", modSys6::PID::MSMacro1, modulatables, gui::ParameterType::Knob),
+    macro2(utils, "M2", "Modulate parameters with this macro.", modSys6::PID::MSMacro2, modulatables, gui::ParameterType::Knob),
+    macro3(utils, "M3", "Modulate parameters with this macro.", modSys6::PID::MSMacro3, modulatables, gui::ParameterType::Knob),
 
     modComps
     {
-        modSys6::gui::ModComp(utils, modulatables, audioProcessor.modulators[0].getTables(), 0),
-        modSys6::gui::ModComp(utils, modulatables, audioProcessor.modulators[1].getTables(), modSys6::NumParamsPerMod)
+        gui::ModComp(utils, modulatables, audioProcessor.modulators[0].getTables(), 0),
+        gui::ModComp(utils, modulatables, audioProcessor.modulators[1].getTables(), modSys6::NumParamsPerMod)
     },
 
     visualizer(utils, "Visualizes the sum of the vibrato's modulators.", p.getChannelCountOfBus(false, 0), 1),
 
-	bufferSizes(utils, "Buffer Sizes", "Switch between different buffer sizes for the vibrato.", modSys6::PID::BufferSize, modulatables, modSys6::gui::ParameterType::Knob),
-    modsDepth(utils, "Depth", "Modulate the depth of the vibrato.", modSys6::PID::Depth, modulatables, modSys6::gui::ParameterType::Knob),
-    modsMix(utils, "Mods\nMix", "Interpolate between the vibrato's modulators.", modSys6::PID::ModsMix, modulatables, modSys6::gui::ParameterType::Knob),
-    dryWetMix(utils, "Mix", "Define the dry/wet ratio of the effect.", modSys6::PID::DryWetMix, modulatables, modSys6::gui::ParameterType::Knob),
-    gainWet(utils, "Gain", "The output gain of the wet signal.", modSys6::PID::WetGain, modulatables, modSys6::gui::ParameterType::Knob),
-    stereoConfig(utils, "StereoConfig", "Configurate if effect is applied to l/r or m/s", modSys6::PID::StereoConfig, modulatables, modSys6::gui::ParameterType::Switch),
-	feedback(utils, "Feedback", "Dial in some feedback to this vibrato's delay.", modSys6::PID::Feedback, modulatables, modSys6::gui::ParameterType::Knob),
-	damp(utils, "Damp", "This is a lowpass filter in the feedback path.", modSys6::PID::Damp, modulatables, modSys6::gui::ParameterType::Knob),
+	bufferSizes(utils, "Buffer Sizes", "Switch between different buffer sizes for the vibrato.", modSys6::PID::BufferSize, modulatables, gui::ParameterType::Knob),
+    modsDepth(utils, "Depth", "Modulate the depth of the vibrato.", modSys6::PID::Depth, modulatables, gui::ParameterType::Knob),
+    modsMix(utils, "Mods\nMix", "Interpolate between the vibrato's modulators.", modSys6::PID::ModsMix, modulatables, gui::ParameterType::Knob),
+    dryWetMix(utils, "Mix", "Define the dry/wet ratio of the effect.", modSys6::PID::DryWetMix, modulatables, gui::ParameterType::Knob),
+    gainWet(utils, "Gain", "The output gain of the wet signal.", modSys6::PID::WetGain, modulatables, gui::ParameterType::Knob),
+    stereoConfig(utils, "StereoConfig", "Configurate if effect is applied to l/r or m/s", modSys6::PID::StereoConfig, modulatables, gui::ParameterType::Switch),
+	feedback(utils, "Feedback", "Dial in some feedback to this vibrato's delay.", modSys6::PID::Feedback, modulatables, gui::ParameterType::Knob),
+	damp(utils, "Damp", "This is a lowpass filter in the feedback path.", modSys6::PID::Damp, modulatables, gui::ParameterType::Knob),
 	
-    macro0Dragger(utils, modSys6::ModType::Macro, 0, modulatables),
-    macro1Dragger(utils, modSys6::ModType::Macro, 1, modulatables),
-    macro2Dragger(utils, modSys6::ModType::Macro, 2, modulatables),
-    macro3Dragger(utils, modSys6::ModType::Macro, 3, modulatables),
+    macro0Dragger(utils, 0, modulatables),
+    macro1Dragger(utils, 1, modulatables),
+    macro2Dragger(utils, 2, modulatables),
+    macro3Dragger(utils, 3, modulatables),
     
-    paramRandomizer(utils, modulatables, "MainRandomizer"),
-	hq(utils, "HQ", "Strong vibrato causes less 'grainy' sidelobes with 4x oversampling.", modSys6::PID::HQ, modulatables, modSys6::gui::ParameterType::Switch),
-	lookahead(utils, "Lookahead", "Lookahead aligns the average position of the vibrato with the dry signal.", modSys6::PID::Lookahead, modulatables, modSys6::gui::ParameterType::Switch),
+    paramRandomizer(utils, modulatables),
+	hq(utils, "HQ", "Strong vibrato causes less 'grainy' sidelobes with 4x oversampling.", modSys6::PID::HQ, modulatables, gui::ParameterType::Switch),
+	lookahead(utils, "Lookahead", "Lookahead aligns the average position of the vibrato with the dry signal.", modSys6::PID::Lookahead, modulatables, gui::ParameterType::Switch),
     popUp(utils),
     enterValue(utils),
 
@@ -113,24 +89,16 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     menuButton
     (
         utils,
-        "All the extra stuff.",
-        [this]()
-        {
-            menu2::openMenu(menu, audioProcessor, utils, *this, layout(1, 1, 2, 1).toNearestInt(), menuButton);
-        },
-        [this](juce::Graphics& g, menu2::ButtonM&)
-        {
-            menu2::paintMenuButton(g, menuButton, utils, menu.get());
-        }
+        "All the extra stuff."
     ),
     presetBrowser(utils, *p.appProperties.getUserSettings())
 {
-    nelLabel.font = modSys6::gui::Shared::shared.font;
+    nelLabel.font = gui::Shared::shared.font;
 
     paramRandomizer.add(&stereoConfig);
 
-    visualizer.onPaint = modSys6::gui::makeVibratoVisualizerOnPaint2();
-    visualizer.onUpdate = [&p = audioProcessor](modSys6::gui::Buffer& b)
+    visualizer.onPaint = gui::makeVibratoVisualizerOnPaint2();
+    visualizer.onUpdate = [&p = audioProcessor](gui::Visualizer::Buffer& b)
     {
         const auto& vals = p.visualizerValues;
         bool needsUpdate = false;
@@ -187,8 +155,17 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     addAndMakeVisible(presetBrowser);
     presetBrowser.init(this);
 
+    menuButton.onClick = [this]()
+    {
+        menu2::openMenu(menu, audioProcessor, utils, *this, layout(1, 1, 2, 1).toNearestInt(), menuButton);
+    };
+    menuButton.onPaint = [this](juce::Graphics& g, menu2::Button&)
+    {
+        menu2::paintMenuButton(g, menuButton, utils, menu.get());
+    };
+
     setOpaque(true);
-    modSys6::gui::makeCursor(*this, modSys6::gui::CursorType::Default);
+    gui::makeCursor(*this, gui::CursorType::Default);
 
     for (auto m = 0; m < modComps.size(); ++m)
     {
@@ -216,12 +193,6 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
             const auto type = static_cast<vibrato::ModType>(val);
             modComps[m].setMod(type);
         }
-        {
-            const auto range = modSys6::makeRange::withCentre(.1f, 10000.f, 4.f);
-            const auto val = range.convertFrom0to1(rand.nextFloat());
-            const juce::Identifier id(vibrato::toString(vibrato::ObjType::DelaySize));
-            audioProcessor.modSys.state.setProperty(id, val, nullptr);
-        }
 
         audioProcessor.forcePrepare();
     });
@@ -230,16 +201,41 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     {
         juce::MessageManagerLock lock;
         audioProcessor.savePatch();
-        return audioProcessor.modSys.state;
+        return audioProcessor.params.state;
     };
 
     setResizable(true, true);
     {
         const auto user = p.appProperties.getUserSettings();
-        const auto w = user->getIntValue("BoundsWidth", nelG::Width);
-        const auto h = user->getIntValue("BoundsHeight", nelG::Height);
+        const auto w = user->getIntValue("BoundsWidth", gui::Width);
+        const auto h = user->getIntValue("BoundsHeight", gui::Height);
         setSize(w, h);
     }
+
+    startTimerHz(60);
+}
+
+void Nel19AudioProcessorEditor::timerCallback()
+{
+    nelLabel.updateTimer();
+    tooltips.updateTimer();
+    buildDate.updateTimer();
+    for (auto modulatable : modulatables)
+        modulatable->updateTimer();
+    for (auto& modComp : modComps)
+        modComp.updateTimer();
+    visualizer.updateTimer();
+    macro0Dragger.updateTimer();
+	macro1Dragger.updateTimer();
+	macro2Dragger.updateTimer();
+	macro3Dragger.updateTimer();
+    paramRandomizer.updateTimer();
+    popUp.updateTimer();
+    enterValue.updateTimer();
+    if (menu != nullptr)
+        menu->updateTimer();
+    menuButton.updateTimer();
+    presetBrowser.updateTimer();
 }
 
 void Nel19AudioProcessorEditor::resized()
@@ -249,7 +245,9 @@ void Nel19AudioProcessorEditor::resized()
     else if (getHeight() < MinEditorBounds)
         return setBounds(0, 0, getWidth(), MinEditorBounds);
 
-    const auto thicc = modSys6::gui::Shared::shared.thicc;
+    utils.resized();
+
+    const auto thicc = utils.thicc;
 
     layout.setBounds(getLocalBounds().toFloat().reduced(thicc));
     layoutBottomBar.setBounds(layout.bottomBar());
@@ -309,7 +307,7 @@ void Nel19AudioProcessorEditor::resized()
     popUp.setBounds({ 0, 0, 100, 50 });
     enterValue.setBounds({ 0, 0, 100, 50 });
 
-    layout.place(presetBrowser, 1, 1, 2, 1, 0.f, false);
+    layout.place(presetBrowser, 1, 1, 2, 1, 0.f);
 
     {
         auto user = audioProcessor.appProperties.getUserSettings();
@@ -317,12 +315,13 @@ void Nel19AudioProcessorEditor::resized()
         user->setValue("BoundsHeight", getHeight());
     }
     
-    layout.place(menu.get(), 1, 1, 2, 2, 0.f, false);
+    layout.place(menu.get(), 1, 1, 2, 2, 0.f);
 }
 
 void Nel19AudioProcessorEditor::paint(juce::Graphics& g)
 {
-    g.fillAll(utils.colour(modSys6::gui::ColourID::Bg));
+    auto& shared = gui::Shared::shared;
+    g.fillAll(shared.colour(gui::ColourID::Bg));
 }
 
 void Nel19AudioProcessorEditor::mouseEnter(const juce::MouseEvent&)

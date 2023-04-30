@@ -19,9 +19,10 @@ Nel19AudioProcessor::Nel19AudioProcessor()
     ),
     Timer(),
     appProperties(),
+    standalonePlayHead(),
     audioBufferD(),
     dryWet(),
-    modSys(*this, [this]() { loadPatch(); }),
+    params(*this),
     oversampling(),
     modulators(),
     modsBuffer(),
@@ -131,17 +132,19 @@ const juce::String Nel19AudioProcessor::getProgramName(int)
     return {};
 }
 
-void Nel19AudioProcessor::changeProgramName(int, const juce::String&)
+void Nel19AudioProcessor::changeProgramName(int, const String&)
 {}
 
 void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize)
 {
+    standalonePlayHead.prepare(sampleRate);
+    
     audioBufferD.setSize(2, maxBufferSize, false, true, false);
 
     using PID = modSys6::PID;
 
     //const auto delaySizeMs = 13.;
-    const auto delaySizeMs = static_cast<double>(modSys.getParam(PID::BufferSize)->getValSumDenorm());
+    const auto delaySizeMs = static_cast<double>(params(PID::BufferSize).getValSumDenorm());
     const auto delaySizeD = std::round(sampleRate * delaySizeMs / 1000.);
 	auto delaySize = static_cast<int>(delaySizeD);
     if (delaySize % 2 != 0)
@@ -150,13 +153,13 @@ void Nel19AudioProcessor::prepareToPlay(double sampleRate, int maxBufferSize)
     
     dryWet.prepare(sampleRate, maxBufferSize, delaySizeHalf);
 
-    const auto lookaheadEnabled = modSys.getParam(PID::Lookahead)->getValueSum() > .5f;
+    const auto lookaheadEnabled = params(PID::Lookahead).getValueSum() > .5f;
 
 	auto latency = delaySizeHalf * (lookaheadEnabled ? 1 : 0);
     
     bool osEnabled = false;
 #if OversamplingEnabled && !DebugModsBuffer
-	osEnabled = modSys.getParam(PID::HQ)->getValueSum() > .5f;
+	osEnabled = params(PID::HQ).getValueSum() > .5f;
     oversampling.prepareToPlay(sampleRate, maxBufferSize, osEnabled);
 
     const auto sampleRateUpD = oversampling.getSampleRateUpsampled();
@@ -205,7 +208,7 @@ bool Nel19AudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) con
 }
 
 
-void Nel19AudioProcessor::processBlock(AudioBufferF& buffer, juce::MidiBuffer& midi)
+void Nel19AudioProcessor::processBlock(AudioBufferF& buffer, MidiBuffer& midi)
 {
     auto samplesD = audioBufferD.getArrayOfWritePointers();
 	auto samplesF = buffer.getArrayOfWritePointers();
@@ -221,18 +224,17 @@ void Nel19AudioProcessor::processBlock(AudioBufferF& buffer, juce::MidiBuffer& m
 			samplesF[ch][s] = static_cast<float>(samplesD[ch][s]);
 }
 
-void Nel19AudioProcessor::processBlockBypassed(AudioBufferF& buffer, juce::MidiBuffer& midi)
+void Nel19AudioProcessor::processBlockBypassed(AudioBufferF& buffer, MidiBuffer&)
 {
     auto samplesD = audioBufferD.getArrayOfWritePointers();
 
     for (auto ch = 0; ch < buffer.getNumChannels(); ++ch)
-        juce::FloatVectorOperations::clear(samplesD[ch], buffer.getNumSamples());
+        SIMD::clear(samplesD[ch], buffer.getNumSamples());
 
-    processBlock(audioBufferD, midi);
+    params.processMacros();
 }
 
-
-void Nel19AudioProcessor::processBlock(AudioBufferD& buffer, juce::MidiBuffer& midi)
+void Nel19AudioProcessor::processBlock(AudioBufferD& buffer, MidiBuffer& midi)
 {
     juce::ScopedNoDenormals noDenormals;
     const auto numSamples = buffer.getNumSamples();
@@ -243,10 +245,15 @@ void Nel19AudioProcessor::processBlock(AudioBufferD& buffer, juce::MidiBuffer& m
             buffer.clear(ch, 0, numSamples);
     }
 	const auto numChannels = buffer.getNumChannels();
-    const auto _playHead = getPlayHead();
-    playHead.store(_playHead);
     
-    modSys.processBlock(numSamples, playHead);
+    dsp::synthesizeTransport
+    (
+        getPlayHead(),
+        standalonePlayHead,
+        numSamples
+    );
+    
+    params.processMacros();
     
     if (numSamples == 0)
     {
@@ -258,12 +265,12 @@ void Nel19AudioProcessor::processBlock(AudioBufferD& buffer, juce::MidiBuffer& m
     const auto samplesRead = buffer.getArrayOfReadPointers();
     auto samples = buffer.getArrayOfWritePointers();
 
-	const auto dryWetMix = modSys.getParam(modSys6::PID::DryWetMix)->getValueSum();
-	const auto lookaheadEnabled = modSys.getParam(modSys6::PID::Lookahead)->getValueSum() > .5f;
+	const auto dryWetMix = params(modSys6::PID::DryWetMix).getValueSum();
+	const auto lookaheadEnabled = params(modSys6::PID::Lookahead).getValueSum() > .5f;
     dryWet.saveDry(samplesRead, dryWetMix, numChannels, numSamples, lookaheadEnabled);
     
 #if !DebugModsBuffer
-    const auto midSideEnabled = modSys.getParam(modSys6::PID::StereoConfig)->getValueSum() > .5f;
+    const auto midSideEnabled = params(modSys6::PID::StereoConfig).getValueSum() > .5f;
     if (midSideEnabled && numChannels == 2)
     {
         midSide::encode(samples, numSamples);
@@ -274,11 +281,11 @@ void Nel19AudioProcessor::processBlock(AudioBufferD& buffer, juce::MidiBuffer& m
 #endif
         processBlockVibrato(buffer, midi, lookaheadEnabled);
 
-    const auto gainWet = modSys.getParam(modSys6::PID::WetGain)->getValSumDenorm();
+    const auto gainWet = params(modSys6::PID::WetGain).getValSumDenorm();
     dryWet.processWet(samples, gainWet, numChannels, numSamples);
 }
 
-void Nel19AudioProcessor::processBlockVibrato(AudioBufferD& bufferOut, const juce::MidiBuffer& midi,
+void Nel19AudioProcessor::processBlockVibrato(AudioBufferD& bufferOut, const MidiBuffer& midi,
     bool lookaheadEnabled) noexcept
 {
     const auto numChannels = bufferOut.getNumChannels();
@@ -291,7 +298,6 @@ void Nel19AudioProcessor::processBlockVibrato(AudioBufferD& bufferOut, const juc
     const auto samplesRead = buffer.getArrayOfReadPointers();
     const auto numSamples = buffer.getNumSamples();
     
-    auto curPlayHead = getPlayHead();
     using namespace modSys6;
     
     // PROCESS MODULATORS
@@ -307,75 +313,82 @@ void Nel19AudioProcessor::processBlockVibrato(AudioBufferD& bufferOut, const juc
         case vibrato::ModType::AudioRate:
             mod.setParametersAudioRate
             (
-                modSys.getParam(withOffset(PID::AudioRate0Oct, offset))->getValSumDenorm(),
-                modSys.getParam(withOffset(PID::AudioRate0Semi, offset))->getValSumDenorm(),
-                modSys.getParam(withOffset(PID::AudioRate0Fine, offset))->getValSumDenorm(),
-                modSys.getParam(withOffset(PID::AudioRate0Width, offset))->getValSumDenorm(),
-                modSys.getParam(withOffset(PID::AudioRate0RetuneSpeed, offset))->getValSumDenorm(),
-                modSys.getParam(withOffset(PID::AudioRate0Atk, offset))->getValSumDenorm(),
-                modSys.getParam(withOffset(PID::AudioRate0Dcy, offset))->getValSumDenorm(),
-                modSys.getParam(withOffset(PID::AudioRate0Sus, offset))->getValSumDenorm(),
-                modSys.getParam(withOffset(PID::AudioRate0Rls, offset))->getValSumDenorm()
+                params(withOffset(PID::AudioRate0Oct, offset)).getValSumDenorm(),
+                params(withOffset(PID::AudioRate0Semi, offset)).getValSumDenorm(),
+                params(withOffset(PID::AudioRate0Fine, offset)).getValSumDenorm(),
+                params(withOffset(PID::AudioRate0Width, offset)).getValSumDenorm(),
+                params(withOffset(PID::AudioRate0RetuneSpeed, offset)).getValSumDenorm(),
+                params(withOffset(PID::AudioRate0Atk, offset)).getValSumDenorm(),
+                params(withOffset(PID::AudioRate0Dcy, offset)).getValSumDenorm(),
+                params(withOffset(PID::AudioRate0Sus, offset)).getValSumDenorm(),
+                params(withOffset(PID::AudioRate0Rls, offset)).getValSumDenorm()
             );
             break;
         case vibrato::ModType::Perlin:
             mod.setParametersPerlin
             (
-                static_cast<double>(modSys.getParam(withOffset(PID::Perlin0RateHz, offset))->getValSumDenorm()),
-                static_cast<double>(modSys.getParam(withOffset(PID::Perlin0RateBeats, offset))->getValSumDenorm()),
-                modSys.getParam(withOffset(PID::Perlin0Octaves, offset))->getValSumDenorm(),
-                modSys.getParam(withOffset(PID::Perlin0Width, offset))->getValSumDenorm(),
-                modSys.getParam(withOffset(PID::Perlin0Phase, offset))->getValSumDenorm(),
-				perlin::Shape(std::round(modSys.getParam(withOffset(PID::Perlin0Shape, offset))->getValSumDenorm())),
-                modSys.getParam(withOffset(PID::Perlin0RateType, offset))->getValueSum() > .5f,
-				modSys.getParam(withOffset(PID::Perlin0RandType, offset))->getValSumDenorm() > .5f
+                static_cast<double>(params(withOffset(PID::Perlin0RateHz, offset)).getValSumDenorm()),
+                static_cast<double>(params(withOffset(PID::Perlin0RateBeats, offset)).getValSumDenorm()),
+                params(withOffset(PID::Perlin0Octaves, offset)).getValSumDenorm(),
+                params(withOffset(PID::Perlin0Width, offset)).getValSumDenorm(),
+                params(withOffset(PID::Perlin0Phase, offset)).getValSumDenorm(),
+				perlin::Shape(std::round(params(withOffset(PID::Perlin0Shape, offset)).getValSumDenorm())),
+                params(withOffset(PID::Perlin0RateType, offset)).getValueSum() > .5f,
+				params(withOffset(PID::Perlin0RandType, offset)).getValSumDenorm() > .5f
             );
             break;
         case vibrato::ModType::Dropout:
             mod.setParametersDropout
             (
-                modSys.getParam(withOffset(PID::Dropout0Decay, offset))->getValSumDenorm(),
-                modSys.getParam(withOffset(PID::Dropout0Spin, offset))->getValSumDenorm(),
-                modSys.getParam(withOffset(PID::Dropout0Chance, offset))->getValSumDenorm(),
-                modSys.getParam(withOffset(PID::Dropout0Smooth, offset))->getValSumDenorm(),
-                modSys.getParam(withOffset(PID::Dropout0Width, offset))->getValueSum()
+                params(withOffset(PID::Dropout0Decay, offset)).getValSumDenorm(),
+                params(withOffset(PID::Dropout0Spin, offset)).getValSumDenorm(),
+                params(withOffset(PID::Dropout0Chance, offset)).getValSumDenorm(),
+                params(withOffset(PID::Dropout0Smooth, offset)).getValSumDenorm(),
+                params(withOffset(PID::Dropout0Width, offset)).getValueSum()
             );
             break;
         case vibrato::ModType::EnvFol:
             mod.setParametersEnvFol
             (
-                modSys.getParam(withOffset(PID::EnvFol0Attack, offset))->getValSumDenorm(),
-                modSys.getParam(withOffset(PID::EnvFol0Release, offset))->getValSumDenorm(),
-                modSys.getParam(withOffset(PID::EnvFol0Gain, offset))->getValSumDenorm(),
-                modSys.getParam(withOffset(PID::EnvFol0Width, offset))->getValueSum()
+                params(withOffset(PID::EnvFol0Attack, offset)).getValSumDenorm(),
+                params(withOffset(PID::EnvFol0Release, offset)).getValSumDenorm(),
+                params(withOffset(PID::EnvFol0Gain, offset)).getValSumDenorm(),
+                params(withOffset(PID::EnvFol0Width, offset)).getValueSum()
             );
             break;
         case vibrato::ModType::Macro:
             mod.setParametersMacro
             (
-                modSys.getParam(withOffset(PID::Macro0, offset))->getValSumDenorm()
+                params(withOffset(PID::Macro0, offset)).getValSumDenorm()
             );
             break;
         case vibrato::ModType::Pitchwheel:
             mod.setParametersPitchbend
             (
-                modSys.getParam(withOffset(PID::Pitchbend0Smooth, offset))->getValSumDenorm()
+                params(withOffset(PID::Pitchbend0Smooth, offset)).getValSumDenorm()
             );
             break;
         case vibrato::ModType::LFO:
             mod.setParametersLFO
             (
-                modSys.getParam(withOffset(PID::LFO0FreeSync, offset))->getValueSum() > .5f,
-                modSys.getParam(withOffset(PID::LFO0RateFree, offset))->getValSumDenorm(),
-                modSys.getParam(withOffset(PID::LFO0RateSync, offset))->getValSumDenorm(),
-                modSys.getParam(withOffset(PID::LFO0Waveform, offset))->getValueSum(),
-                modSys.getParam(withOffset(PID::LFO0Phase, offset))->getValSumDenorm(),
-                modSys.getParam(withOffset(PID::LFO0Width, offset))->getValSumDenorm()
+                params(withOffset(PID::LFO0FreeSync, offset)).getValueSum() > .5f,
+                params(withOffset(PID::LFO0RateFree, offset)).getValSumDenorm(),
+                params(withOffset(PID::LFO0RateSync, offset)).getValSumDenorm(),
+                params(withOffset(PID::LFO0Waveform, offset)).getValueSum(),
+                params(withOffset(PID::LFO0Phase, offset)).getValSumDenorm(),
+                params(withOffset(PID::LFO0Width, offset)).getValSumDenorm()
             );
             break;
         }
         
-        mod.processBlock(samplesRead, midi, curPlayHead, numChannels, numSamples);
+        mod.processBlock
+        (
+            samplesRead,
+            midi,
+            standalonePlayHead.posInfo,
+            numChannels,
+            numSamples
+        );
     }
 
     auto modsBuf = modsBuffer.getArrayOfWritePointers();
@@ -384,17 +397,17 @@ void Nel19AudioProcessor::processBlockVibrato(AudioBufferD& bufferOut, const juc
 
     // FILL MODBUFFER WITH MODULATORS
     {
-        const auto modsMixV = modSys.getParam(modSys6::PID::ModsMix)->getValueSum();
-        const auto depthV = modSys.getParam(modSys6::PID::Depth)->getValueSum();
+        const auto modsMixV = params(modSys6::PID::ModsMix).getValueSum();
+        const auto depthV = params(modSys6::PID::Depth).getValueSum();
         
         auto modsMixInfo = modsMix(modsMixV, numSamples);
 		auto depthInfo = depth(depthV, numSamples);
         depthBuf = depthInfo.buf;
         
         if(!modsMixInfo.smoothing)
-			juce::FloatVectorOperations::fill(modsMixInfo.buf, modsMixV, numSamples);
+			SIMD::fill(modsMixInfo.buf, modsMixV, numSamples);
 		if (!depthInfo.smoothing)
-			juce::FloatVectorOperations::fill(depthBuf, depthV, numSamples);
+			SIMD::fill(depthBuf, depthV, numSamples);
         
         for (auto ch = 0; ch < numChannels; ++ch)
         {
@@ -415,7 +428,7 @@ void Nel19AudioProcessor::processBlockVibrato(AudioBufferD& bufferOut, const juc
     }
 
 #if DebugModsBuffer
-    const auto depthV = modSys.getParam(modSys6::PID::Depth)->getValueSum();
+    const auto depthV = params(modSys6::PID::Depth).getValueSum();
     for (auto ch = 0; ch < numChannels; ++ch)
     {
         const auto mAll = modsBuf[ch];
@@ -425,8 +438,8 @@ void Nel19AudioProcessor::processBlockVibrato(AudioBufferD& bufferOut, const juc
         visualizerValues[ch] = mAll[numSamples - 1];
     }
 #else
-	const auto feedback = static_cast<double>(modSys.getParam(modSys6::PID::Feedback)->getValSumDenorm());
-	const auto dampHz = static_cast<double>(modSys.getParam(modSys6::PID::Damp)->getValSumDenorm());
+	const auto feedback = static_cast<double>(params(modSys6::PID::Feedback).getValSumDenorm());
+	const auto dampHz = static_cast<double>(params(modSys6::PID::Damp).getValSumDenorm());
     vibrat
     (
         buffer.getArrayOfWritePointers(),
@@ -447,11 +460,11 @@ void Nel19AudioProcessor::processBlockVibrato(AudioBufferD& bufferOut, const juc
 #endif
 }
 
-void Nel19AudioProcessor::processBlockBypassed(AudioBufferD& buffer, juce::MidiBuffer&)
+void Nel19AudioProcessor::processBlockBypassed(AudioBufferD& buffer, MidiBuffer&)
 {
     juce::ScopedNoDenormals noDenormals;
     const auto numSamples = buffer.getNumSamples();
-    modSys.processBlock(numSamples, getPlayHead());
+    params.processMacros();
     if (numSamples == 0)
         return;
 	auto numChannels = buffer.getNumChannels();
@@ -461,11 +474,14 @@ void Nel19AudioProcessor::processBlockBypassed(AudioBufferD& buffer, juce::MidiB
         samples,
         numChannels,
         numSamples,
-        modSys.getParam(modSys6::PID::Lookahead)->getValueSum() > .5f
+        params(modSys6::PID::Lookahead).getValueSum() > .5f
     );
 }
 
-bool Nel19AudioProcessor::hasEditor() const { return true; }
+bool Nel19AudioProcessor::hasEditor() const
+{
+    return true;
+}
 
 juce::AudioProcessorEditor* Nel19AudioProcessor::createEditor()
 {
@@ -479,21 +495,21 @@ void Nel19AudioProcessor::getStateInformation(juce::MemoryBlock& destData)
     modSys.state.removeAllChildren(nullptr);
     modSys.state.removeAllProperties(nullptr);
 #endif
-    std::unique_ptr<juce::XmlElement> xml(modSys.state.createXml());
+    std::unique_ptr<juce::XmlElement> xml(params.state.createXml());
     copyXmlToBinary(*xml, destData);
 }
 
 void Nel19AudioProcessor::savePatch()
 {
-    modSys.savePatch();
+    params.savePatch();
     {
         const auto modTypeID = vibrato::toString(vibrato::ObjType::ModType);
         const juce::Identifier id(modTypeID);
-        auto modTypeState = modSys.state.getChildWithName(id);
+        auto modTypeState = params.state.getChildWithName(id);
         if (!modTypeState.isValid())
         {
             modTypeState = juce::ValueTree(id);
-            modSys.state.appendChild(modTypeState, nullptr);
+            params.state.appendChild(modTypeState, nullptr);
         }
         for (auto m = 0; m < NumActiveMods; ++m)
         {
@@ -503,15 +519,15 @@ void Nel19AudioProcessor::savePatch()
         }
     }
     for (auto m = 0; m < NumActiveMods; ++m)
-        modulators[m].savePatch(modSys.state, m);
+        modulators[m].savePatch(params.state, m);
 }
 
 void Nel19AudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
     std::unique_ptr<juce::XmlElement> xmlState(getXmlFromBinary(data, sizeInBytes));
     if (xmlState.get() != nullptr)
-        if (xmlState->hasTagName(modSys.state.getType()))
-            modSys.state = juce::ValueTree::fromXml(*xmlState);
+        if (xmlState->hasTagName(params.state.getType()))
+            params.state = juce::ValueTree::fromXml(*xmlState);
     loadPatch();
 #if RemoveValueTree
     modSys.state.removeAllChildren(nullptr);
@@ -522,10 +538,10 @@ void Nel19AudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 void Nel19AudioProcessor::loadPatch()
 {
     suspendProcessing(true);
-    modSys.loadPatch();
+    params.loadPatch();
     {
         const auto modTypeID = vibrato::toString(vibrato::ObjType::ModType);
-        const auto modTypeState = modSys.state.getChildWithName(modTypeID);
+        const auto modTypeState = params.state.getChildWithName(modTypeID);
         if (modTypeState.isValid())
         {
             for (auto m = 0; m < NumActiveMods; ++m)
@@ -542,7 +558,7 @@ void Nel19AudioProcessor::loadPatch()
         }
     }
     for (auto m = 0; m < modulators.size(); ++m)
-        modulators[m].loadPatch(modSys.state, m);
+        modulators[m].loadPatch(params.state, m);
     
     prepareToPlay(getSampleRate(), getBlockSize());
 
@@ -560,11 +576,11 @@ void Nel19AudioProcessor::timerCallback()
 {
     using PID = modSys6::PID;
 #if OversamplingEnabled && !DebugModsBuffer
-    const bool oversamplingChanged = (modSys.getParam(PID::HQ)->getValueSum() > .5f) != oversampling.isEnabled();
+    const bool oversamplingChanged = (params(PID::HQ).getValueSum() > .5f) != oversampling.isEnabled();
 #else
 	const bool oversamplingChanged = false;
 #endif
-	const auto bufferSize = static_cast<int>(std::round(modSys.getParam(PID::BufferSize)->getValSumDenorm()));
+	const auto bufferSize = static_cast<int>(std::round(params(PID::BufferSize).getValSumDenorm()));
     const auto bufferSizeVibrato = static_cast<int>(std::round(vibrat.getSizeInMs(oversampling.getSampleRateUpsampled())));
     //DBG(bufferSize << " :: " << bufferSizeVibrato);
     const bool bufferSizeChanged = bufferSize != bufferSizeVibrato;
@@ -572,7 +588,7 @@ void Nel19AudioProcessor::timerCallback()
     const auto curLatency = getLatencySamples();
     const auto latencyWithoutOversampling = curLatency - oversampling.getLatency();
     const auto hasLatency = latencyWithoutOversampling != 0;
-    const bool lookaheadChanged = (modSys.getParam(PID::Lookahead)->getValueSum() > .5f) != hasLatency;
+    const bool lookaheadChanged = (params(PID::Lookahead).getValueSum() > .5f) != hasLatency;
     
     if (oversamplingChanged || lookaheadChanged || bufferSizeChanged)
         forcePrepare();

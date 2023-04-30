@@ -2,8 +2,31 @@
 #include <JuceHeader.h>
 #define DebugLayout false && JUCE_DEBUG
 
-namespace nelG
+namespace gui
 {
+    using Path = juce::Path;
+    using Stroke = juce::PathStrokeType;
+    using Bounds = juce::Rectangle<int>;
+    using BoundsF = juce::Rectangle<float>;
+    using Point = juce::Point<int>;
+    using PointF = juce::Point<float>;
+    using Line = juce::Line<int>;
+    using LineF = juce::Line<float>;
+    using Just = juce::Justification;
+    using String = juce::String;
+    using Graphics = juce::Graphics;
+    using Colour = juce::Colour;
+    using Font = juce::Font;
+    using Component = juce::Component;
+    using Timer = juce::Timer;
+    using Mouse = juce::MouseEvent;
+    using MouseWheel = juce::MouseWheelDetails;
+    using Image = juce::Image;
+    using Just = juce::Justification;
+    using Random = juce::Random;
+    using ValueTree = juce::ValueTree;
+	using Identifier = juce::Identifier;
+    
     // MATH UTILS
     static constexpr float Pi = 3.14159265359f;
     static constexpr float Tau = 6.28318530718f;
@@ -13,12 +36,17 @@ namespace nelG
     static constexpr int Width = 546;
     static constexpr int Height = 447;
 
-    inline juce::Rectangle<float> maxQuadIn(const juce::Rectangle<float>& b) noexcept
+    inline BoundsF maxQuadIn(const BoundsF& b) noexcept
     {
         const auto minDimen = std::min(b.getWidth(), b.getHeight());
         const auto x = b.getX() + .5f * (b.getWidth() - minDimen);
         const auto y = b.getY() + .5f * (b.getHeight() - minDimen);
         return { x, y, minDimen, minDimen };
+    }
+
+    inline BoundsF maxQuadIn(Bounds b) noexcept
+    {
+        return maxQuadIn(b.toFloat());
     }
 
     class Layout
@@ -259,49 +287,57 @@ namespace nelG
 #endif
     };
 
-    inline void fillAndOutline(juce::Graphics& g, juce::Rectangle<float> bounds, juce::Colour bg, juce::Colour lines = juce::Colours::transparentBlack)
+    inline void fillAndOutline(Graphics& g, BoundsF bounds, float thicc,
+        Colour bg, Colour lines = juce::Colours::transparentBlack)
     {
-        const auto thicc = modSys6::gui::Shared::shared.thicc;
         g.setColour(bg);
         g.fillRoundedRectangle(bounds, thicc);
         g.setColour(lines);
         g.drawRoundedRectangle(bounds, thicc, thicc);
     }
     
-    inline void fillAndOutline(juce::Graphics& g, const juce::Component& comp, juce::Colour bg, juce::Colour lines = juce::Colours::transparentBlack) {
-        fillAndOutline(g, comp.getBounds().toFloat(), bg, lines);
+    inline void fillAndOutline(Graphics& g, const Component& comp, float thicc,
+        Colour bg, Colour lines = juce::Colours::transparentBlack)
+    {
+        fillAndOutline(g, comp.getBounds().toFloat(), thicc, bg, lines);
     }
     
-    inline void fillAndOutline(juce::Graphics& g, const Layout& layout, juce::Colour bg, juce::Colour lines = juce::Colours::transparentBlack) {
-        fillAndOutline(g, layout(), bg, lines);
+    inline void fillAndOutline(Graphics& g, const Layout& layout, float thicc,
+        Colour bg, Colour lines = juce::Colours::transparentBlack)
+    {
+        fillAndOutline(g, layout(), thicc, bg, lines);
     }
 
-    inline juce::Image load(const void* d, int s)
+    inline Image load(const void* d, int s)
     {
         auto img = juce::ImageCache::getFromMemory(d, s);
 
         auto b = img.getBounds();
         for (auto y = 0; y < img.getHeight(); ++y)
             for (auto x = 0; x < img.getWidth(); ++x)
-                if (!img.getPixelAt(x, y).isTransparent()) {
+                if (!img.getPixelAt(x, y).isTransparent())
+                {
                     b.setY(y);
                     break;
                 }
         for (auto x = 0; x < img.getWidth(); ++x)
             for (auto y = 0; y < img.getHeight(); ++y)
-                if (!img.getPixelAt(x, y).isTransparent()) {
+                if (!img.getPixelAt(x, y).isTransparent())
+                {
                     b.setX(x);
                     break;
                 }
         for (auto y = img.getHeight() - 1; y > -1; --y)
             for (auto x = img.getWidth() - 1; x > -1; --x)
-                if (!img.getPixelAt(x, y).isTransparent()) {
+                if (!img.getPixelAt(x, y).isTransparent())
+                {
                     b.setHeight(y - b.getY());
                     break;
                 }
         for (auto x = img.getWidth() - 1; x > -1; --x)
             for (auto y = img.getHeight() - 1; y > -1; --y)
-                if (!img.getPixelAt(x, y).isTransparent()) {
+                if (!img.getPixelAt(x, y).isTransparent())
+                {
                     b.setWidth(x - b.getX());
                     break;
                 }
@@ -310,10 +346,15 @@ namespace nelG
         return img.getClippedImage(b).createCopy();
     }
     
-    inline juce::Image load(const void* d, int s, int scale)
+    inline Image load(const void* d, int s, int scale)
     {
         const auto img = load(d, s);
-        return img.rescaled(img.getWidth() * scale, img.getHeight() * scale, juce::Graphics::lowResamplingQuality).createCopy();
+        return img.rescaled
+        (
+            img.getWidth() * scale,
+            img.getHeight() * scale,
+            Graphics::lowResamplingQuality
+        ).createCopy();
     }
 }
 

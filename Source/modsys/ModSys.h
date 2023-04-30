@@ -1,9 +1,12 @@
 #pragma once
+#include "../FormulaParser.h"
 #include <JuceHeader.h>
 
 namespace modSys6
 {
 	using String = juce::String;
+	using Identifier = juce::Identifier;
+	using ValueTree = juce::ValueTree;
 
 	inline float nextLowestPowTwoX(float x) noexcept
 	{
@@ -68,8 +71,8 @@ namespace modSys6
 		NumParams
 	};
 	
-	static constexpr int NumMSParams = static_cast<int>(PID::MSMacro3) + 1;
-	static constexpr int NumParamsPerMod = static_cast<int>(PID::Perlin1RateHz) - NumMSParams;
+	static constexpr int NumMacros = static_cast<int>(PID::MSMacro3) + 1;
+	static constexpr int NumParamsPerMod = static_cast<int>(PID::Perlin1RateHz) - NumMacros;
 	static constexpr int NumParams = static_cast<int>(PID::NumParams);
 	
 	inline String toString(PID pID)
@@ -166,12 +169,27 @@ namespace modSys6
 		}
 	}
 	
-	inline int withOffset(PID p, int o) noexcept
+	inline PID withOffset(PID p, int o) noexcept
 	{
-		return static_cast<int>(p) + o;
+		return static_cast<PID>(static_cast<int>(p) + o);
 	}
 
-	enum class Unit { Percent, Hz, Beats, Degree, Octaves, Semi, Fine, Ms, Decibel, Power, PerlinShape, PerlinRandType, NumUnits };
+	enum class Unit
+	{
+		Percent,
+		Hz,
+		Beats,
+		Degree,
+		Octaves,
+		Semi,
+		Fine,
+		Ms,
+		Decibel,
+		Power,
+		PerlinShape,
+		PerlinRandType,
+		NumUnits
+	};
 	
 	inline String toString(Unit pID)
 	{
@@ -190,73 +208,15 @@ namespace modSys6
 		}
 	}
 
-	enum class ModType { None, Macro, Perlin, LFO, NumTypes };
-	
-	static constexpr int NumModTypes = static_cast<int>(ModType::NumTypes);
-	
-	inline String toString(ModType t)
-	{
-		switch (t)
-		{
-		case ModType::Macro: return "Macro";
-		case ModType::Perlin: return "Perlin";
-		case ModType::LFO: return "LFO";
-		default: return "";
-		}
-	}
-	
-	struct ModTypeContext
-	{
-		ModTypeContext(ModType t = ModType::None, int _idx = -1) :
-			type(t),
-			idx(_idx)
-		{}
-
-		ModType type; int idx;
-
-		bool valid() const noexcept { return type != ModType::None; }
-		
-		bool operator==(ModTypeContext o) const noexcept { return type == o.type && idx == o.idx; }
-		
-		bool operator!=(ModTypeContext o) const noexcept { return !this->operator==(o); }
-		
-	};
-	
-	inline String toString(ModTypeContext mtc)
-	{
-		return toString(mtc.type) + juce::String(mtc.idx);
-	}
-
 	using ValToStrFunc = std::function<String(float)>;
 	using StrToValFunc = std::function<float(const String&)>;
 
-	enum class WaveForm { Sine, Triangle, Saw, Square, Noise, NumWaveForms };
-	
-	inline String toString(WaveForm wf)
+	namespace stateID
 	{
-		switch (wf)
-		{
-		case WaveForm::Sine: return "Sine";
-		case WaveForm::Triangle: return "Triangle";
-		case WaveForm::Saw: return "Saw";
-		case WaveForm::Square: return "Square";
-		case WaveForm::Noise: return "Noise";
-		default: return "";
-		}
-	}
-
-	struct StateIDs
-	{
-		juce::Identifier state{ "state" };
-		juce::Identifier params{ "params" };
-		juce::Identifier param{ "param" };
-		juce::Identifier name{ "name" };
-		juce::Identifier value{ "value" };
-		juce::Identifier locked{ "locked" };
-
-		juce::Identifier connex{ "connex" };
-		juce::Identifier connec{ "connec" };
-		juce::Identifier mod{ "mod" };
+		inline Identifier state() { return "state"; };
+		inline Identifier params() { return "params"; };
+		inline Identifier value() { return "value"; };
+		inline Identifier modDepth(int m) { return "moddepth" + String(m); };
 	};
 
 	using Range = juce::NormalisableRange<float>;
@@ -581,7 +541,7 @@ namespace modSys6
 	{
 		Param(const PID pID, const Range& _range, const float _valDenormDefault,
 			const ValToStrFunc& _valToStr, const StrToValFunc& _strToVal,
-			const Unit _unit = Unit::NumUnits, const ModTypeContext _attachedMod = ModTypeContext(ModType::None, -1)) :
+			const Unit _unit = Unit::NumUnits, int _attachedMod = -1) :
 
 			juce::AudioProcessorParameter(),
 			id(pID),
@@ -589,57 +549,98 @@ namespace modSys6
 			attachedMod(_attachedMod),
 			valDenormDefault(_valDenormDefault),
 			valNorm(range.convertTo0to1(_valDenormDefault)),
+			modDepth{ 0.f, 0.f, 0.f, 0.f },
 			valToStr(_valToStr),
 			strToVal(_strToVal),
 			unit(_unit),
-
-			valNormMod(0.f), valNormSum(0.f)
+			valNormSum(0.f),
+			locked(false),
+			valMod(0.f)
 		{
 		}
 		
-		Param(const int pID, const Range& _range, const float _valDenormDefault,
-			const ValToStrFunc& _valToStr, const StrToValFunc& _strToVal,
-			const Unit _unit, const ModTypeContext _attachedMod = ModTypeContext(ModType::None, -1)) :
-
-			juce::AudioProcessorParameter(),
-			id(static_cast<PID>(pID)),
-			range(_range),
-			attachedMod(_attachedMod),
-			valDenormDefault(_valDenormDefault),
-			valNorm(range.convertTo0to1(_valDenormDefault)),
-			valToStr(_valToStr),
-			strToVal(_strToVal),
-			unit(_unit),
-
-			valNormMod(0.f), valNormSum(0.f)
+		void savePatch(ValueTree& state) const
 		{
+			const auto nVal = denormalized();
+			state.setProperty(stateID::value(), nVal, nullptr);
+			for (auto i = 0; i < modDepth.size(); ++i)
+			{
+				const auto md = modDepth[i].load();
+				state.setProperty(stateID::modDepth(i), md, nullptr);
+			}
 		}
 
-		//called by host, normalized, thread-safe
-		float getValue() const override { return valNorm.load(); }
-		float denormalized() const noexcept { return range.convertFrom0to1(valNorm.load()); }
+		void loadPatch(ValueTree& state)
+		{
+			if (locked.load())
+				return;
 
-		// called by host, normalized, avoid locks, not used by editor
-		// use setValueNotifyingHost() from the editor
+			auto nVal = static_cast<float>(state.getProperty(stateID::value(), valDenormDefault));
+			nVal = range.convertTo0to1(range.snapToLegalValue(nVal));
+			setValueNotifyingHost(nVal);
+
+			for (auto i = 0; i < modDepth.size(); ++i)
+			{
+				const auto md = static_cast<float>(state.getProperty(stateID::modDepth(i), 0.f));
+				modDepth[i].store(md);
+			}
+		}
+
+		float getValue() const override
+		{
+			return valNorm.load();
+		}
+		
+		float denormalized() const noexcept
+		{
+			return range.convertFrom0to1(valNorm.load());
+		}
+
 		void setValue(float normalized) override
 		{
+			if (locked.load())
+				return;
+			
 			valNorm.store(normalized);
 		}
+		
 		void setValueWithGesture(float norm)
 		{
 			beginChangeGesture();
 			setValueNotifyingHost(norm);
 			endChangeGesture();
 		}
-		void beginGesture() { beginChangeGesture(); }
-		void endGesture() { endChangeGesture(); }
+		
+		void beginGesture()
+		{
+			beginChangeGesture();
+		}
+		
+		void endGesture()
+		{
+			endChangeGesture();
+		}
 
-		float getDefaultValue() const override { return range.convertTo0to1(valDenormDefault); }
+		float getDefaultValue() const override
+		{
+			return range.convertTo0to1(valDenormDefault);
+		}
 
-		String getName(int) const override { return toString(id); }
+		String getName(int) const override
+		{
+			return toString(id);
+		}
+
+		String getID() const
+		{
+			return toID(getName(0));
+		}
 
 		// units of param (hz, % etc.)
-		String getLabel() const override { return toString(unit); }
+		String getLabel() const override
+		{
+			return toString(unit);
+		}
 
 		// string of norm val
 		String getText(float norm, int) const override
@@ -653,45 +654,69 @@ namespace modSys6
 			const auto val = juce::jlimit(range.start, range.end, strToVal(text));
 			return range.convertTo0to1(val);
 		}
+		
 		// string to denorm val
-		float getValForTextDenorm(const String& text) const { return strToVal(text); }
-
-		void processBlockInit() noexcept
+		float getValForTextDenorm(const String& text) const
 		{
-			valNormMod = valNorm.load();
-		}
-		void processBlockModulate(float m) noexcept
-		{
-			valNormMod += m;
-		}
-		void processBlockFinish()
-		{
-			valNormSum = juce::jlimit(0.f, 1.f, valNormMod);
+			return strToVal(text);
 		}
 
-		float getValueSum() const noexcept { return valNormSum; }
+		void setModDepth(float md, int mIdx) noexcept
+		{
+			if (locked.load())
+				return;
+
+			if (id == static_cast<PID>(mIdx))
+				return;
+
+			modDepth[mIdx].store(md);
+		}
+
+		void modulateInit() noexcept
+		{
+			const auto val = valNorm.load();
+			valMod = val;
+		}
+
+		void modulate(float depth, int mIdx) noexcept
+		{
+			const auto mmd = modDepth[mIdx].load();
+			valMod += mmd * depth;
+		}
+
+		void modulateEnd() noexcept
+		{
+			valNormSum.store(juce::jlimit(0.f, 1.f, valMod));
+		}
+
+		float getValueSum() const noexcept
+		{
+			return valNormSum.load();
+		}
+		
 		float getValSumDenorm() const noexcept
 		{
-			return range.snapToLegalValue(range.convertFrom0to1(valNormSum));
+			return range.snapToLegalValue(range.convertFrom0to1(valNormSum.load()));
 		}
 
-		juce::String _toString()
+		String getDescription()
 		{
 			auto v = getValue();
-			return getName(10) + ": " + juce::String(v) + "; " + getText(v, 10) + "; attached to " + toString(attachedMod);
+			return getName(10) + ": " + String(v) + "; " + getText(v, 10) + (attachedMod == -1 ? "" : "; mod: " + String(attachedMod));
 		}
 
 		const PID id;
 		const Range range;
-		const ModTypeContext attachedMod;
-	protected:
+		const int attachedMod;
 		const float valDenormDefault;
 		std::atomic<float> valNorm;
+		std::array<std::atomic<float>, 4> modDepth;
 		ValToStrFunc valToStr;
 		StrToValFunc strToVal;
 		Unit unit;
-
-		float valNormMod, valNormSum;
+		std::atomic<float> valNormSum;
+		std::atomic<bool> locked;
+		float valMod;
 	};
 
 	struct Params
@@ -708,88 +733,124 @@ namespace modSys6
 		}
 
 		Params(juce::AudioProcessor& audioProcessor) :
+			state("state"),
 			params()
 		{
-			const auto strToValDivision = [](const String& txt, const float altVal)
+			const ValToStrFunc valToStrPercent = [](float v)
 			{
-				if (txt.contains(":") || txt.contains("/"))
-				{
-					for (auto i = 0; i < txt.length(); ++i)
-					{
-						if (txt[i] == ':' || txt[i] == '/')
-						{
-							const auto a = txt.substring(0, i).getFloatValue();
-							const auto b = txt.substring(i + 1).getFloatValue();
-							if(b != 0.f)
-								return a / b;
-						}
-					}
-				}
-				return altVal;
+				v = std::round(v * 100.f);
+				return String(v) + " " + toString(Unit::Percent);
 			};
-
-			const ValToStrFunc valToStrPercent = [](float v) { return juce::String(std::floor(v * 100.f)) + " " + toString(Unit::Percent); };
+			
 			const ValToStrFunc valToStrHz = [](float v)
 			{
 				if (v >= 10000.f)
-					return juce::String(v * .001).substring(0, 4) + " khz";
+					return String(v * .001).substring(0, 4) + " khz";
 				else if (v >= 1000.f)
-					return juce::String(v * .001).substring(0, 3) + " khz";
+					return String(v * .001).substring(0, 3) + " khz";
 				else if (v >= 1.f)
-					return juce::String(v).substring(0, 5) + " hz";
+					return String(v).substring(0, 5) + " hz";
 				else
 				{
 					v *= 1000.f;
 
 					if (v >= 100.f)
-						return juce::String(v).substring(0, 3) + " mhz";
+						return String(v).substring(0, 3) + " mhz";
 					else if (v >= 10.f)
-						return juce::String(v).substring(0, 2) + " mhz";
+						return String(v).substring(0, 2) + " mhz";
 					else
-						return juce::String(v).substring(0, 1) + " mhz";
+						return String(v).substring(0, 1) + " mhz";
 				}
 			};
-			const ValToStrFunc valToStrPhase = [](float v) { return juce::String(std::floor(v * 180.f)) + " " + toString(Unit::Degree); };
-			const ValToStrFunc valToStrPhase360 = [](float v) { return juce::String(std::floor(v * 360.f)) + " " + toString(Unit::Degree); };
-			const ValToStrFunc valToStrOct = [](float v) { return juce::String(std::round(v)) + " " + toString(Unit::Octaves); };
-			const ValToStrFunc valToStrOct2 = [](float v) { return juce::String(std::floor(v / 12.f)) + " " + toString(Unit::Octaves); };
-			const ValToStrFunc valToStrSemi = [](float v) { return juce::String(std::floor(v)) + " " + toString(Unit::Semi); };
-			const ValToStrFunc valToStrFine = [](float v) { return juce::String(std::floor(v * 100.f)) + " " + toString(Unit::Fine); };
+			
+			const ValToStrFunc valToStrPhase = [](float v)
+			{
+				return String(std::round(v * 180.f)) + " " + toString(Unit::Degree);
+			};
+			
+			const ValToStrFunc valToStrPhase360 = [](float v)
+			{
+				return String(std::round(v * 360.f)) + " " + toString(Unit::Degree);
+			};
+			
+			const ValToStrFunc valToStrOct = [](float v)
+			{
+				return juce::String(std::round(v)) + " " + toString(Unit::Octaves);
+			};
+			
+			const ValToStrFunc valToStrOct2 = [](float v)
+			{
+				return juce::String(std::round(v / 12.f)) + " " + toString(Unit::Octaves);
+			};
+			
+			const ValToStrFunc valToStrSemi = [](float v)
+			{
+				return String(std::round(v)) + " " + toString(Unit::Semi);
+			};
+			
+			const ValToStrFunc valToStrFine = [](float v)
+			{
+				return juce::String(std::round(v * 100.f)) + " " + toString(Unit::Fine);
+			};
+			
 			const ValToStrFunc valToStrRatio = [](float v)
 			{
-				const auto y = static_cast<int>(std::floor(v * 100.f));
-				return juce::String(100 - y) + " : " + juce::String(y);
+				const auto y = static_cast<int>(std::round(v * 100.f));
+				return String(100 - y) + " : " + String(y);
 			};
-			const ValToStrFunc valToStrLRMS = [](float v) { return v > .5f ? juce::String("m/s") : juce::String("l/r"); };
-			const ValToStrFunc valToStrFreeSync = [](float v) { return v > .5f ? juce::String("sync") : juce::String("free"); };
-			const ValToStrFunc valToStrPolarity = [](float v) { return v > .5f ? juce::String("on") : juce::String("off"); };
-			const ValToStrFunc valToStrMs = [](float v) { return juce::String(std::floor(v * 10.f) * .1f) + " " + toString(Unit::Ms); };
+			
+			const ValToStrFunc valToStrLRMS = [](float v)
+			{
+				return v > .5f ? String("m/s") : String("l/r");
+			};
+			
+			const ValToStrFunc valToStrFreeSync = [](float v)
+			{
+				return v > .5f ? String("sync") : String("free");
+			};
+			
+			const ValToStrFunc valToStrPolarity = [](float v)
+			{
+				return v > .5f ? String("on") : String("off");
+			};
+			
+			const ValToStrFunc valToStrMs = [](float v)
+			{
+				return String(std::round(v * 10.f) * .1f) + " " + toString(Unit::Ms);
+			};
+			
 			const ValToStrFunc valToStrDb = [](float v)
 			{
 				v = std::round(v * 100.f) * .01f;
 				if(v > -120.f)
-					return juce::String(v) + " " + toString(Unit::Decibel);
+					return String(v) + " " + toString(Unit::Decibel);
 				else
-					return juce::String("-inf ") + toString(Unit::Decibel);;
+					return String("-inf ") + toString(Unit::Decibel);;
 			};
-			const ValToStrFunc valToStrEmpty = [](float) { return juce::String(""); };
+			
+			const ValToStrFunc valToStrEmpty = [](float)
+			{
+				return String("");
+			};
+			
 			const ValToStrFunc valToStrSeed = [](float v)
 			{
 				if (v == 0.f)
-					return juce::String("off");
+					return String("off");
 
-				juce::String str("abcde");
+				String str("abcde");
 				juce::Random rnd;
 				for(auto i = 0; i < str.length(); ++i)
 					str = str.replaceCharacter('a' + i, static_cast<juce::juce_wchar>(rnd.nextInt(26) + 'a'));
 				return str;
 			};
+			
 			const ValToStrFunc valToStrBeats2 = [](float v)
 			{
 				enum Mode { Whole, Triplet, Dotted, NumModes };
 					
 				if (v == 0.f)
-					return juce::String("0");
+					return String("0");
 
 				const auto denormFloor = nextLowestPowTwoX(v);
 				const auto denormFrac = v - denormFloor;
@@ -797,9 +858,9 @@ namespace modSys6
 				const auto mode = modeVal < .66f ? Mode::Whole :
 					modeVal < .75f ? Mode::Triplet :
 					Mode::Dotted;
-				const auto modeStr = mode == Mode::Whole ? juce::String("") :
-					mode == Mode::Triplet ? juce::String("t") :
-					juce::String(".");
+				const auto modeStr = mode == Mode::Whole ? String("") :
+					mode == Mode::Triplet ? String("t") :
+					String(".");
 
 				auto denominator = 1.f / denormFloor;
 				auto numerator = 1.f;
@@ -809,14 +870,15 @@ namespace modSys6
 					denominator = 1.f;
 				}
 
-				return juce::String(numerator) + " / " + juce::String(denominator) + modeStr;
+				return String(numerator) + " / " + String(denominator) + modeStr;
 			};
+			
 			const ValToStrFunc valToStrBeatsSlowToFast = [](float v)
 			{
 				enum Mode { Whole, Triplet, Dotted, NumModes };
 
 				if (v == 0.f)
-					return juce::String("0");
+					return String("0");
 
 				v = 1.f / v;
 
@@ -826,9 +888,9 @@ namespace modSys6
 				const auto mode = modeVal >= .5f ? Mode::Dotted :
 					modeVal >= .333f ? Mode::Triplet :
 					Mode::Whole;
-				const auto modeStr = mode == Mode::Whole ? juce::String("") :
-					mode == Mode::Triplet ? juce::String("t") :
-					juce::String(".");
+				const auto modeStr = mode == Mode::Whole ? String("") :
+					mode == Mode::Triplet ? String("t") :
+					String(".");
 
 				auto denominator = 1.f / denormFloor;
 				auto numerator = 1.f;
@@ -838,22 +900,28 @@ namespace modSys6
 					denominator = 1.f;
 				}
 
-				return juce::String(numerator) + " / " + juce::String(denominator) + modeStr;
+				return String(numerator) + " / " + String(denominator) + modeStr;
 			};
 
 			const ValToStrFunc valToStrPower = [](float v)
 			{
-				return juce::String((v > .5f ? "Enabled" : "Disabled"));
+				return String((v > .5f ? "Enabled" : "Disabled"));
 			};
 
-			const StrToValFunc strToValPercent = [strToValDivision](const juce::String& txt)
+			const auto parse = [](const String& str, float defaultVal)
 			{
-				const auto val = strToValDivision(txt, 0.f);
-				if (val != 0.f)
-					return val;
-				return txt.trimCharactersAtEnd(toString(Unit::Percent)).getFloatValue() * .01f;
+				fx::Parser parse;
+				if (parse(str))
+					return parse();
+				return defaultVal;
 			};
-			const StrToValFunc strToValHz = [](const juce::String& txt)
+
+			const StrToValFunc strToValPercent = [parse](const String& txt)
+			{
+				return parse(txt.trimCharactersAtEnd(toString(Unit::Percent)), 0.f) * .01f;
+			};
+			
+			const StrToValFunc strToValHz = [parse](const String& txt)
 			{
 				auto text = txt.trimCharactersAtEnd(toString(Unit::Hz));
 				auto multiplier = 1.f;
@@ -867,70 +935,115 @@ namespace modSys6
 					multiplier = .001f;
 					text = text.dropLastCharacters(1);
 				}
-				const auto val = text.getFloatValue();
+				const auto val = parse(text, 0.f);
 				const auto val2 = val * multiplier;
 
 				return val2;
 			};
-			const StrToValFunc strToValPhase = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Degree)).getFloatValue() / 180.f; };
-			const StrToValFunc strToValPhase360 = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Degree)).getFloatValue() / 360.f; };
-			const StrToValFunc strToValOct = [](const juce::String& txt) { return std::round(txt.trimCharactersAtEnd(toString(Unit::Octaves)).getFloatValue()); };
-			const StrToValFunc strToValOct2 = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Octaves)).getFloatValue() / 12.f; };
-			const StrToValFunc strToValSemi = [](const juce::String& txt) { return std::round(txt.trimCharactersAtEnd(toString(Unit::Semi)).getFloatValue()); };
-			const StrToValFunc strToValFine = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Fine)).getFloatValue() * .01f; };
-			const StrToValFunc strToValRatio = [strToValDivision](const juce::String& txt)
+			
+			const StrToValFunc strToValPhase = [parse](const String& txt)
 			{
-				const auto val = strToValDivision(txt, -1.f);
-				if (val != -1.f)
-					return val;
-				return juce::jlimit(0.f, 1.f, txt.getFloatValue() * .01f);
+				return parse(txt.trimCharactersAtEnd(toString(Unit::Degree)), 0.f) / 180.f;
 			};
-			const StrToValFunc strToValLRMS = [](const juce::String& txt) { return txt[0] == 'l' ? 0.f : 1.f; };
-			const StrToValFunc strToValFreeSync = [](const juce::String& txt) { return txt[0] == 'f' ? 0.f : 1.f; };
-			const StrToValFunc strToValPolarity = [](const juce::String& txt) { return txt[0] == '0' ? 0.f : 1.f; };
-			const StrToValFunc strToValMs = [](const juce::String& txt) { return txt.trimCharactersAtEnd(toString(Unit::Ms)).getFloatValue(); };
-			const StrToValFunc strToValDb = [](const juce::String& txt)
+			
+			const StrToValFunc strToValPhase360 = [parse](const String& txt)
+			{
+				return parse(txt.trimCharactersAtEnd(toString(Unit::Degree)), 0.f) / 360.f;
+			};
+			
+			const StrToValFunc strToValOct = [parse](const String& txt)
+			{
+				return std::round(parse(txt.trimCharactersAtEnd(toString(Unit::Octaves)), 0.f));
+			};
+			
+			const StrToValFunc strToValOct2 = [parse](const String& txt)
+			{
+				return parse(txt.trimCharactersAtEnd(toString(Unit::Octaves)), 0.f) / 12.f;
+			};
+			
+			const StrToValFunc strToValSemi = [parse](const String& txt)
+			{
+				return std::round(parse(txt.trimCharactersAtEnd(toString(Unit::Semi)), 0.f));
+			};
+			
+			const StrToValFunc strToValFine = [parse](const String& txt)
+			{
+				return parse(txt.trimCharactersAtEnd(toString(Unit::Fine)), 0.f) * .01f;
+			};
+			
+			const StrToValFunc strToValRatio = [parse](const String& txt)
+			{
+				return parse(txt, 0.f) * .01f;
+			};
+			
+			const StrToValFunc strToValLRMS = [parse](const String& txt)
+			{
+				return txt[0] == 'l' ? 0.f : 1.f;
+			};
+			
+			const StrToValFunc strToValFreeSync = [parse](const String& txt)
+			{
+				return txt[0] == 'f' ? 0.f : 1.f;
+			};
+			
+			const StrToValFunc strToValPolarity = [parse](const String& txt)
+			{
+				return txt[0] == '0' ? 0.f : 1.f;
+			};
+			
+			const StrToValFunc strToValMs = [parse](const String& txt)
+			{
+				return parse(txt.trimCharactersAtEnd(toString(Unit::Ms)), 0.f);
+			};
+			
+			const StrToValFunc strToValDb = [parse](const String& txt)
 			{
 				if (txt == "inf" || txt == "-inf")
 					return -120.f;
-				return txt.trimCharactersAtEnd(toString(Unit::Decibel)).getFloatValue();
+				return parse(txt.trimCharactersAtEnd(toString(Unit::Decibel)), 0.f);
 			};
-			const StrToValFunc strToValSeed = [](const juce::String& str) { return str.getFloatValue(); };
-			const StrToValFunc strToValBeats2 = [](const juce::String& txt)
+			
+			const StrToValFunc strToValSeed = [parse](const String& str)
+			{
+				return parse(str, 0.f);
+			};
+			
+			const StrToValFunc strToValBeats2 = [parse](const String& txt)
 			{
 				enum Mode { Beats, Triplet, Dotted, NumModes };
 				const auto lastChr = txt[txt.length() - 1];
 				const auto mode = lastChr == 't' ? Mode::Triplet : lastChr == '.' ? Mode::Dotted : Mode::Beats;
 
 				const auto text = mode == Mode::Beats ? txt : txt.substring(0, txt.length() - 1);
-				auto val = txt.getFloatValue();
+				auto val = parse(txt, 0.f);
 				if (mode == Mode::Triplet)
 					val *= 1.666666666667f;
 				else if (mode == Mode::Dotted)
 					val *= 1.75f;
 				return val;
 			};
-			const StrToValFunc strToValBeatsSlowToFast = [](const juce::String& txt)
+			
+			const StrToValFunc strToValBeatsSlowToFast = [parse](const String& txt)
 			{
 				enum Mode { Beats, Triplet, Dotted, NumModes };
 				const auto lastChr = txt[txt.length() - 1];
 				const auto mode = lastChr == 't' ? Mode::Triplet : lastChr == '.' ? Mode::Dotted : Mode::Beats;
 
 				const auto text = mode == Mode::Beats ? txt : txt.substring(0, txt.length() - 1);
-				auto val = txt.getFloatValue();
+				auto val = parse(txt, 1.f);
 				if (mode == Mode::Triplet)
 					val *= 1.666666666667f;
 				else if (mode == Mode::Dotted)
 					val *= 1.75f;
 				return 1.f / val;
 			};
-			const StrToValFunc strToValPower = [](const juce::String& txt)
+			
+			const StrToValFunc strToValPower = [parse](const String& txt)
 			{
 				const auto text = txt.trimCharactersAtEnd(toString(Unit::Power));
 				if (stringNegates(text))
 					return 0.f;
-				const auto val = text.getFloatValue();
-				return val > .5f ? 1.f : 0.f;
+				return parse(text, 0.f);
 			};
 
 			ValToStrFunc valToStrShape = [](float v)
@@ -939,7 +1052,7 @@ namespace modSys6
 					v < 1.5f ? juce::String("Lerp") :
 					juce::String("Round");
 			};
-			StrToValFunc strToValShape = [](const juce::String& str)
+			StrToValFunc strToValShape = [parse](const juce::String& str)
 			{
 				const auto text = str.toLowerCase();
 				if (text == "steppy" || text == "step")
@@ -949,7 +1062,7 @@ namespace modSys6
 				else if (text == "round" || text == "smooth")
 					return 2.f;
 				
-				return str.getFloatValue();
+				return parse(str, 0.f);
 			};
 
 			ValToStrFunc valToStrRandType = [](float v)
@@ -957,7 +1070,7 @@ namespace modSys6
 				return v < .5f ? juce::String("Random") :
 					juce::String("Procedural");
 			};
-			StrToValFunc strToValRandType = [](const String& str)
+			StrToValFunc strToValRandType = [parse](const String& str)
 			{
 				const auto text = str.toLowerCase();
 				if (text == "rand" || text == "random" || text == "randomise" || text == "randomize")
@@ -965,7 +1078,7 @@ namespace modSys6
 				else if (text == "procedural" || text == "proc" || text == "proceduralise" || text == "proceduralize")
 					return 1.f;
 				
-				return str.getFloatValue();
+				return parse(str, 1.f);
 			};
 
 			ValToStrFunc valToStrHQ = [](float v)
@@ -973,7 +1086,7 @@ namespace modSys6
 				return v < .5f ? juce::String("1x") :
 					juce::String("4x");
 			};
-			StrToValFunc strToValHQ = [](const String& str)
+			StrToValFunc strToValHQ = [parse](const String& str)
 			{
 				const auto text = str.toLowerCase();
 				if (text == "1x" || text == "1" || text == "low" || text == "lo" || text == "off" || text == "false")
@@ -989,7 +1102,7 @@ namespace modSys6
 				return v < .5f ? juce::String("Off") :
 					juce::String("On");
 			};
-			StrToValFunc strToValLookahead = [](const String& str)
+			StrToValFunc strToValLookahead = [parse](const String& str)
 			{
 				const auto text = str.toLowerCase();
 				if (text == "off" || text == "false" || text == "0" || text == "Nopezies")
@@ -1007,105 +1120,25 @@ namespace modSys6
 				v /= 1000.f;
 				return String(std::floor(v)) + "k ms";
 			};
-			StrToValFunc strToValBufferSize = [](const String& str)
+			StrToValFunc strToValBufferSize = [parse](const String& str)
 			{
 				auto nStr = str.removeCharacters("ms").removeCharacters(" ");
 				if (nStr[nStr.length() - 1] == 'k')
 				{
-					auto val = nStr.removeCharacters("k").getFloatValue();
+					auto val = parse(nStr.removeCharacters("k"), .001f);
 					return val * 1000.f;
 				}
-				return str.getFloatValue();
+				return parse(str, 1.f);
 			};
 
-			for (auto p = 0; p < NumMSParams; ++p)
+			// ADD MACRO PARAMETERS
+			for (auto p = 0; p < NumMacros; ++p)
 			{
 				const PID pID = static_cast<PID>(p);
-				const auto name = toString(pID);
-
-				juce::NormalisableRange<float> range(0.f, 1.f);
-				float valDenormDefault = 0.f;
-				ValToStrFunc valToStr = [](float v)               { return juce::String(v); };
-				StrToValFunc strToVal = [](const juce::String& t) { return t.getFloatValue(); };
-				Unit unit = Unit::NumUnits;
-				ModTypeContext attachedMod = { ModType::None, getDigitFromString(name) };
-
-				if (name.substring(0, 2) == "MS")
-				{
-					if (name.contains("Macro"))
-					{
-						range = juce::NormalisableRange<float>(0.f, 1.f);
-						valDenormDefault = 0.f;
-						valToStr = valToStrPercent;
-						strToVal = strToValPercent;
-						unit = Unit::Percent;
-						attachedMod.type = ModType::Macro;
-					}
-					else if (name.contains("LFO"))
-					{
-						if (name.contains("Freq Hz"))
-						{
-							range = makeRange::biasXL(.1f, 40.f, -.7f);
-							valDenormDefault = 1.f;
-							valToStr = valToStrHz;
-							strToVal = strToValHz;
-							unit = Unit::Hz;
-							attachedMod.type = ModType::LFO;
-						}
-						else if (name.contains("Freq Sync"))
-						{
-							range = makeRange::beats(1.f, 16.f, false);
-							valDenormDefault = 1.f;
-							valToStr = valToStrBeats2;
-							strToVal = strToValBeats2;
-							unit = Unit::Beats;
-							attachedMod.type = ModType::LFO;
-						}
-						else if (name.contains("Phase"))
-						{
-							range = juce::NormalisableRange<float>(-1.f, 1.f);
-							valDenormDefault = 0.f;
-							valToStr = valToStrPhase;
-							strToVal = strToValPhase;
-							unit = Unit::Degree;
-							attachedMod.type = ModType::LFO;
-						}
-					}
-					else if (name.contains("Perlin"))
-					{
-						if (name.contains("Freq Hz"))
-						{
-							range = makeRange::biasXL(.1f, 40.f, -.7f);
-							valDenormDefault = 1.f;
-							valToStr = valToStrHz;
-							strToVal = strToValHz;
-							unit = Unit::Hz;
-							attachedMod.type = ModType::Perlin;
-						}
-						else if (name.contains("Octaves"))
-						{
-							range = makeRange::biasXL(1, 8, 0);
-							valDenormDefault = 4.f;
-							valToStr = valToStrOct;
-							strToVal = strToValOct;
-							unit = Unit::Octaves;
-							attachedMod.type = ModType::Perlin;
-						}
-						else if (name.contains("Width"))
-						{
-							range = juce::NormalisableRange<float>(0.f, 1.f);
-							valDenormDefault = 0.f;
-							valToStr = valToStrPercent;
-							strToVal = strToValPercent;
-							unit = Unit::Percent;
-							attachedMod.type = ModType::Perlin;
-						}
-					}
-				}
-				params.push_back(new Param(pID, range, valDenormDefault, valToStr, strToVal, unit, attachedMod));
+				params.push_back(new Param(pID, Range(0.f, 1.f), 1.f, valToStrPercent, strToValPercent, Unit::Percent, p));
 			}
 
-			// ADD NON MODSYS PARAMETERS HERE
+			// ADD VIBRATO MODSYS PARAMETERS
 			for (auto m = 0; m < 2; ++m)
 			{
 				const auto offset = m * NumParamsPerMod;
@@ -1152,6 +1185,7 @@ namespace modSys6
 				params.push_back(new Param(withOffset(PID::LFO0Width, offset), makeRange::stepped(0.f, .5f, LFOPhaseStep), 0.f, valToStrPhase360, strToValPhase, Unit::Degree));
 			}
 
+			// ADD GLOBAL PARAMETERS
 			params.push_back(new Param(PID::Depth, makeRange::lin(0.f, 1.f), 1.f, valToStrPercent, strToValPercent, Unit::Percent));
 			params.push_back(new Param(PID::ModsMix, makeRange::biasXL(0.f, 1.f, 0.f), 0.f, valToStrRatio, strToValRatio));
 			params.push_back(new Param(PID::DryWetMix, makeRange::biasXL(0.f, 1.f, 0.f), 1.f, valToStrRatio, strToValRatio));
@@ -1167,65 +1201,71 @@ namespace modSys6
 				audioProcessor.addParameter(param);
 		}
 		
-		void loadPatch(juce::ValueTree state)
+		void loadPatch()
 		{
-			const StateIDs ids;
-
-			auto childParams = state.getChildWithName(ids.params);
+			auto childParams = state.getChildWithName(stateID::params());
 			if (!childParams.isValid())
 				return;
 
-			for (auto c = 0; c < childParams.getNumChildren(); ++c)
+			for (auto param : params)
 			{
-				const auto childParam = childParams.getChild(c);
-				if (childParam.hasType(ids.param))
-				{
-					const auto pName = childParam.getProperty(ids.name).toString();
-					const auto pIdx = getParamIdx(pName);
-					if (pIdx != -1)
-					{
-						const auto pVal = static_cast<float>(childParam.getProperty(ids.value));
-						params[pIdx]->setValueNotifyingHost(pVal);
-					}
-				}
+				const auto id = param->getID();
+				auto childParam = childParams.getChildWithName(id);
+				if(childParam.isValid())
+					param->loadPatch(childParam);
 			}
 		}
 		
-		void savePatch(juce::ValueTree state)
+		void savePatch()
 		{
-			const StateIDs ids;
-
-			auto childParams = state.getChildWithName(ids.params);
+			auto childParams = state.getChildWithName(stateID::params());
 			if (!childParams.isValid())
 			{
-				childParams = juce::ValueTree(ids.params);
+				childParams = ValueTree(stateID::params());
 				state.appendChild(childParams, nullptr);
 			}
 			
 			for (auto param : params)
 			{
-				const auto paramID = toID(toString(param->id));
-				auto childParam = childParams.getChildWithProperty(ids.name, paramID);
+				const auto id = param->getID();
+				auto childParam = childParams.getChildWithName(id);
 				if (!childParam.isValid())
 				{
-					childParam = juce::ValueTree(ids.param);
-					childParam.setProperty(ids.name, paramID, nullptr);
+					childParam = ValueTree(id);
 					childParams.appendChild(childParam, nullptr);
 				}
-				childParam.setProperty(ids.value, param->getValue(), nullptr);
+				param->savePatch(childParam);
 			}
 		}
 
-		void processBlockInit() noexcept
+		void updatePatch(const ValueTree& other)
 		{
-			for (auto p : params)
-				p->processBlockInit();
+			state = other;
+			loadPatch();
 		}
-		
-		void processBlockFinish()
+
+		void processMacros() noexcept
 		{
-			for (auto p : params)
-				p->processBlockFinish();
+			for (auto param : params)
+				param->modulateInit();
+
+			for (auto i = 0; i < NumMacros; ++i)
+			{
+				auto& macro = *params[i];
+				auto depth = macro.getValueSum();
+
+				for (auto j = 0; j < NumParams; ++j)
+				{
+					if (i != j)
+					{
+						auto& param = *params[j];
+						param.modulate(depth, i);
+					}
+				}
+			}
+
+			for (auto param : params)
+				param->modulateEnd();
 		}
 
 		int getParamIdx(const String& name) const noexcept
@@ -1239,402 +1279,43 @@ namespace modSys6
 			return -1;
 		}
 
-		size_t numParams() const noexcept { return params.size(); }
+		size_t numParams() const noexcept
+		{
+			return params.size();
+		}
 
-		Param* operator[](int i) noexcept { return params[i]; }
+		Param* operator[](int i) noexcept
+		{
+			return params[i];
+		}
 		
-		const Param* operator[](int i) const noexcept { return params[i]; }
+		const Param* operator[](int i) const noexcept
+		{
+			return params[i];
+		}
 		
+		Param& operator()(int i) noexcept
+		{
+			return *params[i];
+		}
+
+		const Param& operator()(int i) const noexcept
+		{
+			return *params[i];
+		}
+
+		Param& operator()(PID pID) noexcept
+		{
+			return *params[static_cast<int>(pID)];
+		}
+
+		const Param& operator()(PID pID) const noexcept
+		{
+			return *params[static_cast<int>(pID)];
+		}
+
+		ValueTree state;
 	protected:
 		std::vector<Param*> params;
-	};
-
-	struct Mod
-	{
-		Mod(ModTypeContext _mtc) :
-			mtc(_mtc),
-			params(),
-			val(0.f)
-		{}
-		
-		bool operator==(ModTypeContext other) const noexcept
-		{
-			return other.type == mtc.type && other.idx == mtc.idx;
-		}
-
-		bool hasParam(Param* param)
-		{
-			for (auto p = 0; p < params.size(); ++p)
-				if (params[p]->id == param->id)
-					return true;
-			return false;
-		}
-
-		void processBlock(int /*numSamples*/) noexcept
-		{
-			if(mtc.type == ModType::Macro)
-				val = params[0]->getValueSum();
-			else if(mtc.type == ModType::LFO)
-			{
-				
-			}
-		}
-
-		ModTypeContext mtc;
-		std::vector<Param*> params;
-		float val;
-	};
-
-	struct Mods
-	{
-		Mods(Params& params) :
-			mods()
-		{
-			for (auto p = 0; p < NumParams; ++p)
-			{
-				auto param = params[p];
-				const auto attachedMod = param->attachedMod;
-				if (attachedMod.idx == -1)
-					break;
-				bool foundMod = false;
-				for(size_t m = 0; m < mods.size(); ++m)
-					if (mods[m] == attachedMod)
-					{
-						mods[m].params.push_back(param);
-						foundMod = true;
-						m = mods.size();
-					}
-				if (!foundMod)
-				{
-					mods.push_back(attachedMod);
-					mods.back().params.push_back(param);
-				}
-			}
-		}
-
-		void processBlock(int numSamples) noexcept
-		{
-			for (auto& m : mods)
-				m.processBlock(numSamples);
-		}
-
-		const Mod& operator[](int i) const noexcept { return mods[i]; }
-		Mod& operator[](int i) noexcept { return mods[i]; }
-
-		size_t numMods() const noexcept { return mods.size(); }
-	protected:
-		std::vector<Mod> mods;
-	};
-
-	struct Connec
-	{
-		Connec() :
-			depth(0.f), enabled(0.f),
-			pIdx(0), mIdx(0)
-		{
-		}
-		
-		void disable() noexcept { enabled = 0.f; }
-		
-		void enable(int _mIdx, int _pIdx, float _depth) noexcept
-		{
-			disable();
-			pIdx = _pIdx;
-			mIdx = _mIdx;
-			depth = _depth;
-			enabled = 1.f;
-		}
-		
-		void setDepth(float d) noexcept { depth = d; }
-		
-		float getDepth() const noexcept { return depth; }
-		
-		int getPIdx() const noexcept { return pIdx; }
-		
-		int getMIdx() const noexcept { return mIdx; }
-		
-		void processBlock(Params& params, const Mods& mods) noexcept
-		{
-			const auto val = mods[mIdx].val * depth * enabled;
-			params[pIdx]->processBlockModulate(val);
-		}
-		
-		bool has(int _mIdx, int _pIdx) const noexcept
-		{
-			return isEnabled() && pIdx == _pIdx && mIdx == _mIdx;
-		}
-		
-		bool isEnabled() const noexcept { return enabled > 0.f; }
-		
-		String toString() const
-		{
-			if (enabled != 1.f) return "disabled";
-			return "m: " + juce::String(mIdx) + "; p: " + juce::String(pIdx);
-		}
-
-		void savePatch(juce::ValueTree& connexState, const StateIDs& ids)
-		{
-			juce::ValueTree state(ids.connec);
-			state.setProperty(ids.mod, mIdx, nullptr);
-			state.setProperty(ids.param, pIdx, nullptr);
-			state.setProperty(ids.value, depth, nullptr);
-			connexState.appendChild(state, nullptr);
-		}
-		
-	protected:
-		float depth, enabled;
-		int pIdx, mIdx;
-	};
-	
-	struct Connex
-	{
-		Connex() :
-			connex()
-		{}
-		
-		bool enableConnection(int mIdx, int pIdx, float depth) noexcept
-		{
-			for (auto c = 0; c < connex.size(); ++c)
-				if (!connex[c].isEnabled())
-				{
-					connex[c].enable(mIdx, pIdx, depth);
-					return true;
-				}
-			return false;
-		}
-		
-		int getConnecIdxWith(int mIdx, int pIdx) const noexcept
-		{
-			for (auto c = 0; c < connex.size(); ++c)
-				if (connex[c].has(mIdx, pIdx))
-					return c;
-			return -1;
-		}
-		
-		void processBlock(Params& params, const Mods& mods) noexcept
-		{
-			for (auto& connec : connex)
-				connec.processBlock(params, mods);
-		}
-
-		Connec& operator[](int c) noexcept { return connex[c]; }
-		
-		const Connec& operator[](int c) const noexcept { return connex[c]; }
-
-		void loadPatch(juce::ValueTree& state)
-		{
-			StateIDs ids;
-			const auto connexState = state.getChildWithName(ids.connex);
-			if (!connexState.isValid()) return;
-			auto c = 0;
-			for (; c < connexState.getNumChildren(); ++c)
-			{
-				const auto connecState = connexState.getChild(c);
-				const auto pIdx = static_cast<int>(connecState.getProperty(ids.param));
-				const auto mIdx = static_cast<int>(connecState.getProperty(ids.mod));
-				const auto depth = static_cast<float>(connecState.getProperty(ids.value));
-				connex[c].enable(mIdx, pIdx, depth);
-			}
-			for (; c < connex.size(); ++c)
-				connex[c].disable();
-		}
-		
-		void savePatch(juce::ValueTree& state)
-		{
-			StateIDs ids;
-			auto connexState = state.getChildWithName(ids.connex);
-			if (!connexState.isValid())
-			{
-				connexState = juce::ValueTree(ids.connex);
-				state.appendChild(connexState, nullptr);
-			}
-			else
-				connexState.removeAllChildren(nullptr);
-			
-			for (auto c = 0; c < connex.size(); ++c)
-				if (connex[c].isEnabled())
-					connex[c].savePatch(connexState, ids);
-				else
-					return;
-		}
-
-		std::array<Connec, 32> connex;
-
-		String toString() const
-		{
-			String str("Connex:\n");
-			for (auto c = 0; c < connex.size(); ++c)
-				if (!connex[c].isEnabled())
-					return str;
-				else
-					str += "c: " + String(c) + "; " + connex[c].toString() + "\n";
-			return str;
-		}
-	};
-
-	struct ModSys
-	{
-		ModSys(juce::AudioProcessor& audioProcessor, std::function<void()>&& _updatePatch) :
-			state(),
-			params(audioProcessor),
-			mods(params),
-			connex(),
-			hasPlayHead(true),
-			updatePatchFunc(_updatePatch)
-		{
-			{
-				StateIDs ids;
-				state = juce::ValueTree(ids.state);
-			}
-		}
-
-		void updatePatch(const juce::String& xmlString)
-		{
-			state = state.fromXml(xmlString);
-			updatePatchFunc();
-		}
-		
-		void updatePatch(const juce::ValueTree& newState)
-		{
-			state = newState;
-			updatePatchFunc();
-		}
-
-		void loadPatch()
-		{
-			connex.loadPatch(state);
-			params.loadPatch(state);
-		}
-		
-		void savePatch()
-		{
-			params.savePatch(state);
-			connex.savePatch(state);
-		}
-
-		void processBlock(int numSamples, const juce::AudioPlayHead* playHead) noexcept
-		{
-			hasPlayHead.store(playHead != nullptr);
-			params.processBlockInit();
-			mods.processBlock(numSamples);
-			connex.processBlock(params, mods);
-			params.processBlockFinish();
-		}
-
-		const Param* getParam(PID p) const noexcept { return params[static_cast<int>(p)]; }
-		Param* getParam(PID p) noexcept { return params[static_cast<int>(p)]; }
-		const Param* getParam(int p) const noexcept { return params[p]; }
-		Param* getParam(int p) noexcept { return params[p]; }
-		const Params& getParams() const noexcept { return params; }
-		Params& getParams() noexcept { return params; }
-		int getParamIdx(PID pID) const noexcept {
-			for (auto p = 0; p < NumParams; ++p)
-				if (params[p]->id == pID)
-					return p;
-			return -1;
-		}
-
-		int getModIdx(ModTypeContext mtc) const noexcept
-		{
-			for (auto m = 0; m < mods.numMods(); ++m)
-				if (mods[m].mtc == mtc)
-					return m;
-			return -1;
-		}
-		
-		int getConnecIdxWith(int mIdx, PID pID) const noexcept
-		{
-			return connex.getConnecIdxWith(mIdx, getParamIdx(pID));
-		}
-		
-		int getConnecIdxWith(int mIdx, int pIdx) const noexcept
-		{
-			return connex.getConnecIdxWith(mIdx, pIdx);
-		}
-
-		bool enableConnection(int mIdx, int pIdx, float depth)
-		{
-			const auto cIdx = connex.getConnecIdxWith(mIdx, pIdx);
-			const bool connectionExistsAlready = cIdx != -1;
-			if (connectionExistsAlready)
-				return false;
-
-			const bool modDoesntExist = mIdx >= mods.numMods();
-			if (modDoesntExist)
-				return false;
-			
-			auto param = params[pIdx];
-			const bool paramDoesntExist = param == nullptr;
-			if (paramDoesntExist)
-				return false;
-
-			const auto& mod = mods[mIdx];
-			for (auto p = 0; p < mod.params.size(); ++p)
-			{
-				const bool modTrysToModulateParamOfSameMod = mod.params[p]->id == param->id;
-				if (modTrysToModulateParamOfSameMod)
-					return false;
-			}
-
-			const auto paramMTC = param->attachedMod;
-			const auto paramModIdx = getModIdx(paramMTC);
-			if (paramModIdx != -1)
-				for (auto p = 0; p < mod.params.size(); ++p)
-				{
-					const auto xModIdx = connex.getConnecIdxWith(paramModIdx, getParamIdx(mod.params[p]->id));
-					const bool paramModTrysToModulateParamOfMod = xModIdx != -1;
-					if (paramModTrysToModulateParamOfMod)
-						return false;
-				}
-
-			return connex.enableConnection(mIdx, pIdx, depth);
-		}
-		
-		bool disableConnection(int cIdx) noexcept
-		{
-			if (cIdx == -1)
-				return false;
-			//const auto param = params[connex[cIdx].getPIdx()];
-			connex[cIdx].disable();
-			return true;	
-		}
-
-		float getConnecDepth(int cIdx) const noexcept
-		{
-			return connex[cIdx].getDepth();
-		}
-		
-		bool setConnecDepth(int cIdx, float depth) noexcept
-		{
-			//const auto param = params[connex[cIdx].getPIdx()];
-			connex[cIdx].setDepth(depth);
-			return true;
-		}
-
-		bool getHasPlayHead() const noexcept
-		{
-			return hasPlayHead.load();
-		}
-
-		void dbgConnex()
-		{
-			DBG(connex.toString());
-		}
-
-		juce::ValueTree state;
-	protected:
-		Params params;
-		Mods mods;
-		Connex connex;
-		std::atomic<bool> hasPlayHead;
-		std::function<void()> updatePatchFunc;
 	};
 }
-
-/*
-
-stringToVal functions sometimes make no sense
-	stringToVal functions need ability to return current value if input invalid
-		how to determine if input is invalid without causing edgecases?
-
-*/

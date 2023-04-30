@@ -178,7 +178,7 @@ namespace dsp
 
         void operator()(double* const* samples,
             int numChannels, int numSamples,
-            PosInfo& transport, double _rateHz, double _rateSync,
+            const PosInfo& transport, double _rateHz, double _rateSync,
             double phase, double width, double wtPos,
             bool temposync) noexcept
         {

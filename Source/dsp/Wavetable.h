@@ -39,39 +39,35 @@ namespace dsp
 		{
 			fill([wt](Float x)
 			{
-				const auto wt2 = static_cast<Float>(2) * wt;
-				
-				if (x < static_cast<Float>(-1) + wt)
-					return static_cast<Float>(2) * (x + 1) / wt2;
+				auto wt2 = wt * 2.f - 1.f;
 
-				if(x < static_cast<Float>(1) - wt)
-					return -2.f * x / (2.f - wt2);
-				else
-					return static_cast<Float>(2) * (x - 1) / wt2;
+				auto pi = static_cast<Float>(Pi);
+
+				auto A = static_cast<Float>(2) * std::asin(std::sin(x * pi + pi * static_cast<Float>(.5))) / pi;
+				auto B = static_cast<Float>(1) - static_cast<Float>(8) * std::pow(x * static_cast<Float>(.5), static_cast<Float>(2));
+
+				return A + wt2 * (B - A);
 
 			}, false, false);
 		}
 
 		void makeTableSinc(Float wt)
 		{
-			const auto sinc = [](Float x)
+			fill([wt](Float x)
 			{
 				if (x == static_cast<Float>(0))
-					return static_cast<Float>(1);
-				return std::sin(x) / x;
-			};
+					return static_cast<Float>(1) - wt;
+				
+				auto pi = static_cast<Float>(Pi);
+				auto xpi = x * pi;
+				auto xpi2 = xpi * static_cast<Float>(2);
+					
+				const auto A = std::sin(xpi2) / xpi2;
+				const auto B = (static_cast<Float>(1) - cos(xpi2)) / (static_cast<Float>(1.5) * xpi);
+				
+				return A + wt * (B - A);
 
-			fill([sinc, wt](Float x)
-			{
-				const auto xpi = x * static_cast<Float>(Pi);
-				const auto W = static_cast<Float>(Pi) * wt;
-
-				const auto s0 = sinc(static_cast<Float>(3) * xpi);
-				const auto s1 = sinc(static_cast<Float>(4) * xpi);
-
-				return s0 + W * (s1 - s0);
-
-			}, false, false);
+			}, false, true);
 		}
 
 		Wavetable() :
