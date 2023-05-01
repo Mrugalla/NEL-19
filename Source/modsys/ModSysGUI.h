@@ -4,6 +4,7 @@
 #include "ModSys.h"
 #include <array>
 #include <cstdint>
+#include "../FormulaParser.h"
 
 namespace gui
 {
@@ -19,11 +20,13 @@ namespace gui
         TooltipUpdated,
         ModSelectionChanged,
         ModDialDragged,
+        ModDraggerDragged,
         ParameterHovered,
         ParameterDragged,
         KillPopUp,
         EnterValue,
         EnterModDepth,
+        EnterModBias,
         KillEnterValue,
         PatchUpdated,
         NumTypes
@@ -104,7 +107,7 @@ namespace gui
         std::vector<Evt*> evts;
     };
 
-    enum class ColourID { Txt, Bg, Abort, Mod, Interact, Inactive, Darken, Hover, Transp, NumCols };
+    enum class ColourID { Txt, Bg, Abort, Mod, Bias, Interact, Inactive, Darken, Hover, Transp, NumCols };
         
     inline Colour getDefault(ColourID i) noexcept
     {
@@ -115,6 +118,7 @@ namespace gui
         case ColourID::Inactive: return Colour(0xff808080);
         case ColourID::Abort: return Colour(0xffff0000);
         case ColourID::Mod: return Colour(0xff0046ff);
+        case ColourID::Bias: return Colour(0xffffff33);
         case ColourID::Interact: return Colour(0xff00ffc5);
         case ColourID::Darken: return Colour(0xea000000);
         case ColourID::Hover: return Colour(0x53ffffff);
@@ -130,6 +134,7 @@ namespace gui
         case ColourID::Bg: return "background";
         case ColourID::Abort: return "abort";
         case ColourID::Mod: return "mod";
+        case ColourID::Bias: return "bias";
         case ColourID::Interact: return "interact";
         case ColourID::Inactive: return "inactive";
         case ColourID::Darken: return "darken";
@@ -1276,122 +1281,6 @@ namespace gui
     }
 
     static constexpr float LockAlpha = .3f;
-    
-    /*
-    struct Lock :
-        public Comp
-    {
-        Lock(Utils& u, Comp* _comp, String&& _id) :
-            Comp(u, "Click here to (un)lock this component."),
-            comp(_comp),
-            id(modSys6::toID(_id)),
-            locked(false)
-        {
-            auto& state = u.getState();
-            const Identifier locksID("locks");
-            auto child = state.getChildWithName(locksID);
-            if (!child.isValid())
-            {
-                child = ValueTree(locksID);
-                state.appendChild(child, nullptr);
-            }
-            locked = static_cast<int>(child.getProperty(id, 0)) == 0 ? false : true;
-        }
-            
-        bool isLocked()
-        {
-            return locked;
-        }
-            
-        void switchLock()
-        {
-            locked = !locked;
-            auto& state = utils.getState();
-            const Identifier locksID("locks");
-            auto child = state.getChildWithName(locksID);
-            if (!child.isValid())
-            {
-                child = ValueTree(locksID);
-                state.appendChild(child, nullptr);
-            }
-            child.setProperty(id, locked ? 1 : 0, nullptr);
-        }
-
-        void paint(Graphics& g) override
-        {
-            const auto thicc = utils.thicc;
-            const auto bounds = getLocalBounds().toFloat().reduced(thicc);
-            const PointF centre
-            (
-                bounds.getX() + bounds.getWidth() * .5f,
-                bounds.getY() + bounds.getHeight() * .5f
-            );
-
-            if (isMouseOver())
-            {
-                g.setColour(Shared::shared.colour(ColourID::Hover));
-                g.fillRoundedRectangle(bounds, thicc);
-                if (isMouseButtonDown())
-                    g.fillRoundedRectangle(bounds, thicc);
-                g.setColour(Shared::shared.colour(ColourID::Interact));
-            }
-            else
-                g.setColour(Colour(0xff999999));
-
-            BoundsF bodyArea, arcArea;
-            {
-                auto x = bounds.getX();
-                auto w = bounds.getWidth();
-                auto h = bounds.getHeight() * .6f;
-                auto y = bounds.getBottom() - h;
-                bodyArea.setBounds(x, y, w, h);
-                g.fillRoundedRectangle(bodyArea, thicc);
-            }
-            {
-                const PointF rad
-                (
-                    bounds.getWidth() * .5f - thicc,
-                    bounds.getHeight() * .5f - thicc
-                );
-                Path arc;
-                arc.addCentredArc(centre.x, centre.y, rad.x, rad.y, 0.f, -PiHalf, PiHalf, true);
-                g.strokePath(arc, Stroke(thicc));
-            }
-        }
-
-        void mouseEnter(const Mouse& evt) override
-        {
-            Comp::mouseEnter(evt);
-            repaint();
-        }
-            
-        void mouseExit(const Mouse&) override
-        {
-            repaint();
-        }
-            
-        void mouseDown(const Mouse&) override
-        {
-            repaint();
-        }
-            
-        void mouseUp(const Mouse& evt) override
-        {
-            if (!evt.mouseWasDraggedSinceMouseDown())
-            {
-                switchLock();
-                comp->setAlpha(locked ? LockAlpha : 1.f);
-                comp->repaint();
-            }
-            repaint();
-        }
-            
-    protected:
-        Comp* comp;
-        juce::Identifier id;
-        bool locked;
-    };
-    */
 
     inline void makeLockButton(Button& button, PID pID)
     {
@@ -1517,9 +1406,19 @@ namespace gui
 
                 const auto mIdx = utils.getSelectedMod();
                 auto& prm = paramtr.param;
+                auto& params = utils.audioProcessor.params;
 
-                depth = juce::jlimit(-1.f, 1.f, prm.modDepth[mIdx].load() - dragMove);
-                prm.setModDepth(depth, mIdx);
+                if (evt.mods.isLeftButtonDown())
+                {
+                    auto md = juce::jlimit(-1.f, 1.f, prm.modDepth[mIdx].load() - dragMove);
+                    params.setModDepth(prm.id, md, mIdx);
+                }
+                else
+                {
+                    auto mb = juce::jlimit(-1.f, 1.f, prm.modBias[mIdx].load() - dragMove);
+                    prm.setModBias(mb, mIdx);
+                }
+                
                 depth = prm.modDepth[mIdx].load();
                 notify(NotificationType::ModDialDragged, &paramtr.param.id);
                 
@@ -1536,21 +1435,21 @@ namespace gui
                     mms.enableUnboundedMouseMovement(false, true);
                     return;
                 }
-                else if (evt.mods.isLeftButtonDown())
+                else if (evt.mods.isAltDown())
                 {
-                    if (evt.mods.isAltDown())
-                    {
-						notify(NotificationType::EnterModDepth, &paramtr);
-                        repaintWithChildren(getParentComponent());
-                    }
+                    const auto type = evt.mods.isLeftButtonDown() ?
+                        NotificationType::EnterModDepth :
+                        NotificationType::EnterModBias;
+                    notify(type, &paramtr);
+                    repaintWithChildren(getParentComponent());
                 }
 
                 repaintWithChildren(getParentComponent());
             }
 
-            void mouseDoubleClick(const Mouse&) override
+            void mouseDoubleClick(const Mouse& evt) override
             {
-                clearModulation();
+                clearModulation(evt.mods.isRightButtonDown());
                 repaintWithChildren(getParentComponent());
             }
 
@@ -1586,11 +1485,14 @@ namespace gui
         protected:
             float maxThicc;
 
-            void clearModulation() noexcept
+            void clearModulation(bool justBias) noexcept
             {
                 const auto mIdx = utils.getSelectedMod();
                 auto& prm = paramtr.param;
-                prm.setModDepth(0.f, mIdx);
+				auto& params = utils.audioProcessor.params;
+                if(!justBias)
+                    params.setModDepth(prm.id, 0.f, mIdx);
+                prm.setModBias(.5f, mIdx);
                 depth = prm.modDepth[mIdx].load();
             }
         };
@@ -1603,6 +1505,11 @@ namespace gui
                 {
                     p.modDial.updateDepth();
                     p.modDial.repaint();
+                }
+                if (t == NotificationType::ModDraggerDragged)
+                {
+					p.modDial.updateDepth();
+					p.modDial.repaint();
                 }
                 return false;
             };
@@ -1655,7 +1562,7 @@ namespace gui
         ModDial modDial;
         Button lockr;
         bool attachedModSelected;
-        float valNorm, valSum, modDepth, dragY;
+        float valNorm, valSum, modDepth, modBias, dragY;
 
         void init(std::vector<Paramtr*>& modulatables)
         {
@@ -1678,11 +1585,13 @@ namespace gui
             const auto vs = param.getValueSum();
             const auto mIdx = utils.getSelectedMod();
             const auto md = param.modDepth[mIdx].load();
-            if (valNorm != vn || valSum != vs || modDepth != md)
+            const auto mb = param.modBias[mIdx].load();
+            if (valNorm != vn || valSum != vs || modDepth != md || modBias != mb)
             {
                 valNorm = vn;
                 valSum = vs;
                 modDepth = md;
+				modBias = mb;
                 repaint();
             }
         }
@@ -1754,14 +1663,23 @@ namespace gui
 
             // draw modulation
             {
+                if (modBias != .5f)
+                {
+                    const auto biasAngle = -AngleWidth + modBias * AngleRange;
+                    const auto biasTick = LineF::fromStartAndAngle(centre, radiusExt - thicc4, biasAngle);
+                    g.setColour(Shared::shared.colour(ColourID::Bias));
+                    g.drawLine(biasTick.withShortenedStart(radiusInner - thicc4), thicc2);
+                }
+
                 const auto modCol = Shared::shared.colour(ColourID::Mod);
                 const auto valSumAngle = valSum * AngleRange;
                 const auto sumAngle = -AngleWidth + valSumAngle;
                 const auto sumTick = LineF::fromStartAndAngle(centre, radiusExt, sumAngle);
+                const auto sumTickLine = sumTick.withShortenedStart(radiusInner);
                 g.setColour(Shared::shared.colour(ColourID::Bg));
-                g.drawLine(sumTick, thicc4);
+                g.drawLine(sumTickLine, thicc4);
                 g.setColour(modCol);
-                g.drawLine(sumTick.withShortenedStart(radiusInner), thicc2);
+                g.drawLine(sumTickLine, thicc2);
 
                 const auto mdAngle = juce::jlimit(-AngleWidth, AngleWidth, valAngle + modDepth * AngleRange);
                 {
@@ -1780,10 +1698,11 @@ namespace gui
             // draw tick
             {
                 const auto tickLine = juce::Line<float>::fromStartAndAngle(centre, radiusExt, valAngle);
+                const auto tickLineX = tickLine.withShortenedStart(radiusInner);
                 g.setColour(Shared::shared.colour(ColourID::Bg));
-                g.drawLine(tickLine, thicc4);
+                g.drawLine(tickLineX, thicc4);
                 g.setColour(Shared::shared.colour(ColourID::Interact));
-                g.drawLine(tickLine.withShortenedStart(radiusInner), thicc2);
+                g.drawLine(tickLineX, thicc2);
             }
         }
             
@@ -2091,7 +2010,9 @@ namespace gui
                 auto& param = utils.getParam(pID);
                 const auto pValue = param.getValue();
                 const auto depth = 1.f - pValue;
-                param.setModDepth(depth, mIdx);
+                auto& params = utils.audioProcessor.params;
+                params.setModDepth(pID, depth, mIdx);
+				notify(NotificationType::ModDraggerDragged);
                 hoveredParameter = nullptr;
             }
             setBounds(origin);
@@ -2312,6 +2233,8 @@ namespace gui
     class EnterValueComp :
         public Comp
     {
+        enum class ValueType { Value, Mod, Bias, NumTypes };
+
         inline Notify makeNotify(EnterValueComp& comp)
         {
             return [&evc = comp](int type, const void* stuff)
@@ -2320,14 +2243,21 @@ namespace gui
                 {
                     const auto param = static_cast<const Paramtr*>(stuff);
                     const auto pID = param->getPID();
-                    evc.enable(pID, evc.utils.getWindowNearby(*param), false);
+                    evc.enable(pID, evc.utils.getWindowNearby(*param), ValueType::Value);
                     return true;
                 }
                 if (type == NotificationType::EnterModDepth)
                 {
                     const auto param = static_cast<const Paramtr*>(stuff);
                     const auto pID = param->getPID();
-                    evc.enable(pID, evc.utils.getWindowNearby(*param), true);
+                    evc.enable(pID, evc.utils.getWindowNearby(*param), ValueType::Mod);
+                    return true;
+                }
+                if (type == NotificationType::EnterModBias)
+                {
+                    const auto param = static_cast<const Paramtr*>(stuff);
+                    const auto pID = param->getPID();
+                    evc.enable(pID, evc.utils.getWindowNearby(*param), ValueType::Bias);
                     return true;
                 }
                 if (type == NotificationType::KillEnterValue)
@@ -2349,20 +2279,28 @@ namespace gui
             drawTick(false),
             timerUpdateIdx(0),
             timerRunning(false),
-            forModulation(false)
+            valueType(ValueType::Value)
         {
             setWantsKeyboardFocus(true);
         }
             
-        void enable(PID pID, Point pt, bool _forModulation)
+        void enable(PID pID, Point pt, ValueType _valueType)
         {
             setCentrePosition(pt);
             param = &utils.getParam(pID);
-            forModulation = _forModulation;
-            if (forModulation)
-                initValue = param->modDepth[utils.getSelectedMod()];
-            else
+            valueType = _valueType;
+            switch (valueType)
+            {
+			case ValueType::Value:
                 initValue = param->getValue();
+				break;
+            case ValueType::Mod:
+                initValue = param->modDepth[utils.getSelectedMod()].load();
+                break;
+			case ValueType::Bias:
+				initValue = param->modBias[utils.getSelectedMod()].load();
+                break;
+            }
             txt = "";
             enable();
         }
@@ -2399,18 +2337,24 @@ namespace gui
             if (key == key.returnKey)
             {
                 const auto valNorm = param->getValueForText(txt);
+                const auto mIdx = utils.getSelectedMod();
+                const auto value = param->getValue();
+                const auto modDepth = valNorm - value;
+                auto params = utils.audioProcessor.params;
+                fx::Parser parse;
 
-                if (forModulation)
+                switch (valueType)
                 {
-                    const auto mIdx = utils.getSelectedMod();
-                    const auto value = param->getValue();
-                    const auto modDepth = valNorm - value;
-
-                    param->setModDepth(modDepth, mIdx);
-				}
-				else
-				{
+                case ValueType::Value:
                     param->setValueWithGesture(valNorm);
+                    break;
+                case ValueType::Mod:
+                    params.setModDepth(param->id, modDepth, mIdx);
+                    break;
+                case ValueType::Bias:
+                    if(parse(txt))
+                        param->setModBias(parse(0.f), mIdx);
+                    break;
                 }
                 
                 disable();
@@ -2498,7 +2442,8 @@ namespace gui
         Param* param;
         float initValue;
         int tickIdx;
-        bool drawTick, forModulation;
+        bool drawTick;
+        ValueType valueType;
 
         int timerUpdateIdx;
         bool timerRunning;
@@ -3168,12 +3113,21 @@ namespace gui
                 refreshBrowser();
             };
         }
-        void init(juce::Component* c)
+        
+        void init(Component* c)
         {
             c->addAndMakeVisible(openCloseButton);
         }
-        const Button& getOpenCloseButton() const noexcept { return openCloseButton; }
-        Button& getOpenCloseButton() noexcept { return openCloseButton; }
+        
+        const Button& getOpenCloseButton() const noexcept
+        {
+            return openCloseButton;
+        }
+        
+        Button& getOpenCloseButton() noexcept
+        {
+            return openCloseButton;
+        }
 
         SavePatch savePatch;
     protected:
@@ -3203,6 +3157,7 @@ namespace gui
         }
     private:
         void paint(Graphics&) override {}
+        
         void resized() override
         {
             const auto bounds = getLocalBounds().toFloat();
@@ -3232,13 +3187,15 @@ namespace gui
                 browser.setBounds(BoundsF(x, y, w, h).toNearestInt());
             }
         }
+        
         void initBrowser()
         {
             const juce::File directory(presetsPath);
             const auto fileTypes = juce::File::TypesOfFileToFind::findFiles;
             const String extension(".nel");
             const auto wildCard = "*" + extension;
-            const juce::RangedDirectoryIterator files(
+            const juce::RangedDirectoryIterator files
+            (
                 directory,
                 true,
                 wildCard,
@@ -3285,7 +3242,8 @@ namespace gui
         void timerCallback() override
         {
             juce::File directory(presetsPath);
-            const auto numFiles = directory.getNumberOfChildFiles(
+            const auto numFiles = directory.getNumberOfChildFiles
+            (
                 juce::File::TypesOfFileToFind::findFiles,
                 "*nel"
             );

@@ -217,6 +217,7 @@ namespace modSys6
 		inline Identifier params() { return "params"; };
 		inline Identifier value() { return "value"; };
 		inline Identifier modDepth(int m) { return "moddepth" + String(m); };
+		inline Identifier modBias(int m) { return "modbias" + String(m); };
 	};
 
 	using Range = juce::NormalisableRange<float>;
@@ -539,6 +540,8 @@ namespace modSys6
 	struct Param :
 		public juce::AudioProcessorParameter
 	{
+		static constexpr float BiasEps = .000001f;
+		
 		Param(const PID pID, const Range& _range, const float _valDenormDefault,
 			const ValToStrFunc& _valToStr, const StrToValFunc& _strToVal,
 			const Unit _unit = Unit::NumUnits, int _attachedMod = -1) :
@@ -550,6 +553,7 @@ namespace modSys6
 			valDenormDefault(_valDenormDefault),
 			valNorm(range.convertTo0to1(_valDenormDefault)),
 			modDepth{ 0.f, 0.f, 0.f, 0.f },
+			modBias{ .5f, .5f, .5f, .5f },
 			valToStr(_valToStr),
 			strToVal(_strToVal),
 			unit(_unit),
@@ -563,10 +567,13 @@ namespace modSys6
 		{
 			const auto nVal = denormalized();
 			state.setProperty(stateID::value(), nVal, nullptr);
-			for (auto i = 0; i < modDepth.size(); ++i)
+			for (auto i = 0; i < NumMacros; ++i)
 			{
 				const auto md = modDepth[i].load();
 				state.setProperty(stateID::modDepth(i), md, nullptr);
+
+				const auto mb = modBias[i].load();
+				state.setProperty(stateID::modBias(i), mb, nullptr);
 			}
 		}
 
@@ -579,10 +586,13 @@ namespace modSys6
 			nVal = range.convertTo0to1(range.snapToLegalValue(nVal));
 			setValueNotifyingHost(nVal);
 
-			for (auto i = 0; i < modDepth.size(); ++i)
+			for (auto i = 0; i < NumMacros; ++i)
 			{
 				const auto md = static_cast<float>(state.getProperty(stateID::modDepth(i), 0.f));
 				modDepth[i].store(md);
+
+				const auto mb = static_cast<float>(state.getProperty(stateID::modBias(i), .5f));
+				modBias[i].store(mb);
 			}
 		}
 
@@ -661,17 +671,6 @@ namespace modSys6
 			return strToVal(text);
 		}
 
-		void setModDepth(float md, int mIdx) noexcept
-		{
-			if (locked.load())
-				return;
-
-			if (id == static_cast<PID>(mIdx))
-				return;
-
-			modDepth[mIdx].store(md);
-		}
-
 		void modulateInit() noexcept
 		{
 			const auto val = valNorm.load();
@@ -680,8 +679,7 @@ namespace modSys6
 
 		void modulate(float depth, int mIdx) noexcept
 		{
-			const auto mmd = modDepth[mIdx].load();
-			valMod += mmd * depth;
+			valMod = calcValMod(valMod, depth, mIdx);
 		}
 
 		void modulateEnd() noexcept
@@ -705,12 +703,52 @@ namespace modSys6
 			return getName(10) + ": " + String(v) + "; " + getText(v, 10) + (attachedMod == -1 ? "" : "; mod: " + String(attachedMod));
 		}
 
+		void setModBias(float b, int mIdx) noexcept
+		{
+			if (locked.load())
+				return;
+
+			if (modDepth[mIdx] == 0.f)
+				return;
+
+			b = juce::jlimit(BiasEps, 1.f - BiasEps, b);
+			modBias[mIdx].store(b);
+		}
+
+		/* start, end, bias[0,1], x */
+		float biased(float start, float end, float bias, float depth) const noexcept
+		{
+			const auto r = end - start;
+			if (r == 0.f)
+				return 0.f;
+			const auto a2 = 2.f * bias;
+			const auto aM = 1.f - bias;
+			const auto aR = r * bias;
+			return start + aR * depth / (aM - depth + a2 * depth);
+		}
+
+		/* modVal, depth[0,1], mIdx[0,3] */
+		float calcValMod(float modVal, float depth, int mIdx) const noexcept
+		{
+			const auto mmd = modDepth[mIdx].load();
+			const auto bias = modBias[mIdx].load();
+			if (bias == .5f)
+				return modVal + mmd * depth;
+			
+			const auto pol = mmd > 0.f ? 1.f : -1.f;
+			const auto md = mmd * pol;
+			const auto mdSkew = biased(0.f, md, bias, depth);
+			const auto mod = mdSkew * pol;
+
+			return modVal + mod;
+		}
+
 		const PID id;
 		const Range range;
 		const int attachedMod;
 		const float valDenormDefault;
 		std::atomic<float> valNorm;
-		std::array<std::atomic<float>, 4> modDepth;
+		std::array<std::atomic<float>, NumMacros> modDepth, modBias;
 		ValToStrFunc valToStr;
 		StrToValFunc strToVal;
 		Unit unit;
@@ -1052,7 +1090,7 @@ namespace modSys6
 					v < 1.5f ? juce::String("Lerp") :
 					juce::String("Round");
 			};
-			StrToValFunc strToValShape = [parse](const juce::String& str)
+			StrToValFunc strToValShape = [parse](const String& str)
 			{
 				const auto text = str.toLowerCase();
 				if (text == "steppy" || text == "step")
@@ -1236,6 +1274,28 @@ namespace modSys6
 				}
 				param->savePatch(childParam);
 			}
+		}
+
+		void setModDepth(PID pID, float md, int mIdx) noexcept
+		{
+			auto pIDInt = static_cast<int>(pID);
+
+			auto& paramDest = *params[pIDInt];
+
+			if (paramDest.locked.load())
+				return;
+
+			const bool sameMacro = pID == static_cast<PID>(mIdx);
+			if (sameMacro)
+				return;
+
+			const auto& paramSrc = *params[mIdx];
+			const auto depthFromDest = paramSrc.modDepth[pIDInt].load();
+			const bool isDestParamAlreadyModulatingSelectedModulator = depthFromDest != 0.f;
+			if (isDestParamAlreadyModulatingSelectedModulator)
+				return;
+
+			paramDest.modDepth[mIdx].store(md);
 		}
 
 		void updatePatch(const ValueTree& other)

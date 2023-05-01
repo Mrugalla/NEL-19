@@ -494,11 +494,13 @@ namespace menu2
 			setBufferedToImage(false);
 			setInterceptsMouseClicks(false, true);
 		}
+		
 		void addLink(juce::String&& _tooltip, juce::String&& _name, juce::String&& _link)
 		{
-			links.push_back(std::make_unique<Link>(
-				this->utils, std::move(_tooltip), std::move(_name), std::move(_link)
-				));
+			links.push_back(std::make_unique<Link>
+			(
+				utils, std::move(_tooltip), std::move(_name), std::move(_link)
+			));
 			addAndMakeVisible(links.back().get());
 		}
 	protected:

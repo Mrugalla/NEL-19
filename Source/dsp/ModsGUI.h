@@ -897,7 +897,7 @@ namespace gui
             wavetableBrowser.addEntry
             (
                 "Triangles",
-                "Resample the signal with rich triangular textures.",
+                "Smoothly transition between up/downwards chirps and a siren in the center.",
                 [this]()
                 {
                     tables.makeTablesTriangles();
@@ -908,7 +908,7 @@ namespace gui
             wavetableBrowser.addEntry
             (
                 "Sinc",
-                "Everyone loves a good sinc function.",
+                "It interpolates from a sinc wave to its 90" + String(juce::CharPointer_UTF8("\xc2\xb0")) + " rotated counterpart.",
                 [this]()
                 {
                     tables.makeTablesSinc();
