@@ -1285,15 +1285,19 @@ namespace modSys6
 			if (paramDest.locked.load())
 				return;
 
-			const bool sameMacro = pID == static_cast<PID>(mIdx);
-			if (sameMacro)
-				return;
+			bool belongsToModulator = paramDest.attachedMod != -1;
+			if (belongsToModulator)
+			{
+				const bool trysToModulateItself = pID == static_cast<PID>(mIdx);
+				if (trysToModulateItself)
+					return;
 
-			const auto& paramSrc = *params[mIdx];
-			const auto depthFromDest = paramSrc.modDepth[pIDInt].load();
-			const bool isDestParamAlreadyModulatingSelectedModulator = depthFromDest != 0.f;
-			if (isDestParamAlreadyModulatingSelectedModulator)
-				return;
+				const auto& paramSrc = *params[mIdx];
+				const auto depthFromDest = paramSrc.modDepth[pIDInt].load();
+				const bool alreadyModulatesSrcMod = depthFromDest != 0.f;
+				if (alreadyModulatesSrcMod)
+					return;
+			}
 
 			paramDest.modDepth[mIdx].store(md);
 		}
