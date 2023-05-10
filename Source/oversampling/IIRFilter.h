@@ -251,6 +251,6 @@ namespace oversampling
 		}
 		
 	protected:
-		std::array<IIR<Float>, 2> filters;
+		std::array<IIR<Float>, 4> filters;
 	};
 }

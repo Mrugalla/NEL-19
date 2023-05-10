@@ -33,8 +33,8 @@ namespace gui
     static constexpr float PiHalf = Pi * .5f;
     static constexpr float PiQuart = Pi * .25f;
     // DEFAULT BOUNDS
-    static constexpr int Width = 546;
-    static constexpr int Height = 447;
+    static constexpr int Width = 564;
+    static constexpr int Height = 537;
 
     inline BoundsF maxQuadIn(const BoundsF& b) noexcept
     {

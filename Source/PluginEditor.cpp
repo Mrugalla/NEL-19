@@ -309,13 +309,14 @@ void Nel19AudioProcessorEditor::resized()
 
     layout.place(presetBrowser, 1, 1, 2, 1, 0.f);
 
+    if(menu != nullptr)
+        layout.place(*menu, 1, 1, 2, 1);
+
     {
         auto user = audioProcessor.appProperties.getUserSettings();
         user->setValue("BoundsWidth", getWidth());
         user->setValue("BoundsHeight", getHeight());
     }
-    
-    layout.place(menu.get(), 1, 1, 2, 2, 0.f);
 }
 
 void Nel19AudioProcessorEditor::paint(juce::Graphics& g)

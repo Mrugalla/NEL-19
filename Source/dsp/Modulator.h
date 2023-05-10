@@ -729,7 +729,6 @@ namespace vibrato
 
 		struct EnvFol
 		{
-			
 			EnvFol() :
 				gainSmooth(0.), widthSmooth(0.),
 				widthBuf(),
@@ -741,7 +740,8 @@ namespace vibrato
 				attackInMs(-1.), releaseInMs(-1.), gain(-420.),
 
 				attackV(1.), releaseV(1.), gainV(1.), widthV(0.),
-				autogainV(1.)
+				autogainV(1.),
+				scEnabled(false)
 			{}
 			
 			void prepare(double sampleRate, int blockSize)
@@ -765,7 +765,7 @@ namespace vibrato
 				updateAutogainV();
 			}
 			
-			void setParameters(double _attackInMs, double _releaseInMs, double _gain, double _width) noexcept
+			void setParameters(double _attackInMs, double _releaseInMs, double _gain, double _width, bool _scEnabled) noexcept
 			{
 				if (attackInMs != _attackInMs)
 				{
@@ -787,10 +787,12 @@ namespace vibrato
 					gainV = juce::Decibels::decibelsToGain(gain);
 				}
 				widthV = _width;
+				scEnabled = _scEnabled;
 			}
 			
 			void operator()(Buffer& buffer, const double* const* samples,
-				int numChannels, int numSamples) noexcept
+				const double* const* samplesSC, int numChannels, int numChannelsSC,
+				int numSamples) noexcept
 			{
 				auto gainBuf = buffer[2].data();
 				{ // PROCESS GAIN SMOOTH
@@ -800,9 +802,11 @@ namespace vibrato
 						juce::FloatVectorOperations::fill(gainBuf, gVal, numSamples);
 				}
 				{ // SYNTHESIZE ENVELOPE FROM SAMPLES
+					const auto samplesInput = scEnabled ? samplesSC : samples;
+
 					{
 						auto& env = envelope[0];
-						const auto smpls = samples[0];
+						const auto smpls = samplesInput[0];
 						auto buf = buffer[0].data();
 
 						for (auto s = 0; s < numSamples; ++s)
@@ -818,7 +822,7 @@ namespace vibrato
 					if (numChannels == 2)
 					{
 						auto& env = envelope[1];
-						const auto smpls = samples[1];
+						const auto smpls = samplesInput[1 % numChannelsSC];
 						auto buf = buffer[1].data();
 
 						for (auto s = 0; s < numSamples; ++s)
@@ -856,6 +860,15 @@ namespace vibrato
 							buf[s] = smooth(buf[s] < 1. ? buf[s] : 1.);
 					}
 				}
+				{ // MAP TO [-1,1]
+					for (auto ch = 0; ch < numChannels; ++ch)
+					{
+						auto buf = buffer[ch].data();
+						juce::FloatVectorOperations::multiply(buf, 2., numSamples);
+						for (auto s = 0; s < numSamples; ++s)
+							buf[s] -= 1.;
+					}
+				}
 			}
 			
 		protected:
@@ -870,6 +883,7 @@ namespace vibrato
 
 			double attackV, releaseV, gainV, widthV;
 			double autogainV;
+			bool scEnabled;
 
 			void updateAutogainV() noexcept
 			{
@@ -1123,9 +1137,9 @@ namespace vibrato
 			dropout.setParameters(decay, spin, freqChance, freqSmooth, width);
 		}
 		
-		void setParametersEnvFol(double atk, double rls, double gain, double width) noexcept
+		void setParametersEnvFol(double atk, double rls, double gain, double width, bool scEnabled) noexcept
 		{
-			envFol.setParameters(atk, rls, gain, width);
+			envFol.setParameters(atk, rls, gain, width, scEnabled);
 		}
 		
 		void setParametersMacro(double m) noexcept
@@ -1143,15 +1157,17 @@ namespace vibrato
 			lfo.setParameters(isSync, rateFree, rateSync, waveform, phase, width);
 		}
 
-		void processBlock(const double* const* samples, const juce::MidiBuffer& midi,
-			const PosInfo& transport, int numChannels, int numSamples) noexcept
+		void processBlock(const double* const* samples, const double* const* samplesSC,
+			const juce::MidiBuffer& midi, const PosInfo& transport,
+			int numChannels, int numChannelsSC,
+			int numSamples) noexcept
 		{
 			switch (type)
 			{
 			case ModType::Perlin: return perlin(buffer, numChannels, numSamples, transport);
 			case ModType::AudioRate: return audioRate(buffer, midi, numChannels, numSamples);
 			case ModType::Dropout: return dropout(buffer, numChannels, numSamples);
-			case ModType::EnvFol: return envFol(buffer, samples, numChannels, numSamples);
+			case ModType::EnvFol: return envFol(buffer, samples, samplesSC, numChannels, numChannelsSC, numSamples);
 			case ModType::Macro: return macro(buffer, numChannels, numSamples);
 			case ModType::Pitchwheel: return pitchbend(buffer, numChannels, numSamples, midi);
 			case ModType::LFO: return lfo(buffer, numChannels, numSamples, transport);

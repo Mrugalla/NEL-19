@@ -626,13 +626,13 @@ namespace gui
     struct ModCompEnvFol :
         public Comp
     {
-        enum { Attack, Release, Gain, Width, NumParams };
+        enum { Attack, Release, Gain, Width, SC, NumParams };
 
         ModCompEnvFol(Utils& u, std::vector<Paramtr*>& modulatables, int mOff = 0) :
             Comp(u, "", CursorType::Default),
             layout
             (
-                { 5, 5, 5, 5, 3 },
+                { 2, 3, 5, 5, 3 },
                 { 2, 8 }
             ),
             params
@@ -640,7 +640,8 @@ namespace gui
                 Paramtr(u, "Attack", "The envelope follower's attack time in milliseconds.", withOffset(PID::EnvFol0Attack, mOff), modulatables),
                 Paramtr(u, "Release", "The envelope follower's release time in milliseconds.", withOffset(PID::EnvFol0Release, mOff), modulatables),
                 Paramtr(u, "Gain", "This modulator's input gain.", withOffset(PID::EnvFol0Gain, mOff), modulatables),
-                Paramtr(u, "Width", "The modulator's stereo-width", withOffset(PID::EnvFol0Width, mOff), modulatables)
+                Paramtr(u, "Width", "The modulator's stereo-width", withOffset(PID::EnvFol0Width, mOff), modulatables),
+				Paramtr(u, "SC", "If enabled the envelope follower is synthesized from the sidechain input.", withOffset(PID::EnvFol0SC, mOff), modulatables, ParameterType::Switch)
             }
         {
             for (auto& p : params)
@@ -663,10 +664,11 @@ namespace gui
         void resized() override
         {
             layout.setBounds(getLocalBounds().toFloat());
-            layout.place(params[Gain], 0, 1, 1, 1, 0.f, true);
-            layout.place(params[Attack], 1, 0, 1, 2, 0.f, true);
-            layout.place(params[Release], 2, 0, 1, 2, 0.f, true);
-            layout.place(params[Width], 3, 1, 1, 1, 0.f, true);
+            layout.place(params[SC], 0, 1, 1, 1, 0.f, true);
+            layout.place(params[Gain], 1, 1, 1, 1, 0.f, true);
+            layout.place(params[Attack], 2, 0, 1, 2, 0.f, true);
+            layout.place(params[Release], 3, 0, 1, 2, 0.f, true);
+            layout.place(params[Width], 4, 1, 1, 1, 0.f, true);
         }
         
         void updateTimer() override

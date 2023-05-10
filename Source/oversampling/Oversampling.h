@@ -107,7 +107,7 @@ namespace oversampling
 				FsUp = Fs;
 				blockSizeUp = blockSize;
 			}
-			buffer.setSize(2, blockSizeUp, false, false, false);
+			buffer.setSize(4, blockSizeUp, false, false, false);
 		}
 		
 		////////////////////////////////////////
@@ -251,7 +251,7 @@ namespace oversampling
 		}
 		
 		Processor processor;
-		std::array<juce::dsp::IIR::Filter<double>, 2> filters;
+		std::array<juce::dsp::IIR::Filter<double>, 4> filters;
 		juce::ReferenceCountedObjectPtr<juce::dsp::IIR::Coefficients<double>> coefficients;
 		double cutoff, q, gain;
 	};

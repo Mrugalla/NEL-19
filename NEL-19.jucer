@@ -52,6 +52,7 @@
         <FILE id="A464RP" name="Perlin.h" compile="0" resource="0" file="Source/dsp/Perlin.h"/>
         <FILE id="wIesez" name="Phasor.h" compile="0" resource="0" file="Source/dsp/Phasor.h"/>
         <FILE id="nVcp5W" name="PRM.h" compile="0" resource="0" file="Source/dsp/PRM.h"/>
+        <FILE id="BOsKKr" name="Sidechain.h" compile="0" resource="0" file="Source/dsp/Sidechain.h"/>
         <FILE id="OLmX3W" name="Smooth.cpp" compile="1" resource="0" file="Source/dsp/Smooth.cpp"/>
         <FILE id="GXopIc" name="Smooth.h" compile="0" resource="0" file="Source/dsp/Smooth.h"/>
         <FILE id="dkVRrp" name="StandalonePlayHead.h" compile="0" resource="0"

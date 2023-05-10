@@ -80,6 +80,7 @@ ich studiere.
 #include <JuceHeader.h>
 #include "modsys/ModSys.h"
 #include "BenchmarkProcessBlock.h"
+#include "dsp/Sidechain.h"
 #include <limits>
 
 struct Nel19AudioProcessor :
@@ -89,6 +90,7 @@ struct Nel19AudioProcessor :
     using ChannelSet = juce::AudioChannelSet;
     using AudioBufferF = juce::AudioBuffer<float>;
 	using AudioBufferD = juce::AudioBuffer<double>;
+    using BusesProps = juce::AudioProcessor::BusesProperties;
     using MidiBuffer = juce::MidiBuffer;
     using String = juce::String;
     using SIMD = juce::FloatVectorOperations;
@@ -96,6 +98,7 @@ struct Nel19AudioProcessor :
     using Smooth = smooth::Smooth<double>;
     using PRM = dsp::PRM<double>;
     using PRMInfo = dsp::PRMInfo<double>;
+    using PID = modSys6::PID;
     static constexpr int NumActiveMods = 2;
     
     bool supportsDoublePrecisionProcessing() const override
@@ -104,17 +107,17 @@ struct Nel19AudioProcessor :
     }
 
     Nel19AudioProcessor();
-    void prepareToPlay (double sampleRate, int samplesPerBlock) override;
+    void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
    #ifndef JucePlugin_PreferredChannelConfigurations
-    bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
+    bool isBusesLayoutSupported(const BusesLayout&) const override;
    #endif
 
     void processBlock(AudioBufferF&, juce::MidiBuffer&) override;
-    void processBlockBypassed(AudioBufferF& buffer, juce::MidiBuffer&) override;
+    void processBlockBypassed(AudioBufferF&, juce::MidiBuffer&) override;
 
     void processBlock(AudioBufferD&, juce::MidiBuffer&) override;
-    void processBlockBypassed(AudioBufferD& buffer, juce::MidiBuffer&) override;
+    void processBlockBypassed(AudioBufferD&, juce::MidiBuffer&) override;
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override;
     const juce::String getName() const override;
@@ -124,15 +127,21 @@ struct Nel19AudioProcessor :
     double getTailLengthSeconds() const override;
     int getNumPrograms() override;
     int getCurrentProgram() override;
-    void setCurrentProgram (int index) override;
-    const juce::String getProgramName (int index) override;
-    void changeProgramName (int index, const juce::String& newName) override;
-    void getStateInformation (juce::MemoryBlock& destData) override;
-    void setStateInformation (const void* data, int sizeInBytes) override;
+    void setCurrentProgram (int) override;
+    const juce::String getProgramName (int) override;
+    void changeProgramName (int, const juce::String&) override;
+    void getStateInformation (juce::MemoryBlock&) override;
+    void setStateInformation (const void*, int) override;
     void savePatch();
     void loadPatch();
     juce::PropertiesFile::Options makeOptions();
     void forcePrepare();
+    
+    bool canAddBus(bool) const override;
+
+    BusesProps makeBusesProps();
+
+    dsp::Sidechain sidechain;
 
     juce::ApplicationProperties appProperties;
     dsp::StandalonePlayHead standalonePlayHead;

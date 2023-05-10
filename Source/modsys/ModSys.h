@@ -53,7 +53,7 @@ namespace modSys6
 		Perlin0RateHz, Perlin0RateBeats, Perlin0Octaves, Perlin0Width, Perlin0RateType, Perlin0Phase, Perlin0Shape, Perlin0RandType,
 		AudioRate0Oct, AudioRate0Semi, AudioRate0Fine, AudioRate0Width, AudioRate0RetuneSpeed, AudioRate0Atk, AudioRate0Dcy, AudioRate0Sus, AudioRate0Rls,
 		Dropout0Decay, Dropout0Spin, Dropout0Chance, Dropout0Smooth, Dropout0Width,
-		EnvFol0Attack, EnvFol0Release, EnvFol0Gain, EnvFol0Width,
+		EnvFol0Attack, EnvFol0Release, EnvFol0Gain, EnvFol0Width, EnvFol0SC,
 		Macro0,
 		Pitchbend0Smooth,
 		LFO0FreeSync, LFO0RateFree, LFO0RateSync, LFO0Waveform, LFO0Phase, LFO0Width,
@@ -61,7 +61,7 @@ namespace modSys6
 		Perlin1RateHz, Perlin1RateBeats, Perlin1Octaves, Perlin1Width, Perlin1RateType, Perlin1Phase, Perlin1Shape, Perlin1RandType,
 		AudioRate1Oct, AudioRate1Semi, AudioRate1Fine, AudioRate1Width, AudioRate1RetuneSpeed, AudioRate1Atk, AudioRate1Dcy, AudioRate1Sus, AudioRate1Rls,
 		Dropout1Decay, Dropout1Spin, Dropout1Chance, Dropout1Smooth, Dropout1Width,
-		EnvFol1Attack, EnvFol1Release, EnvFol1Gain, EnvFol1Width,
+		EnvFol1Attack, EnvFol1Release, EnvFol1Gain, EnvFol1Width, EnvFol1SC,
 		Macro1,
 		Pitchbend1Smooth,
 		LFO1FreeSync, LFO1RateFree, LFO1RateSync, LFO1Waveform, LFO1Phase, LFO1Width,
@@ -110,6 +110,7 @@ namespace modSys6
 		case PID::EnvFol0Release: return "EnvFol 0 Release";
 		case PID::EnvFol0Gain: return "EnvFol 0 Gain";
 		case PID::EnvFol0Width: return "EnvFol 0 Width";
+		case PID::EnvFol0SC: return "EnvFol 0 SC";
 		case PID::Macro0: return "Macro 0";
 		case PID::Pitchbend0Smooth: return "Pitchbend 0 Smooth";
 		case PID::LFO0FreeSync: return "LFO 0 FreeSync";
@@ -145,6 +146,7 @@ namespace modSys6
 		case PID::EnvFol1Release: return "EnvFol 1 Release";
 		case PID::EnvFol1Gain: return "EnvFol 1 Gain";
 		case PID::EnvFol1Width: return "EnvFol 1 Width";
+		case PID::EnvFol1SC: return "EnvFol 1 SC";
 		case PID::Macro1: return "Macro 1";
 		case PID::Pitchbend1Smooth: return "Pitchbend 1 Smooth";
 		case PID::LFO1FreeSync: return "LFO 1 FreeSync";
@@ -369,31 +371,26 @@ namespace modSys6
 				table.emplace_back(static_cast<float>(valDotted));
 			}
 			table.emplace_back(static_cast<float>(1. / maxDenominator));
+			
+			const auto maxValuesF = static_cast<float>(numValues) - .5f;
+			const auto maxValuesInv = 1.f / maxValuesF;
 
-			static constexpr float Eps = 1.f - std::numeric_limits<float>::epsilon();
-			static constexpr float EpsInv = 1.f / Eps;
-
-			const auto numValuesF = static_cast<float>(numValues);
-			const auto numValuesInv = 1.f / numValuesF;
-			const auto numValsX = numValuesInv * EpsInv;
-			const auto normValsY = numValuesF * Eps;
-
-			juce::NormalisableRange<float> range
+			Range range
 			{
 				table.front(), table.back(),
-				[table, normValsY](float, float, float normalized)
+				[table, maxValuesF](float, float, float normalized)
 				{
-					const auto valueIdx = normalized * normValsY;
+					const auto valueIdx = normalized * maxValuesF;
 					return table[static_cast<int>(valueIdx)];
 				},
-				[table, numValsX](float, float, float denormalized)
+				[table, maxValuesInv](float, float, float denormalized)
 				{
 					for (auto i = 0; i < table.size(); ++i)
 						if (denormalized <= table[i])
-							return static_cast<float>(i) * numValsX;
+							return static_cast<float>(i) * maxValuesInv;
 					return 0.f;
 				},
-				[table, numValsX](float start, float end, float denormalized)
+				[table](float start, float end, float denormalized)
 				{
 					auto closest = table.front();
 					for (auto i = 0; i < table.size(); ++i)
@@ -446,30 +443,25 @@ namespace modSys6
 			for (auto i = (withZero ? 1 : 0); i < table.size(); ++i)
 				table[i] = 1.f / table[i];
 
-			static constexpr float Eps = 1.f - std::numeric_limits<float>::epsilon();
-			static constexpr float EpsInv = 1.f / Eps;
+			const auto maxValueF = static_cast<float>(numValues) - .5f;
+			const auto maxValueInv = 1.f / maxValueF;
 
-			const auto numValuesF = static_cast<float>(numValues);
-			const auto numValuesInv = 1.f / numValuesF;
-			const auto numValsX = numValuesInv * EpsInv;
-			const auto normValsY = numValuesF * Eps;
-			
-			juce::NormalisableRange<float> range
+			Range range
 			{
 				table.front(), table.back(),
-				[table, normValsY](float, float, float normalized)
+				[table, maxValueF](float, float, float normalized)
 				{
-					const auto valueIdx = normalized * normValsY;
+					const auto valueIdx = normalized * maxValueF;
 					return table[static_cast<int>(valueIdx)];
 				},
-				[table, numValsX](float, float, float denormalized)
+				[table, maxValueInv](float, float, float denormalized)
 				{
 					for (auto i = 0; i < table.size(); ++i)
 						if (denormalized <= table[i])
-							return static_cast<float>(i) * numValsX;
+							return static_cast<float>(i) * maxValueInv;
 					return 0.f;
 				},
-				[table, numValsX](float start, float end, float denormalized)
+				[table](float start, float end, float denormalized)
 				{
 					auto closest = table.front();
 					for (auto i = 0; i < table.size(); ++i)
@@ -1209,6 +1201,7 @@ namespace modSys6
 				params.push_back(new Param(withOffset(PID::EnvFol0Release, offset), makeRange::biasXL(1.f, 2000.f, -.9f), 250.f, valToStrMs, strToValMs, Unit::Ms));
 				params.push_back(new Param(withOffset(PID::EnvFol0Gain, offset), makeRange::biasXL(-20.f, 80.f, 0.f), 0.f, valToStrDb, strToValDb, Unit::Decibel));
 				params.push_back(new Param(withOffset(PID::EnvFol0Width, offset), makeRange::biasXL(0.f, 1.f, 0.f), 0.f, valToStrPercent, strToValPercent, Unit::Percent));
+				params.push_back(new Param(withOffset(PID::EnvFol0SC, offset), makeRange::toggle(), 0.f, valToStrPower, strToValPower, Unit::Power));
 
 				params.push_back(new Param(withOffset(PID::Macro0, offset), makeRange::biasXL(-1.f, 1.f, 0.f), 0.f, valToStrPercent, strToValPercent, Unit::Percent));
 				params.push_back(new Param(withOffset(PID::Pitchbend0Smooth, offset), makeRange::biasXL(1.f, 1000.f, -.97f), 30.f, valToStrMs, strToValMs, Unit::Ms));
@@ -1216,7 +1209,7 @@ namespace modSys6
 				static constexpr float LFOPhaseStep = 5.f / 360.f;
 
 				params.push_back(new Param(withOffset(PID::LFO0FreeSync, offset), makeRange::toggle(), 0.f, valToStrFreeSync, strToValFreeSync, Unit::NumUnits));
-				params.push_back(new Param(withOffset(PID::LFO0RateFree, offset), makeRange::quad(.2f, 40.f, 2), 4.f, valToStrHz, strToValHz, Unit::Hz));
+				params.push_back(new Param(withOffset(PID::LFO0RateFree, offset), makeRange::quad(.2f, 40.f, 2), 3.2f, valToStrHz, strToValHz, Unit::Hz));
 				params.push_back(new Param(withOffset(PID::LFO0RateSync, offset), makeRange::beatsSlowToFast(.25, 64., false), 8.f, valToStrBeatsSlowToFast, strToValBeatsSlowToFast, Unit::Beats));
 				params.push_back(new Param(withOffset(PID::LFO0Waveform, offset), makeRange::lin(0.f, 1.f), 0.f, valToStrPercent, strToValPercent, Unit::Percent));
 				params.push_back(new Param(withOffset(PID::LFO0Phase, offset), makeRange::stepped(-.5f, .5f, LFOPhaseStep), 0.f, valToStrPhase360, strToValPhase, Unit::Degree));
@@ -1233,7 +1226,7 @@ namespace modSys6
 			params.push_back(new Param(PID::Damp, makeRange::quad(40.f, 8000.f, 2), 180.f, valToStrHz, strToValHz, Unit::Hz));
 			params.push_back(new Param(PID::HQ, makeRange::toggle(), 1.f, valToStrHQ, strToValHQ, Unit::Power));
 			params.push_back(new Param(PID::Lookahead, makeRange::toggle(), 1.f, valToStrLookahead, strToValLookahead, Unit::Power));
-			params.push_back(new Param(PID::BufferSize, makeRange::bufferSizes({1.f, 4.f, 12.f, 24.f, 69.f, 420.f, 2000.f}), 0, valToStrBufferSize, strToValBufferSize));
+			params.push_back(new Param(PID::BufferSize, makeRange::bufferSizes({1.f, 4.f, 12.f, 24.f, 69.f, 420.f, 2000.f}), 4.f, valToStrBufferSize, strToValBufferSize));
 
 			for (auto param : params)
 				audioProcessor.addParameter(param);

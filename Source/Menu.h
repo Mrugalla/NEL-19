@@ -32,39 +32,6 @@ namespace menu2
 	using ValueTree = juce::ValueTree;
 	using Identifier = juce::Identifier;
 
-	/*
-	struct ButtonM :
-		public Comp
-	{
-		ButtonM(Utils& u, const juce::String& tooltp, std::function<void()> _onClick, std::function<void(juce::Graphics&, ButtonM&)> _onPaint) :
-			Comp(u, tooltp, CursorType::Interact),
-			onClick(_onClick),
-			onPaint(_onPaint),
-			blinkyBoy(this)
-		{
-		}
-		BlinkyBoy& getBlinky() noexcept { return blinkyBoy; }
-	protected:
-		std::function<void()> onClick;
-		std::function<void(juce::Graphics&, ButtonM&)> onPaint;
-		BlinkyBoy blinkyBoy;
-
-		void mouseEnter(const juce::MouseEvent& evt) override
-		{
-			Comp::mouseEnter(evt);
-			repaint();
-		}
-		void mouseExit(const juce::MouseEvent&) override { repaint(); }
-		void mouseUp(const juce::MouseEvent& evt) override
-		{
-			if (evt.mouseWasDraggedSinceMouseDown()) return;
-			onClick();
-			blinkyBoy.trigger(3.f);
-		}
-		void paint(juce::Graphics& g) override { onPaint(g, *this); }
-	};
-	*/
-
 	inline void paintMenuButton(Graphics& g, Button& b, const Utils& utils, bool selected = false)
 	{
 		//auto& blinky = b.blinky;
@@ -90,33 +57,6 @@ namespace menu2
 		g.drawRoundedRectangle(bounds, thicc, thicc);
 		g.drawFittedText(b.getName(), bounds.toNearestInt(), Just::centred, 1);
 	}
-
-	/*
-	struct LabelM :
-		public modSys6::gui::Label
-	{
-		LabelM(Utils& _utils, const juce::String& _name) :
-			modSys6::gui::Label(_utils, "< " + _name + " >")
-		{
-		}
-	protected:
-		void paint(Graphics& g) override
-		{
-			g.setFont(Shared::shared.font);
-			const auto thicc = utils.thicc;
-			const auto bounds = getLocalBounds().toFloat().reduced(Shared::shared.thicc);
-			g.setColour(Shared::shared.colour(bgC));
-			g.fillRoundedRectangle(bounds, thicc);
-			g.setColour(Shared::shared.colour(outlineC));
-			g.drawRoundedRectangle(bounds, thicc, thicc);
-			g.setColour(Shared::shared.colour(txtC));
-			g.drawFittedText(
-				txt, getLocalBounds(), juce::Justification::centred, 1
-			);
-		}
-	};
-	*/
-	
 
 	struct ColourSelector :
 		public Comp
@@ -146,6 +86,7 @@ namespace menu2
 
 			selector.setCurrentColour(startColour);
 		}
+		
 		void update(int cIdx, Colour col)
 		{
 			Shared::shared.setColour(cIdx, col);
@@ -157,17 +98,10 @@ namespace menu2
 			update(colIdx, selector.getCurrentColour());
 		}
 		
-	protected:
-		juce::ColourSelector selector;
-		Button okButton, undoButton, defaultButton;
-		Colour startColour;
-		const int colIdx;
-		std::function<void()> onExit;
-
 		void resized() override
 		{
 			const auto bounds = getLocalBounds().toFloat();
-			const auto selectorBounds = maxQuadIn(bounds);
+			const auto selectorBounds = bounds.withWidth(bounds.getWidth() * .8f);
 			selector.setBounds(selectorBounds.toNearestInt());
 			const auto buttonsX = selectorBounds.getRight();
 			auto buttonY = 0.f;
@@ -180,8 +114,17 @@ namespace menu2
 			buttonY += buttonsHeight;
 			defaultButton.setBounds(BoundsF(buttonsX, buttonY, buttonsWidth, buttonsHeight).toNearestInt());
 		}
+
+		void paint(Graphics&) override
+		{}
+
+	protected:
+		juce::ColourSelector selector;
+		Button okButton, undoButton, defaultButton;
+		Colour startColour;
+		const int colIdx;
+		std::function<void()> onExit;
 		
-	private:
 		void onClickOK()
 		{
 			update(colIdx, selector.getCurrentColour());
@@ -525,15 +468,15 @@ namespace menu2
 		}
 	};
 
-	class Menu :
+	struct Menu :
 		public Comp,
-		public juce::Timer
+		public Timer
 	{
 		enum ID { ID, MENU, TOOLTIP, COLOURSELECTOR, SWITCH, TEXTBOX, IMGSTRIP, TXT, LINK, LINKSTRIP, NumIDs };
-	public:
-		Menu(Nel19AudioProcessor& p, Utils& u, juce::ValueTree _xml, Menu* _parent = nullptr) :
+
+		Menu(Nel19AudioProcessor& p, Utils& u, ValueTree _xml, Menu* _parent = nullptr) :
 			Comp(u, ""),
-			juce::Timer(),
+			Timer(),
 			processor(p),
 			xml(_xml),
 			nameLabel(u, xml.getProperty("id", "")),
@@ -541,12 +484,13 @@ namespace menu2
 			colourSelector(nullptr),
 			parent(_parent)
 		{
-			std::array<juce::Identifier, NumIDs> id = { "id", "menu", "tooltip", "colourselector", "switch", "textbox", "imgStrip", "txt", "link", "linkstrip" };
+			nameLabel.font = Shared::shared.fontFlx; nameLabel.font.setHeight(30.f);
+			std::array<Identifier, NumIDs> id = { "id", "menu", "tooltip", "colourselector", "switch", "textbox", "imgStrip", "txt", "link", "linkstrip" };
 			addEntries(id);
 			addAndMakeVisible(nameLabel);
 			startTimerHz(12);
 		}
-	protected:
+		
 		Nel19AudioProcessor& processor;
 		ValueTree xml;
 		Label nameLabel;
@@ -562,7 +506,7 @@ namespace menu2
 				parent->setVisibleAllMenus(e);
 		}
 
-		void paint(juce::Graphics& g) override
+		void paint(Graphics& g) override
 		{
 			g.fillAll(Shared::shared.colour(ColourID::Bg));
 		}
@@ -575,15 +519,15 @@ namespace menu2
 			const auto thicc2 = thicc * 2.f;
 			BoundsF nameLabelBounds;
 			{
-				const auto& font = Shared::shared.font;
-				const auto w = static_cast<float>(font.getStringWidth(nameLabel.getText())) + thicc2;
+				const auto w = static_cast<float>(nameLabel.font.getStringWidth(nameLabel.getText())) + thicc2;
 				const auto h = height * .2f;
 				const auto x = (width - w) * .5f;
 				const auto y = 0.f;
 				nameLabelBounds.setBounds(x, y, w, h);
 				nameLabel.setBounds(nameLabelBounds.toNearestInt());
 			}
-			if (entries.size() == 0) return;
+			if (entries.size() == 0)
+				return;
 			const auto entriesY = nameLabelBounds.getBottom();
 			const auto entriesHeight = height - entriesY;
 			BoundsF entriesBounds(0.f, entriesY, width, entriesHeight);
@@ -591,8 +535,19 @@ namespace menu2
 			auto entryY = entriesY;
 			for (auto& e : entries)
 			{
-				e->setBounds(BoundsF(0.f, entryY, width, entryHeight).reduced(1).toNearestInt());
+				e->setBounds(BoundsF(0.f, entryY, width, entryHeight).toNearestInt());
 				entryY += entryHeight;
+			}
+
+			if (subMenu != nullptr)
+				subMenu->setBounds(0, 0, getWidth(), getHeight());
+			if (colourSelector != nullptr)
+			{
+				auto& top = utils.pluginTop;
+				const auto topBounds = top.getBounds();
+				const auto minDimen = std::min(topBounds.getWidth(), topBounds.getHeight());
+				const auto reduced = minDimen / 6;
+				colourSelector->setBounds(top.getLocalBounds().reduced(reduced));
 			}
 		}
 		
@@ -601,8 +556,8 @@ namespace menu2
 			if (colourSelector != nullptr && colourSelector->isVisible())
 				colourSelector->update();
 		}
+	
 	private:
-		
 		void addEntries(const std::array<juce::Identifier, NumIDs>& id)
 		{
 			for (auto i = 0; i < xml.getNumChildren(); ++i)
@@ -669,12 +624,12 @@ namespace menu2
 					repaintWithChildren(top);
 				};
 				colourSelector.reset(new ColourSelector(utils, idx, onExit));
-				auto top = getTopLevelComponent();
-				top->addAndMakeVisible(*colourSelector.get());
-				const auto bounds = top->getBounds();
+				auto& top = utils.pluginTop;
+				top.addAndMakeVisible(*colourSelector.get());
+				const auto bounds = top.getBounds();
 				const auto minDimen = std::min(bounds.getWidth(), bounds.getHeight());
 				const auto reduced = minDimen / 6;
-				colourSelector->setBounds(top->getLocalBounds().reduced(reduced));
+				colourSelector->setBounds(top.getLocalBounds().reduced(reduced));
 				setVisibleAllMenus(false);
 			};
 			const auto onPaint = [this](Graphics& g, Button& b)

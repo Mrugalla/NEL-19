@@ -179,7 +179,7 @@ namespace oversampling
 			Float _cutoff = static_cast<Float>(.25), Float _bandwidth = static_cast<Float>(.25),
 				bool upsampling = false) :
 			ir(makeSincFilter2(_Fs, _cutoff, _bandwidth, upsampling)),
-			filters{ ir, ir }
+			filters{ ir, ir, ir, ir }
 		{
 		}
 		
@@ -212,6 +212,6 @@ namespace oversampling
 		
 	protected:
 		IR ir;
-		std::array<Convolution, 2> filters;
+		std::array<Convolution, 4> filters;
 	};
 }
