@@ -26,6 +26,8 @@ namespace gui
     using Random = juce::Random;
     using ValueTree = juce::ValueTree;
 	using Identifier = juce::Identifier;
+    using File = juce::File;
+    using URL = juce::URL;
     
     // MATH UTILS
     static constexpr float Pi = 3.14159265359f;

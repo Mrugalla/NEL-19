@@ -91,7 +91,7 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
         utils,
         "All the extra stuff."
     ),
-    presetBrowser(utils, *p.appProperties.getUserSettings())
+    presetBrowser(utils, ".nel", "presets")
 {
     nelLabel.font = gui::Shared::shared.font;
 
@@ -151,14 +151,25 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
 
     addAndMakeVisible(popUp);
     addChildComponent(enterValue);
+    
+    presetBrowser.init(*this);
+    presetBrowser.saveFunc = [&]()
+    {
+        utils.audioProcessor.savePatch();
+        return utils.audioProcessor.params.state;
+    };
 
-    addAndMakeVisible(presetBrowser);
-    presetBrowser.init(this);
+    presetBrowser.loadFunc = [&](const juce::ValueTree& vt)
+    {
+        utils.updatePatch(vt);
+        notify(gui::NotificationType::PatchUpdated);
+    };
 
     menuButton.onClick = [this]()
     {
         menu2::openMenu(menu, audioProcessor, utils, *this, layout(1, 1, 2, 1).toNearestInt(), menuButton);
     };
+    
     menuButton.onPaint = [this](juce::Graphics& g, menu2::Button&)
     {
         menu2::paintMenuButton(g, menuButton, utils, menu.get());
@@ -196,13 +207,6 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
 
         audioProcessor.forcePrepare();
     });
-
-    presetBrowser.savePatch = [this]()
-    {
-        juce::MessageManagerLock lock;
-        audioProcessor.savePatch();
-        return audioProcessor.params.state;
-    };
 
     setResizable(true, true);
     {
@@ -321,7 +325,7 @@ void Nel19AudioProcessorEditor::resized()
 
 void Nel19AudioProcessorEditor::paint(juce::Graphics& g)
 {
-    auto& shared = gui::Shared::shared;
+    const auto& shared = gui::Shared::shared;
     g.fillAll(shared.colour(gui::ColourID::Bg));
 }
 

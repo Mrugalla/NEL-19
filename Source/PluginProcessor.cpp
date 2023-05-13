@@ -42,8 +42,9 @@ Nel19AudioProcessor::Nel19AudioProcessor()
 #endif
 {
     appProperties.setStorageParameters(makeOptions());
+    
+    /*
     auto user = appProperties.getUserSettings();
-
     { // MAKE PRESETS
         auto& userFile = user->getFile();
         auto file = userFile.getParentDirectory();
@@ -60,20 +61,9 @@ Nel19AudioProcessor::Nel19AudioProcessor()
                 nFile.create();
                 nFile.appendText(txt, false, false);
             };
-            /*
-            make("AudioRate Arp (midi)", BinaryData::AudioRate_Arp_midi_nel, BinaryData::AudioRate_Arp_midi_nelSize);
-            make("Broken Tape", BinaryData::Broken_Tape_nel, BinaryData::Broken_Tape_nelSize);
-            make("Dream Arp EnvFol", BinaryData::Dream_Arp_EnvFol_nel, BinaryData::Dream_Arp_EnvFol_nelSize);
-            make("Flanger", BinaryData::Flanger_nel, BinaryData::Flanger_nelSize);
-            make("Init", BinaryData::Init_nel, BinaryData::Init_nelSize);
-            make("Psychosis", BinaryData::Psychosis_nel, BinaryData::Psychosis_nelSize);
-            make("Resample", BinaryData::Resample_nel, BinaryData::Resample_nelSize);
-            make("Shoegaze", BinaryData::Shoegaze_nel, BinaryData::Shoegaze_nelSize);
-            make("Sines", BinaryData::Sines_nel, BinaryData::Sines_nelSize);
-            make("Thicc", BinaryData::Thicc_nel, BinaryData::Thicc_nelSize);
-            */
         }
     }
+    */
 
     startTimerHz(4);
 }

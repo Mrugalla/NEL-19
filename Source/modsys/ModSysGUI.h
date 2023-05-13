@@ -2955,25 +2955,27 @@ namespace gui
             setInterceptsMouseClicks(false, true);
             addChildComponent(scrollBar);
         }
+        
         void addEntry(String&& _tooltip,
             const Button::OnPaint& onPaint, const Button::OnClick& onClick)
         {
             entries.push_back(std::make_unique<Button>(utils, std::move(_tooltip)));
-            auto& entry = entries.back();
-            entry->onPaint = onPaint;
-            entry->onClick = onClick;
-            addAndMakeVisible(*entry);
+            auto& entry = *entries.back();
+            entry.onPaint = onPaint;
+            entry.onClick = onClick;
+            addAndMakeVisible(entry);
             resized();
         }
+        
         void addEntry(String&& _name, String&& _tooltip,
             const Button::OnClick& onClick, Just just = Just::centred)
         {
             entries.push_back(std::make_unique<Button>(utils, std::move(_tooltip)));
-            auto& entry = entries.back();
-            entry->setName(std::move(_name));
-            entry->onPaint = makeTextButtonOnPaint(std::move(_name), just);
-            entry->onClick = onClick;
-            addAndMakeVisible(*entry);
+            auto& entry = *entries.back();
+            entry.setName(std::move(_name));
+            entry.onPaint = makeTextButtonOnPaint(std::move(_name), just);
+            entry.onClick = onClick;
+            addAndMakeVisible(entry);
             resized();
         }
             
@@ -2982,13 +2984,11 @@ namespace gui
             entries.clear();
         }
             
-        size_t getNumEntries() const noexcept { return entries.size(); }
+        size_t getNumEntries() const noexcept
+        {
+            return entries.size();
+        }
             
-    protected:
-        std::vector<Entry> entries;
-        ScrollBar scrollBar;
-        int yOffset;
-
         void paint(Graphics& g) override
         {
             g.setColour(Shared::shared.colour(ColourID::Darken));
@@ -3011,7 +3011,7 @@ namespace gui
             const auto bounds = getLocalBounds().toFloat().reduced(thicc);
             const auto entriesSizeInv = 1.f / static_cast<float>(entries.size());
             auto entryHeight = bounds.getHeight() * entriesSizeInv;
-            if(entryHeight >= MinEntryHeight)
+            if (entryHeight >= MinEntryHeight)
             {
                 scrollBar.setVisible(false);
                 const auto x = bounds.getX();
@@ -3050,62 +3050,74 @@ namespace gui
                 }
             }
         }
+       
+    protected:
+        std::vector<Entry> entries;
+        ScrollBar scrollBar;
+        int yOffset;
     };
 
     struct PresetBrowser :
-        public Comp,
-        public juce::Timer
+        public Comp
     {
-        using SavePatch = std::function<juce::ValueTree()>;
-        using LoadPatch = std::function<void()>;
+        using SaveFunc = std::function<juce::ValueTree()>;
+		using LoadFunc = std::function<void(const juce::ValueTree&)>;
 
-        PresetBrowser(Utils& u, juce::PropertiesFile& prop) :
+        PresetBrowser(Utils& u, const String& _extension, const String& subDirectory) :
             Comp(u, "", CursorType::Default),
+            saveFunc(nullptr),
+            loadFunc(nullptr),
+            //
             openCloseButton(u, "Click here to open or close the preset browser."),
-            saveButton(u, "Click here to manifest the current preset into the browser with this name."),
-            pathButton(u, "This button will lead you to your preset files."),
+            saveButton(u, "Click here to manifest the current preset into the browser."),
+            pathButton(u, "This button will show you where your files are stored."),
             browser(u),
-            presetNameEditor("Enter Preset Name.."),
-
-            user(prop),
-            presetsPath(getPresetsPath()),
-            savePatch()
+            presetNameEditor("Enter Name.."),
+            //
+            directory(u.audioProcessor.appProperties.getUserSettings()->getFile().getParentDirectory().getChildFile(subDirectory)),
+            extension(_extension),
+            //
+            timerIdx(0),
+            timerRunning(false)
         {
-            juce::File direc(presetsPath);
-            direc.createDirectory();
-
+            if (!directory.exists())
+                directory.createDirectory();
+            
             setInterceptsMouseClicks(false, true);
             setBufferedToImage(false);
             addChildComponent(browser);
             addChildComponent(presetNameEditor);
             addChildComponent(saveButton);
             addChildComponent(pathButton);
+
             openCloseButton.onPaint = makeButtonOnPaintBrowse();
-            openCloseButton.onClick = [this]()
+            openCloseButton.onClick = [&]()
             {
-                const bool e = !browser.isVisible();
-                setBrowserOpen(e);
+                setBrowserOpen(!browser.isVisible());
             };
 
             pathButton.onPaint = makeButtonOnPaintDirectory();
-            pathButton.onClick = [this]()
+            pathButton.onClick = [&]()
             {
-                juce::URL url(presetsPath);
+                URL url(directory.getFullPathName());
                 url.launchInDefaultBrowser();
             };
 
             saveButton.onPaint = makeButtonOnPaintSave();
-            saveButton.onClick = [this]()
+            saveButton.onClick = [&]()
             {
                 // save preset to list of presets
                 auto pName = presetNameEditor.getText();
-                if (!pName.endsWith(".nel"))
-                    pName += String(".nel");
-                juce::File pFile(presetsPath + juce::File::getSeparatorString() + pName);
+                if (pName.isEmpty())
+                    return;
+                if (!pName.endsWith(extension))
+                    pName += extension;
+                auto pFile = directory.getChildFile(pName);
                 if (pFile.exists())
                     pFile.deleteFile();
-                const auto state = savePatch();
-                pFile.appendText(
+                const auto state = saveFunc();
+                pFile.appendText
+                (
                     state.toXmlString(),
                     false,
                     false
@@ -3114,9 +3126,10 @@ namespace gui
             };
         }
         
-        void init(Component* c)
+        void init(Component& c)
         {
-            c->addAndMakeVisible(openCloseButton);
+            c.addAndMakeVisible(*this);
+            c.addAndMakeVisible(openCloseButton);
         }
         
         const Button& getOpenCloseButton() const noexcept
@@ -3129,14 +3142,37 @@ namespace gui
             return openCloseButton;
         }
 
-        SavePatch savePatch;
+        void updateTimer() override
+        {
+            if (!timerRunning)
+                return;
+
+            ++timerIdx;
+            if (timerIdx < 15)
+                return;
+
+            timerIdx = 0;
+            
+            const auto numFiles = directory.getNumberOfChildFiles
+            (
+                File::TypesOfFileToFind::findFiles,
+                "*" + extension
+            );
+            if (numFiles != browser.getNumEntries())
+                refreshBrowser();
+        }
+
+        SaveFunc saveFunc;
+        LoadFunc loadFunc;
     protected:
         Button openCloseButton, saveButton, pathButton;
         Browser browser;
         juce::TextEditor presetNameEditor;
-
-        juce::PropertiesFile& user;
-        String presetsPath;
+        
+        const File directory;
+        String extension;
+        int timerIdx;
+        bool timerRunning;
 
         void setBrowserOpen(bool e)
         {
@@ -3145,15 +3181,10 @@ namespace gui
             saveButton.setVisible(e);
             pathButton.setVisible(e);
             if (e)
-            {
                 initBrowser();
-                startTimerHz(4);
-            }
             else
-            {
                 browser.clearEntries();
-                stopTimer();
-            }
+            timerRunning = e;
         }
     private:
         void paint(Graphics&) override {}
@@ -3190,9 +3221,7 @@ namespace gui
         
         void initBrowser()
         {
-            const juce::File directory(presetsPath);
-            const auto fileTypes = juce::File::TypesOfFileToFind::findFiles;
-            const String extension(".nel");
+            const auto fileTypes = File::TypesOfFileToFind::findFiles;
             const auto wildCard = "*" + extension;
             const juce::RangedDirectoryIterator files
             (
@@ -3201,6 +3230,7 @@ namespace gui
                 wildCard,
                 fileTypes
             );
+            
             for (const auto& it: files)
             {
                 const auto file = it.getFile();
@@ -3210,14 +3240,11 @@ namespace gui
                 (
                     fileName.substring(0, nameLen),
                     "Click here to choose this preset.",
-                    [this, file]()
+                    [&, str = file.loadFileAsString()]()
                     {
-                        auto str = file.loadFileAsString();
-					    utils.updatePatch(ValueTree::fromXml(str));
-                        notify(NotificationType::PatchUpdated);
-                        //setBrowserOpen(false);
+						loadFunc(ValueTree::fromXml(str));
                     },
-                    juce::Justification::left
+                    Just::left
                 );
             }
         }
@@ -3228,30 +3255,8 @@ namespace gui
             initBrowser();
             resized();
         }
-
-        String getPresetsPath()
-        {
-            const auto& file = user.getFile();
-            const auto pathStr = file.getFullPathName();
-            for (auto i = pathStr.length() - 1; i > 0; --i)
-                if (pathStr.substring(i, i + 1) == juce::File::getSeparatorString())
-                    return pathStr.substring(0, i + 1) + "Presets";
-            return "";
-        }
-
-        void timerCallback() override
-        {
-            juce::File directory(presetsPath);
-            const auto numFiles = directory.getNumberOfChildFiles
-            (
-                juce::File::TypesOfFileToFind::findFiles,
-                "*nel"
-            );
-            if (numFiles != browser.getNumEntries())
-                refreshBrowser();
-        }
     };
-
+    
     inline std::function<void(Graphics&, Visualizer&)> makeVibratoVisualizerOnPaint()
     {
         return[](Graphics& g, Visualizer& v)
