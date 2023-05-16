@@ -1,9 +1,16 @@
 #pragma once
+
+#define DebugMenuExists true
+#define PresetsExist true
+
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
 #include "modsys/ModSysGUI.h"
 #include "dsp/ModsGUI.h"
+
+#if DebugMenuExists
 #include "Menu.h"
+#endif
 
 struct Nel19AudioProcessorEditor :
     public juce::AudioProcessorEditor,
@@ -49,11 +56,16 @@ protected:
     gui::PopUp popUp;
     gui::EnterValueComp enterValue;
     
+#if DebugMenuExists
     std::unique_ptr<menu2::Menu> menu;
     gui::Button menuButton;
+#endif
 
+#if PresetsExist
     gui::PresetBrowser presetBrowser;
+#endif
 };
+
 /*
 
 mod selector to do:

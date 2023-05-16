@@ -57,88 +57,212 @@ namespace menu2
 		g.drawRoundedRectangle(bounds, thicc, thicc);
 		g.drawFittedText(b.getName(), bounds.toNearestInt(), Just::centred, 1);
 	}
-
+	
 	struct ColourSelector :
 		public Comp
 	{
-		ColourSelector(Utils& u, int idx, std::function<void()> _onExit) :
+		ColourSelector(Utils& u) :
 			Comp(u, "", CursorType::Interact),
+			layout
+			(
+				{ 1, 5 },
+				{ 13, 1 }
+			),
 			selector(27, 4, 7),
-			okButton(u, "you accept the changes you made."),
-			undoButton(u, "you want to go back to better times."),
-			defaultButton(u, "back to default colour."),
-			startColour(Shared::shared.colour(static_cast<ColourID>(idx))),
-			colIdx(idx),
-			onExit(_onExit)
+			colourButtons
+			{
+				Button(u, "this is the colour for " + toString(static_cast<ColourID>(0))),
+				Button(u, "this is the colour for " + toString(static_cast<ColourID>(1))),
+				Button(u, "this is the colour for " + toString(static_cast<ColourID>(2))),
+				Button(u, "this is the colour for " + toString(static_cast<ColourID>(3))),
+				Button(u, "this is the colour for " + toString(static_cast<ColourID>(4))),
+				Button(u, "this is the colour for " + toString(static_cast<ColourID>(5))),
+				Button(u, "this is the colour for " + toString(static_cast<ColourID>(6))),
+				Button(u, "this is the colour for " + toString(static_cast<ColourID>(7))),
+				Button(u, "this is the colour for " + toString(static_cast<ColourID>(8))),
+				Button(u, "this is the colour for " + toString(static_cast<ColourID>(9)))
+			},
+			undoButton(u, "You want to go back to better times."),
+			defaultButton(u, "You wish to go back to the default colour."),
+			browser(u, ".col", "Colours"),
+			startColour(),
+			currentColour(),
+			colIdx(0),
+			timerIdx(0)
 		{
-			okButton.onClick = [this]() { onClickOK(); };
 			undoButton.onClick = [this]() { onClickUNDO(); };
 			defaultButton.onClick = [this]() { onClickDEFAULT(); };
 
-			okButton.onPaint = [this](juce::Graphics& g, Button& b) { paintMenuButton(g, b, utils); };
-			undoButton.onPaint = [this](juce::Graphics& g, Button& b) { paintMenuButton(g, b, utils); };
-			defaultButton.onPaint = [this](juce::Graphics& g, Button& b) { paintMenuButton(g, b, utils); };
+			undoButton.onPaint = [this](Graphics& g, Button& b) { paintMenuButton(g, b, utils); };
+			defaultButton.onPaint = [this](Graphics& g, Button& b) { paintMenuButton(g, b, utils); };
+
+			for (auto i = 0; i < NumCols; ++i)
+			{
+				auto& btn = colourButtons[i];
+				btn.setState(false);
+				addAndMakeVisible(btn);
+				btn.onPaint = makeTextButtonOnPaint(toString(static_cast<ColourID>(i)), Just::centred, 1);
+				btn.onClick = [&, i]()
+				{
+					for (auto& b : colourButtons)
+						b.setState(false);
+					colourButtons[i].setState(true);
+
+					initSelector(static_cast<ColourID>(i));
+
+					for (auto& b : colourButtons)
+						b.repaint();
+				};
+			}
 
 			addAndMakeVisible(selector);
-			addAndMakeVisible(okButton);		okButton.setName("OK");
+		
 			addAndMakeVisible(undoButton);		undoButton.setName("undo");
 			addAndMakeVisible(defaultButton);	defaultButton.setName("default");
 
+			initSelector(ColourID::Bg);
+
+			browser.init(*this);
+			
+			browser.loadFunc = [&](const juce::ValueTree& vt)
+			{
+				for (auto c = 0; c < NumCols; ++c)
+				{
+					const auto cID = static_cast<ColourID>(c);
+					const auto cIDStr = toString(cID);
+					const auto cChild = vt.getChildWithName(cIDStr);
+					const auto cProp = cChild.getProperty("val", "");
+					const auto cStr = cProp.toString();
+					Colour col;
+					if (cStr.isNotEmpty())
+						col = Colour::fromString(cStr);
+					else
+						col = getDefault(cID);
+
+					Shared::shared.setColour(c, col);
+				}
+				notify(NotificationType::ColourChanged, nullptr);
+			};
+			
+			browser.saveFunc = [&]()
+			{
+				auto vt = juce::ValueTree("PROPERTIES");
+				for (auto c = 0; c < NumCols; ++c)
+				{
+					const auto cID = static_cast<ColourID>(c);
+					const auto cIDStr = toString(cID);
+					auto cChild = juce::ValueTree(cIDStr);
+					const auto cProp = Shared::shared.colour(cID).toString();
+					cChild.setProperty("val", cProp, nullptr);
+					vt.appendChild(cChild, nullptr);
+				}
+				return vt;
+			};
+
+			setOpaque(false);
+		}
+
+		void updateTimer() override
+		{
+			if (!isShowing())
+				return;
+			
+			for(auto& btn: colourButtons)
+				btn.updateTimer();
+			undoButton.updateTimer();
+			defaultButton.updateTimer();
+			browser.updateTimer();
+			
+			++timerIdx;
+			if (timerIdx < 15)
+				return;
+
+			timerIdx = 0;
+
+			const auto curCol = selector.getCurrentColour();
+			if (curCol == currentColour)
+				return;
+			
+			currentColour = curCol;
+			update(currentColour);
+		}
+
+		void initSelector(ColourID cID)
+		{
+			colIdx = static_cast<int>(cID);
+			currentColour = startColour = Shared::shared.colour(cID);
 			selector.setCurrentColour(startColour);
+			colourButtons[colIdx].setState(true);
 		}
 		
-		void update(int cIdx, Colour col)
+		void update(Colour col)
 		{
-			Shared::shared.setColour(cIdx, col);
+			Shared::shared.setColour(colIdx, col);
 			notify(NotificationType::ColourChanged, &colIdx);
-		}
-		
-		void update()
-		{
-			update(colIdx, selector.getCurrentColour());
 		}
 		
 		void resized() override
 		{
-			const auto bounds = getLocalBounds().toFloat();
-			const auto selectorBounds = bounds.withWidth(bounds.getWidth() * .8f);
-			selector.setBounds(selectorBounds.toNearestInt());
-			const auto buttonsX = selectorBounds.getRight();
-			auto buttonY = 0.f;
-			const auto buttonsWidth = bounds.getWidth() - buttonsX;
-			const auto buttonsHeight = bounds.getHeight() / 3.f;
+			layout.setBounds(getLocalBounds().toFloat());
+			{
+				auto colourButtonsArea = layout(0, 0, 1, 2);
+				auto x = colourButtonsArea.getX();
+				auto y = colourButtonsArea.getY();
+				auto w = colourButtonsArea.getWidth();
+				auto h = colourButtonsArea.getHeight() / NumCols;
 
-			okButton.setBounds(BoundsF(buttonsX, buttonY, buttonsWidth, buttonsHeight).toNearestInt());
-			buttonY += buttonsHeight;
-			undoButton.setBounds(BoundsF(buttonsX, buttonY, buttonsWidth, buttonsHeight).toNearestInt());
-			buttonY += buttonsHeight;
-			defaultButton.setBounds(BoundsF(buttonsX, buttonY, buttonsWidth, buttonsHeight).toNearestInt());
+				for (auto i = 0; i < NumCols; ++i)
+				{
+					auto& btn = colourButtons[i];
+					btn.setBounds(BoundsF(x,y,w,h).toNearestInt());
+					y += h;
+				}
+			}
+			layout.place(selector, 1, 0, 1, 1);
+			{
+				auto buttonsArea = layout(1, 1, 1, 1);
+				auto x = buttonsArea.getX();
+				auto y = buttonsArea.getY();
+				auto w = buttonsArea.getWidth() / 3.f;
+				auto h = buttonsArea.getHeight();
+
+				undoButton.setBounds(BoundsF(x, y, w, h).toNearestInt());
+				x += w;
+				defaultButton.setBounds(BoundsF(x, y, w, h).toNearestInt());
+				x += w;
+				browser.getOpenCloseButton().setBounds(BoundsF(x, y, w, h).toNearestInt());
+			}
+			layout.place(browser, 0, 0, 2, 2, utils.thicc);
 		}
 
-		void paint(Graphics&) override
-		{}
-
-	protected:
-		juce::ColourSelector selector;
-		Button okButton, undoButton, defaultButton;
-		Colour startColour;
-		const int colIdx;
-		std::function<void()> onExit;
-		
-		void onClickOK()
+		void paint(Graphics& g) override
 		{
-			update(colIdx, selector.getCurrentColour());
-			onExit();
+			g.fillAll(Shared::shared.colour(ColourID::Darken));
 		}
+		
+	protected:
+		Layout layout;
+		std::array<Button, gui::NumCols> colourButtons;
+		juce::ColourSelector selector;
+		Button undoButton, defaultButton;
+		PresetBrowser browser;
+		Colour startColour, currentColour;
+		int colIdx;
+
+		int timerIdx;
+		
 		void onClickUNDO()
 		{
-			update(colIdx, startColour);
-			onExit();
+			currentColour = startColour;
+			update(currentColour);
+			selector.setCurrentColour(currentColour);
 		}
+		
 		void onClickDEFAULT()
 		{
-			update(colIdx, getDefault(static_cast<ColourID>(colIdx)));
-			onExit();
+			currentColour = startColour = getDefault(static_cast<ColourID>(colIdx));
+			update(currentColour);
+			selector.setCurrentColour(currentColour);
 		}
 	};
 
@@ -469,26 +593,38 @@ namespace menu2
 	};
 
 	struct Menu :
-		public Comp,
-		public Timer
+		public Comp
 	{
 		enum ID { ID, MENU, TOOLTIP, COLOURSELECTOR, SWITCH, TEXTBOX, IMGSTRIP, TXT, LINK, LINKSTRIP, NumIDs };
 
 		Menu(Nel19AudioProcessor& p, Utils& u, ValueTree _xml, Menu* _parent = nullptr) :
 			Comp(u, ""),
-			Timer(),
 			processor(p),
 			xml(_xml),
 			nameLabel(u, xml.getProperty("id", "")),
 			subMenu(nullptr),
-			colourSelector(nullptr),
+			colourSelector(u),
 			parent(_parent)
 		{
 			nameLabel.font = Shared::shared.fontFlx; nameLabel.font.setHeight(30.f);
-			std::array<Identifier, NumIDs> id = { "id", "menu", "tooltip", "colourselector", "switch", "textbox", "imgStrip", "txt", "link", "linkstrip" };
+			std::array<Identifier, NumIDs> id =
+			{ 
+				"id",
+				"menu",
+				"tooltip",
+				"colourselector",
+				"switch",
+				"textbox",
+				"imgStrip",
+				"txt",
+				"link",
+				"linkstrip"
+			};
 			addEntries(id);
 			addAndMakeVisible(nameLabel);
-			startTimerHz(12);
+
+			auto& top = utils.pluginTop;
+			top.addChildComponent(colourSelector);
 		}
 		
 		Nel19AudioProcessor& processor;
@@ -496,7 +632,7 @@ namespace menu2
 		Label nameLabel;
 		std::vector<std::unique_ptr<Comp>> entries;
 		std::unique_ptr<Menu> subMenu;
-		std::unique_ptr<ColourSelector> colourSelector;
+		ColourSelector colourSelector;
 		Menu* parent;
 
 		void setVisibleAllMenus(bool e)
@@ -541,22 +677,25 @@ namespace menu2
 
 			if (subMenu != nullptr)
 				subMenu->setBounds(0, 0, getWidth(), getHeight());
-			if (colourSelector != nullptr)
 			{
 				auto& top = utils.pluginTop;
 				const auto topBounds = top.getBounds();
 				const auto minDimen = std::min(topBounds.getWidth(), topBounds.getHeight());
 				const auto reduced = minDimen / 6;
-				colourSelector->setBounds(top.getLocalBounds().reduced(reduced));
+				colourSelector.setBounds(top.getLocalBounds().reduced(reduced));
 			}
 		}
-		
-		void timerCallback() override
-		{
-			if (colourSelector != nullptr && colourSelector->isVisible())
-				colourSelector->update();
-		}
 	
+		void updateTimer() override
+		{
+			nameLabel.updateTimer();
+			for (auto& entry : entries)
+				entry->updateTimer();
+			if(subMenu != nullptr)
+				subMenu->updateTimer();
+			colourSelector.updateTimer();
+		}
+
 	private:
 		void addEntries(const std::array<juce::Identifier, NumIDs>& id)
 		{
@@ -567,7 +706,7 @@ namespace menu2
 				if (type == id[MENU])
 					addSubMenuButton(id, child, i);
 				else if (type == id[COLOURSELECTOR])
-					addColourSelector(id, child, i);
+					addColourSelector(id, child);
 				else if (type == id[SWITCH])
 					addSwitchButton(id, child, i);
 				else if (type == id[TEXTBOX])
@@ -579,11 +718,11 @@ namespace menu2
 				else if (type == id[LINK])
 					addLink(id, child, i);
 				else if (type == id[LINKSTRIP])
-					addLinkStrip(id, child, i);
+					addLinkStrip(child);
 			}
 		}
 
-		void addSubMenuButton(const std::array<juce::Identifier, NumIDs>& id, juce::ValueTree child, const int i)
+		void addSubMenuButton(const std::array<juce::Identifier, NumIDs>& id, ValueTree child, const int i)
 		{
 			const auto onClick = [this, idx = i]()
 			{
@@ -612,38 +751,29 @@ namespace menu2
 			addAndMakeVisible(*entries.back().get());
 		}
 		
-		void addColourSelector(const std::array<juce::Identifier, NumIDs>& id, juce::ValueTree child, const int i)
+		void addColourSelector(const std::array<juce::Identifier, NumIDs>& id, ValueTree child)
 		{
-			const auto onClick = [this, idx = i]()
+			const auto buttonName = child.getProperty(id[ID]).toString();
+			entries.push_back(std::make_unique<Button>(utils, "individualize the colourscheme here."));
+			auto& btn = *reinterpret_cast<Button*>(entries.back().get());
+			btn.setName(buttonName);
+			addAndMakeVisible(btn);
+
+			btn.onPaint = [](Graphics& g, Button& b)
 			{
-				const auto onExit = [this]()
-				{
-					auto top = getTopLevelComponent();
-					colourSelector->setVisible(false);
-					setVisibleAllMenus(true);
-					repaintWithChildren(top);
-				};
-				colourSelector.reset(new ColourSelector(utils, idx, onExit));
+				paintMenuButton(g, b, b.utils);
+			};
+
+			btn.onClick = [&]()
+			{
 				auto& top = utils.pluginTop;
-				top.addAndMakeVisible(*colourSelector.get());
+				colourSelector.setVisible(true);
 				const auto bounds = top.getBounds();
 				const auto minDimen = std::min(bounds.getWidth(), bounds.getHeight());
 				const auto reduced = minDimen / 6;
-				colourSelector->setBounds(top.getLocalBounds().reduced(reduced));
+				colourSelector.setBounds(top.getLocalBounds().reduced(reduced));
 				setVisibleAllMenus(false);
 			};
-			const auto onPaint = [this](Graphics& g, Button& b)
-			{
-				paintMenuButton(g, b, utils);
-			};
-			const auto buttonName = child.getProperty(id[ID]).toString();
-			const auto tooltp = String("adjust the colour of ") + buttonName + String(" UI elements.");
-			entries.push_back(std::make_unique<Button>(utils, tooltp));
-			auto& btn = *reinterpret_cast<Button*>(entries.back().get());
-			btn.onClick = onClick;
-			btn.onPaint = onPaint;
-			btn.setName(buttonName);
-			addAndMakeVisible(btn);
 		}
 		
 		void addSwitchButton(const std::array<juce::Identifier, NumIDs>& id, juce::ValueTree child, const int,
@@ -765,8 +895,7 @@ namespace menu2
 			addAndMakeVisible(entries.back().get());
 		}
 		
-		void addLinkStrip(const std::array<juce::Identifier, NumIDs>&,
-			juce::ValueTree child, const int)
+		void addLinkStrip(ValueTree child)
 		{
 			entries.push_back(std::make_unique<LinkStrip>(this->utils));
 
@@ -775,7 +904,8 @@ namespace menu2
 			for (auto j = 0; j < child.getNumChildren(); ++j)
 			{
 				const auto c = child.getChild(j);
-				strip->addLink(
+				strip->addLink
+				(
 					c.getProperty("tooltip").toString(),
 					c.getProperty("id").toString(),
 					c.getProperty("link").toString()

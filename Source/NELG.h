@@ -108,14 +108,16 @@ namespace gui
             rX.resize(rXRaw.size(), 0.f);
             rY.resize(rYRaw.size(), 0.f);
         }
-        // SET
+
         void setBounds(const juce::Rectangle<float>& bounds) noexcept {
             for (auto x = 0; x < rX.size(); ++x)
                 rX[x] = rXRaw[x] * bounds.getWidth();
             for (auto y = 0; y < rY.size(); ++y)
                 rY[y] = rYRaw[y] * bounds.getHeight();
-            for (auto& x : rX) x += bounds.getX();
-            for (auto& y : rY) y += bounds.getY();
+            for (auto& x : rX)
+                x += bounds.getX();
+            for (auto& y : rY)
+                y += bounds.getY();
         }
         // PROCESS
         void place(juce::Component& comp, int x, int y, int width = 1, int height = 1, float padding = 0.f, bool isQuad = false)

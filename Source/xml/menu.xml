@@ -1,15 +1,5 @@
 <menu id="options">
-    <menu id="colours" tooltip="individualize the colour sheme of the plugin here.">
-	    <colourselector id="txt"/>
-	    <colourselector id="bg"/>
-	    <colourselector id="abort"/>
-	    <colourselector id="mod"/>
-		<colourselector id="bias"/>
-	    <colourselector id="interact"/>
-	    <colourselector id="inactive"/>
-	    <colourselector id="darken"/>
-	    <colourselector id="hover"/>
-    </menu>
+    <colourselector id="colours" tooltip="individualize the colour sheme of the plugin here."/>
     <menu id="help" tooltip="get help! literally.">
         <switch id="tooltips" tooltip="turn on/off tooltips here.">
           <option id="disable"/>

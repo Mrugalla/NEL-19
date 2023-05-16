@@ -108,20 +108,21 @@ namespace gui
     };
 
     enum class ColourID { Txt, Bg, Abort, Mod, Bias, Interact, Inactive, Darken, Hover, Transp, NumCols };
+	static constexpr int NumCols = static_cast<int>(ColourID::NumCols);
         
     inline Colour getDefault(ColourID i) noexcept
     {
         switch (i)
         {
-        case ColourID::Txt: return Colour(0xff67cf00);
-        case ColourID::Bg: return Colour(0xff100021);
-        case ColourID::Inactive: return Colour(0xff808080);
-        case ColourID::Abort: return Colour(0xffff0000);
-        case ColourID::Mod: return Colour(0xff0046ff);
-        case ColourID::Bias: return Colour(0xffffff33);
-        case ColourID::Interact: return Colour(0xff00ffc5);
+        case ColourID::Txt: return Colour(0xffcc5f2d);
+        case ColourID::Bg: return Colour(0xffc5c9ca);
+        case ColourID::Inactive: return Colour(0xff82919b);
+        case ColourID::Abort: return Colour(0xffd21846);
+        case ColourID::Mod: return Colour(0xff1a6a62);
+        case ColourID::Bias: return Colour(0xff20a1ff);
+        case ColourID::Interact: return Colour(0xff68b39d);
         case ColourID::Darken: return Colour(0xea000000);
-        case ColourID::Hover: return Colour(0x53ffffff);
+        case ColourID::Hover: return Colour(0xff818181);
         default: return Colour(0x00000000);
         }
     }

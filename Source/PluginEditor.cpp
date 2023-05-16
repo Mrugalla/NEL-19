@@ -85,13 +85,17 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     popUp(utils),
     enterValue(utils),
 
+#if DebugMenuExists
     menu(nullptr),
     menuButton
     (
         utils,
         "All the extra stuff."
-    ),
-    presetBrowser(utils, ".nel", "presets")
+    )
+#endif
+#if PresetsExist
+    ,presetBrowser(utils, ".nel", "presets")
+#endif
 {
     nelLabel.font = gui::Shared::shared.font;
 
@@ -131,8 +135,10 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     addAndMakeVisible(paramRandomizer);
     addAndMakeVisible(hq);
 	addAndMakeVisible(lookahead);
+#if DebugMenuExists
     addAndMakeVisible(menuButton);
-
+#endif
+    
     addAndMakeVisible(visualizer);
 
 	addAndMakeVisible(bufferSizes);
@@ -152,6 +158,7 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     addAndMakeVisible(popUp);
     addChildComponent(enterValue);
     
+#if PresetsExist
     presetBrowser.init(*this);
     presetBrowser.saveFunc = [&]()
     {
@@ -164,7 +171,9 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
         utils.updatePatch(vt);
         notify(gui::NotificationType::PatchUpdated);
     };
+#endif
 
+#if DebugMenuExists
     menuButton.onClick = [this]()
     {
         menu2::openMenu(menu, audioProcessor, utils, *this, layout(1, 1, 2, 1).toNearestInt(), menuButton);
@@ -174,6 +183,7 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     {
         menu2::paintMenuButton(g, menuButton, utils, menu.get());
     };
+#endif
 
     setOpaque(true);
     gui::makeCursor(*this, gui::CursorType::Default);
@@ -236,10 +246,14 @@ void Nel19AudioProcessorEditor::timerCallback()
     paramRandomizer.updateTimer();
     popUp.updateTimer();
     enterValue.updateTimer();
+#if DebugMenuExists
     if (menu != nullptr)
         menu->updateTimer();
     menuButton.updateTimer();
+#endif
+#if PresetsExist
     presetBrowser.updateTimer();
+#endif
 }
 
 void Nel19AudioProcessorEditor::resized()
@@ -295,8 +309,12 @@ void Nel19AudioProcessorEditor::resized()
     layoutMainParams.place(stereoConfig, 0, 5, 1, 1, 0.f, true);
     
     layoutTopBar.place(paramRandomizer, 1, 0, 1, 1, 0.f, true);
+#if DebugMenuExists
     layoutTopBar.place(menuButton,      0, 0, 1, 1, 0.f, true);
+#endif
+#if PresetsExist
     layoutTopBar.place(presetBrowser.getOpenCloseButton(), 2, 0, 1, 1, 0.f, true);
+#endif
     layoutTopBar.place(hq,              3, 0, 1, 1, 0.f, true);
 	layoutTopBar.place(lookahead,       4, 0, 1, 1, 0.f, true);
     layoutTopBar.place(nelLabel,        5, 0, 1, 1);
@@ -311,10 +329,14 @@ void Nel19AudioProcessorEditor::resized()
     popUp.setBounds({ 0, 0, 100, 50 });
     enterValue.setBounds({ 0, 0, 100, 50 });
 
+#if PresetsExist
     layout.place(presetBrowser, 1, 1, 2, 1, 0.f);
+#endif
 
+#if DebugMenuExists
     if(menu != nullptr)
         layout.place(*menu, 1, 1, 2, 1);
+#endif
 
     {
         auto user = audioProcessor.appProperties.getUserSettings();
@@ -325,8 +347,7 @@ void Nel19AudioProcessorEditor::resized()
 
 void Nel19AudioProcessorEditor::paint(juce::Graphics& g)
 {
-    const auto& shared = gui::Shared::shared;
-    g.fillAll(shared.colour(gui::ColourID::Bg));
+    g.fillAll(gui::Shared::shared.colour(gui::ColourID::Bg).withAlpha(1.f));
 }
 
 void Nel19AudioProcessorEditor::mouseEnter(const juce::MouseEvent&)
@@ -339,5 +360,4 @@ void Nel19AudioProcessorEditor::mouseDown(const juce::MouseEvent&)
     utils.killEnterValue();
 }
 
-/*
-*/
+#undef DebugMenuExists
