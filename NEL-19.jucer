@@ -9,9 +9,6 @@
               cppLanguageStandard="20">
   <MAINGROUP id="V2oOlh" name="NEL">
     <GROUP id="{FF8BE835-9B90-31CB-45F4-D4B15FDEFD04}" name="Source">
-      <FILE id="ABMV3Z" name="FormulaParser.cpp" compile="1" resource="0"
-            file="Source/FormulaParser.cpp"/>
-      <FILE id="W8nidk" name="FormulaParser.h" compile="0" resource="0" file="Source/FormulaParser.h"/>
       <GROUP id="{8EC0EF39-024B-4AE6-4857-5AD651D74232}" name="modsys">
         <FILE id="nECyrZ" name="ModSys.h" compile="0" resource="0" file="Source/modsys/ModSys.h"/>
         <FILE id="IhYJlR" name="ModSysGUI.cpp" compile="1" resource="0" file="Source/modsys/ModSysGUI.cpp"/>
@@ -74,6 +71,9 @@
         <FILE id="e3uEiq" name="vst3_logo_small.png" compile="0" resource="1"
               file="Source/Img/vst3_logo_small.png"/>
       </GROUP>
+      <FILE id="ABMV3Z" name="FormulaParser.cpp" compile="1" resource="0"
+            file="Source/FormulaParser.cpp"/>
+      <FILE id="W8nidk" name="FormulaParser.h" compile="0" resource="0" file="Source/FormulaParser.h"/>
       <FILE id="NKabK2" name="Menu.h" compile="0" resource="0" file="Source/Menu.h"/>
       <FILE id="jJ2XEr" name="Approx.h" compile="0" resource="0" file="Source/Approx.h"/>
       <FILE id="xZdKBx" name="Outtakes.h" compile="0" resource="0" file="Source/Outtakes.h"/>

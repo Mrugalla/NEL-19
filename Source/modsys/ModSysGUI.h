@@ -1339,7 +1339,13 @@ namespace gui
         };
     }
 
-    enum class ParameterType { Knob, Switch, NumTypes };
+    enum class ParameterType
+    {
+        Knob,
+        Switch,
+        RadioButton,
+        NumTypes
+    };
 
     static constexpr float SensitiveDrag = .2f;
     static constexpr float WheelDefaultSpeed = .02f;
@@ -1552,6 +1558,7 @@ namespace gui
             {
             case ParameterType::Knob: return callbackKnob();
             case ParameterType::Switch: return callbackSwitch();
+			case ParameterType::RadioButton: return callbackRadioButton();
             }
         }
             
@@ -1607,6 +1614,16 @@ namespace gui
             }
         }
 
+        void callbackRadioButton()
+        {
+            const auto vn = param.getValue();
+            if (valNorm != vn)
+            {
+                valNorm = vn;
+                repaint();
+            }
+        }
+
         void paint(Graphics& g) override
         {
             g.setFont(Shared::shared.fontFlx);
@@ -1615,6 +1632,7 @@ namespace gui
             {
             case ParameterType::Knob: return paintKnob(g);
             case ParameterType::Switch: return paintSwitch(g);
+			case ParameterType::RadioButton: return paintRadioButton(g);
             }
         }
             
@@ -1720,8 +1738,8 @@ namespace gui
                 g.fillRoundedRectangle(bounds, thicc);
             }
                 
-            auto valNormInt = static_cast<int>(std::round(valNorm));
-            auto active = valNormInt == targetToggleState;
+            const auto valNormInt = static_cast<int>(std::round(valNorm));
+            const auto active = valNormInt == targetToggleState;
             col = Shared::shared.colour(ColourID::Interact);
                 
             if (active)
@@ -1730,22 +1748,69 @@ namespace gui
                 g.drawRoundedRectangle(bounds, thicc, thicc);
             }  
             else
-            {
                 visualizeGroup(g, "", bounds, col, thicc);
-            }
                 
             if(onPaint == nullptr)
-                g.drawFittedText(param.getCurrentValueAsText(), bounds.toNearestInt(), Just::centred, 1);
+                g.drawFittedText
+                (
+                    param.getCurrentValueAsText(),
+                    bounds.toNearestInt(),
+                    Just::centred,
+                    1
+                );
 			else
 				onPaint(g);
         }
 
+        void paintRadioButton(Graphics& g)
+        {
+            const auto thicc = utils.thicc;
+            const auto bounds = getLocalBounds().toFloat();
+            
+            const auto boundsText = bounds.withHeight(bounds.getHeight() * .5f);
+            const auto boundsBox = maxQuadIn(bounds.withY(boundsText.getBottom()).withHeight(boundsText.getHeight())).reduced(thicc);
+
+            const auto& range = param.range;
+            const auto start = range.start;
+            
+            const auto stateOffset = start + targetToggleState;
+            const auto stateF = static_cast<float>(stateOffset);
+
+			const auto valDenormInt = static_cast<int>(std::round(range.convertFrom0to1(valNorm)));
+            
+            if (isMouseOverOrDragging())
+            {
+                g.setColour(Shared::shared.colour(ColourID::Hover));
+                g.fillEllipse(boundsBox);
+            }
+
+            g.setColour(Shared::shared.colour(ColourID::Interact));
+
+            if (valDenormInt == stateOffset)
+            {
+                g.fillEllipse(boundsBox);
+            }
+            else
+            {
+                g.drawEllipse(boundsBox, thicc);
+            }
+
+			g.drawFittedText
+            (
+                param.valToStr(stateF),
+                boundsText.toNearestInt(),
+                Just::centred,
+                1
+            );
+        }
+        
         void resized() override
         {
             switch (pType)
             {
             case ParameterType::Knob: return resizedKnob();
             case ParameterType::Switch: return resizedSwitch();
+            case ParameterType::RadioButton: return resizedRadioButton();
             }
         }
             
@@ -1773,28 +1838,33 @@ namespace gui
             
         void resizedSwitch()
         {
-            const auto thicc = utils.thicc;
-            const auto bounds = getLocalBounds().toFloat().reduced(thicc);
-            {
-                const auto w = std::min(getWidth(), getHeight()) / 3;
-                const auto h = w;
-                const auto x = getWidth() - w;
-                const auto y = 0;
-                lockr.setBounds(x, y, w, h);
-            }
+            const auto w = std::min(getWidth(), getHeight()) / 3;
+            const auto h = w;
+            const auto x = getWidth() - w;
+            const auto y = 0;
+            lockr.setBounds(x, y, w, h);
         }
+
+		void resizedRadioButton()
+		{
+            const auto w = std::min(getWidth(), getHeight()) / 3;
+            const auto h = w;
+            const auto x = getWidth() - w;
+            const auto y = 0;
+            lockr.setBounds(x, y, w, h);
+		}
 
         void mouseEnter(const Mouse& evt) override
         {
             Comp::mouseEnter(evt);
             notify(NotificationType::ParameterHovered, this);
-            if (pType == ParameterType::Switch)
+            if (pType != ParameterType::Knob)
                 repaint();
         }
             
         void mouseExit(const Mouse&) override
         {
-            if (pType == ParameterType::Switch)
+            if (pType != ParameterType::Knob)
                 repaint();
         }
             
@@ -1843,6 +1913,7 @@ namespace gui
             {
             case ParameterType::Knob: return mouseUpKnob(evt);
             case ParameterType::Switch: return mouseUpSwitch(evt);
+			case ParameterType::RadioButton: return mouseUpRadioButton(evt);
             }
         }
             
@@ -1916,16 +1987,37 @@ namespace gui
 
         void mouseUpSwitch(const Mouse& evt)
         {
-            if (evt.mods.isLeftButtonDown())
+            if (!evt.mods.isLeftButtonDown())
+                return;
+
+            if (!evt.mouseWasDraggedSinceMouseDown())
+                if (evt.mods.isCtrlDown())
+                    param.setValueWithGesture(param.getDefaultValue());
+                else
+                    param.setValueWithGesture(1.f - param.getValue());
+            notify(NotificationType::ParameterDragged, this);
+        }
+
+        void mouseUpRadioButton(const Mouse& evt)
+        {
+            if (evt.mouseWasDraggedSinceMouseDown())
+                return;
+            
+            if (!evt.mods.isLeftButtonDown())
+                return;
+            
+            if (evt.mods.isCtrlDown())
+                param.setValueWithGesture(param.getDefaultValue());
+            else
             {
-                if (!evt.mouseWasDraggedSinceMouseDown())
-                    if (evt.mods.isCtrlDown())
-                        param.setValueWithGesture(param.getDefaultValue());
-                    else
-                        param.setValueWithGesture(1.f - param.getValue());
-                notify(NotificationType::ParameterDragged, this);
+                auto& range = param.range;
+                auto start = range.start;
+                auto stateOffset = static_cast<float>(start + targetToggleState);
+                auto nVal = range.convertTo0to1(stateOffset);
+                param.setValueWithGesture(nVal);
             }
-            repaint();
+
+            notify(NotificationType::ParameterDragged, this);
         }
     };
 

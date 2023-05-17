@@ -80,7 +80,9 @@ namespace gui
             Width,
             RateType,
             Phase,
-            Shape,
+            ShapeSteppy,
+            ShapeLerp,
+            ShapeRound,
             RandType,
             NumParams
         };
@@ -90,7 +92,7 @@ namespace gui
             layout
             (
                 { 1, 13, 21, 34, 1 },
-                { 13, 21 }
+                { 3, 8 }
             ),
             params
             {
@@ -100,7 +102,9 @@ namespace gui
                 Paramtr(u, "Width", "This parameter adds a phase offset to the right channel.", withOffset(PID::Perlin0Width, mOff), modulatables),
 				Paramtr(u, "Temposync", "Switch between the rate units, free running (hz) or temposync (beats).", withOffset(PID::Perlin0RateType, mOff), modulatables, ParameterType::Switch),
 				Paramtr(u, "Phase", "Apply a phase shift to the signal.", withOffset(PID::Perlin0Phase, mOff), modulatables),
-				Paramtr(u, "Shape", "The perlin noise mod can have 3 shapes. Steppy, linear and round.", withOffset(PID::Perlin0Shape, mOff), modulatables),
+				Paramtr(u, "Steppy", "The steppy shape makes the playhead jump in discontinuous steps.", withOffset(PID::Perlin0Shape, mOff), modulatables, ParameterType::RadioButton),
+                Paramtr(u, "Lerp", "Lerp linearly interpolates between the values of the noise.", withOffset(PID::Perlin0Shape, mOff), modulatables, ParameterType::RadioButton),
+                Paramtr(u, "Round", "The round shape creates smooth perlin noise.", withOffset(PID::Perlin0Shape, mOff), modulatables, ParameterType::RadioButton),
 				Paramtr(u, "Proc", "Every noise segment corresponds to a distinct combination of rate, bpm and transport info.", withOffset(PID::Perlin0RandType, mOff), modulatables, ParameterType::Switch)
             }
         {
@@ -154,6 +158,11 @@ namespace gui
 				g.drawFittedText("P", params[RandType].getLocalBounds(), Just::centred, 1);
             };
 			params[RandType].targetToggleState = 1;
+            
+            params[ShapeSteppy].targetToggleState = 0;
+			params[ShapeLerp].targetToggleState = 1;
+			params[ShapeRound].targetToggleState = 2;
+            
         }
             
         void activate(ParamtrRandomizer& randomizer)
@@ -173,32 +182,33 @@ namespace gui
 
             layout.place(params[RateHz], 2, 0, 1, 2);
             layout.place(params[RateBeats], 2, 0, 1, 2);
-            // perlin params:
+            
             {
-                const auto area = layout(3, 0, 1, 1);
-                const auto w = area.getWidth();
-                const auto h = area.getHeight();
-                auto x = area.getX();
-                auto y = area.getY();
-
-                auto buttonWidth = w / 3.f;
-                params[Shape].setBounds(juce::Rectangle<float>(x, y, buttonWidth, h).toNearestInt());
-                x += buttonWidth;
-                params[Shape].setBounds(juce::Rectangle<float>(x, y, buttonWidth, h).toNearestInt());
-                x += buttonWidth;
-                params[Shape].setBounds(juce::Rectangle<float>(x, y, buttonWidth, h).toNearestInt());
+                const auto shapeBounds = layout(3, 0, 1, 1);
+                const auto y = shapeBounds.getY();
+                const auto w = shapeBounds.getWidth() / 3.f;
+                const auto h = shapeBounds.getHeight();
+				auto x = shapeBounds.getX();
+                params[ShapeSteppy].setBounds(BoundsF(x, y, w, h).toNearestInt());
+                x += w;
+				params[ShapeLerp].setBounds(BoundsF(x, y, w, h).toNearestInt());
+				x += w;
+				params[ShapeRound].setBounds(BoundsF(x, y, w, h).toNearestInt());
             }
+            
             {
                 const auto area = layout(3, 1, 1, 1);
+				const auto y = area.getY();
+				const auto h = area.getHeight();
                 const auto w = area.getWidth();
                 const auto knobW = w / 3.f;
                 auto x = area.getX();
 
-                params[Oct].setBounds(juce::Rectangle<float>(x, area.getY(), knobW, area.getHeight()).toNearestInt());
+                params[Oct].setBounds(BoundsF(x, y, knobW, h).toNearestInt());
                 x += knobW;
-                params[Phase].setBounds(juce::Rectangle<float>(x, area.getY(), knobW, area.getHeight()).toNearestInt());
+                params[Phase].setBounds(BoundsF(x, y, knobW, h).toNearestInt());
                 x += knobW;
-                params[Width].setBounds(juce::Rectangle<float>(x, area.getY(), knobW, area.getHeight()).toNearestInt());
+                params[Width].setBounds(BoundsF(x, y, knobW, h).toNearestInt());
             }
             //layout.place(seed, 1, 1, 1, 1);
             {
@@ -210,20 +220,20 @@ namespace gui
 
                 const auto buttonW = w * .5f;
 
-                params[RateType].setBounds(maxQuadIn(juce::Rectangle<float>(x, y, w - buttonW, h)).toNearestInt());
+                params[RateType].setBounds(maxQuadIn(BoundsF(x, y, w - buttonW, h)).toNearestInt());
                 x += buttonW;
-                params[RandType].setBounds(maxQuadIn(juce::Rectangle<float>(x, y, w - buttonW, h)).toNearestInt());
+                params[RandType].setBounds(maxQuadIn(BoundsF(x, y, w - buttonW, h)).toNearestInt());
             }
         }
 
         void updateTimer() override
         {
-            for (auto& param : params)
-                param.updateTimer();
-
             bool isTempoSync = utils.getParam(params[RateType].getPID()).getValueSum() > .5f;
             params[RateBeats].setVisible(isTempoSync);
             params[RateHz].setVisible(!isTempoSync);
+            
+            for (auto& param : params)
+                param.updateTimer();
         }
         
     protected:
