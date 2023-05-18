@@ -943,7 +943,7 @@ namespace gui
             {
                 return [&comp = modComp, type = modType]()
                 {
-                    comp.setMod(type);
+                    comp.setMod(type, true);
                 };
             }
         
@@ -1111,10 +1111,14 @@ namespace gui
             setMod(getModType());
         }
             
-        void setMod(ModType t)
+        void setMod(ModType t, bool resetSelector = false)
         {
             if (modType == t)
+            {
+                if(resetSelector)
+                    selector.reset(nullptr);
                 return;
+            }
                 
             modType = t;
             perlin.setVisible(false);
