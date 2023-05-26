@@ -107,6 +107,8 @@ struct Nel19AudioProcessor :
     }
 
     Nel19AudioProcessor();
+    ~Nel19AudioProcessor() override;
+    
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
    #ifndef JucePlugin_PreferredChannelConfigurations

@@ -28,6 +28,39 @@ namespace perlin
 		return static_cast<Float>(1) / msInSamples(ms, Fs);
 	}
 
+	inline double applyBias(double x, double bias) noexcept
+	{
+		if (bias == 0.)
+			return x;
+		const auto X = 2. * x * x * x * x * x;
+		const auto Y = X * X * X;
+		return x + bias * (std::tanh(Y) - x);
+	}
+
+	inline void applyBias(double* smpls, double bias, int numSamples) noexcept
+	{
+		for (auto s = 0; s < numSamples; ++s)
+			smpls[s] = applyBias(smpls[s], bias);
+	}
+
+	inline void applyBias(double* const* samples, double bias, int numChannels, int numSamples) noexcept
+	{
+		for (auto ch = 0; ch < numChannels; ++ch)
+			applyBias(samples[ch], bias, numSamples);
+	}
+
+	inline void applyBias(double* smpls, const double* bias, int numSamples) noexcept
+	{
+		for (auto s = 0; s < numSamples; ++s)
+			smpls[s] = applyBias(smpls[s], bias[s]);
+	}
+
+	inline void applyBias(double* const* samples, const double* bias, int numChannels, int numSamples) noexcept
+	{
+		for (auto ch = 0; ch < numChannels; ++ch)
+			applyBias(samples[ch], bias, numSamples);
+	}
+
 	inline void generateProceduralNoise(double* noise, int size, unsigned int seed)
 	{
 		std::random_device rd;
@@ -127,11 +160,11 @@ namespace perlin
 		}
 		
 		/* samples, noise, gainBuffer,
-		octavesInfo, phsInfo, widthInfo, shape,
-		numChannels, numSamples */
+		octavesInfo, phsInfo, widthInfo,
+		shape, numChannels, numSamples */
 		void operator()(double* const* samples, const double* noise, const double* gainBuffer,
-			const PRMInfo& octavesInfo, const PRMInfo& phsInfo, const PRMInfo& widthInfo, Shape shape,
-			int numChannels, int numSamples) noexcept
+			const PRMInfo& octavesInfo, const PRMInfo& phsInfo, const PRMInfo& widthInfo,
+			Shape shape, int numChannels, int numSamples) noexcept
 		{
 			synthesizePhasor(phsInfo, numSamples);
 
@@ -174,6 +207,13 @@ namespace perlin
 				}
 		}
 
+		double getInterpolatedSample(const double* noise,
+			double phase, Shape shape) const noexcept
+		{
+			const auto smpl0 = interpolationFuncs[static_cast<int>(shape)](noise, phase);
+			return smpl0;
+		}
+
 		/* smpls, octavesInfo, noise, gainBuffer, shape, numSamples */
 		void processOctaves(double* smpls, const PRMInfo& octavesInfo,
 			const double* noise, const double* gainBuffer, Shape shape, int numSamples) noexcept
@@ -184,14 +224,10 @@ namespace perlin
 				processOctavesSmoothing(smpls, octavesInfo.buf, noise, gainBuffer, shape, numSamples);
 		}
 
-		double getInterpolatedSample(const double* noise, double phase, Shape shape) noexcept
-		{
-			return interpolationFuncs[static_cast<int>(shape)](noise, phase);
-		}
-
+		
 		/* smpls, noise, gainBuffer, octaves, shape, numSamples */
-		void processOctavesNotSmoothing(double* smpls, const double* noise,
-			const double* gainBuffer, double octaves, Shape shape, int numSamples) noexcept
+		void processOctavesNotSmoothing(double* smpls, const double* noise, const double* gainBuffer, double octaves,
+			Shape shape, int numSamples) noexcept
 		{
 			const auto octFloor = std::floor(octaves);
 
@@ -232,7 +268,8 @@ namespace perlin
 
 		/* smpls, octavesBuf, noise, gainBuffer, shape, numSamples */
 		void processOctavesSmoothing(double* smpls, const double* octavesBuf,
-			const double* noise, const double* gainBuffer, Shape shape, int numSamples) noexcept
+			const double* noise, const double* gainBuffer,
+			Shape shape, int numSamples) noexcept
 		{
 			for (auto s = 0; s < numSamples; ++s)
 			{
@@ -354,7 +391,8 @@ namespace perlin
 			curPosInSamples(0),
 			latency(0)
 		{
-			setSeed(69420);
+			juce::Random rand;
+			setSeed(rand.nextInt());
 
 			for (auto s = 0; s < Perlin::NoiseOvershoot; ++s)
 				noise[Perlin::NoiseSize + s] = noise[s];
@@ -386,12 +424,12 @@ namespace perlin
 		}
 
 		/* samples, numChannels, numSamples, playHeadPos,
-		rateHz, rateBeats, octaves, width, phs,
+		rateHz, rateBeats, octaves, width, phs, bias[0,1]
 		shape, temposync, procedural */
 		void operator()(double* const* samples, int numChannels, int numSamples,
 			const PlayHeadPos& playHeadPos,
 			double _rateHz, double _rateBeats,
-			double octaves, double width, double phs,
+			double octaves, double width, double phs, double bias,
 			Shape shape, bool temposync, bool procedural) noexcept
 		{
 			if (temposync)
@@ -428,6 +466,23 @@ namespace perlin
 				numChannels,
 				numSamples
 			);
+
+			if(bias != 0.)
+				for(auto ch = 0; ch < numChannels; ++ch)
+					for (auto s = 0; s < numSamples; ++s)
+					{
+						auto x = samples[ch][s];
+						auto y = 1.;
+						if (x != 0.)
+						{
+							auto X = 8. * x * Pi;
+							auto A = 1. - abs(x);
+							y = approx::sin(X) * approx::sin(X) / X;
+							y = 1.5 * A * A * y;
+						}
+							
+						samples[ch][s] = x + bias * (y - x);
+					}
 		}
 
 		// misc

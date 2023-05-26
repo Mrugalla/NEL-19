@@ -28,6 +28,7 @@ namespace gui
 	using Identifier = juce::Identifier;
     using File = juce::File;
     using URL = juce::URL;
+	using KeyPress = juce::KeyPress;
     
     // MATH UTILS
     static constexpr float Pi = 3.14159265359f;

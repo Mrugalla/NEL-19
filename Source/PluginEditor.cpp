@@ -65,13 +65,13 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
 
     visualizer(utils, "Visualizes the sum of the vibrato's modulators.", p.getChannelCountOfBus(false, 0), 1),
 
-	bufferSizes(utils, "Buffer Sizes", "Switch between different buffer sizes for the vibrato.", modSys6::PID::BufferSize, modulatables, gui::ParameterType::Knob),
+	bufferSizes(utils, "Buffer", "Switch between different buffer sizes for the vibrato.", modSys6::PID::BufferSize, modulatables, gui::ParameterType::Knob),
     modsDepth(utils, "Depth", "Modulate the depth of the vibrato.", modSys6::PID::Depth, modulatables, gui::ParameterType::Knob),
-    modsMix(utils, "Mods\nMix", "Interpolate between the vibrato's modulators.", modSys6::PID::ModsMix, modulatables, gui::ParameterType::Knob),
+    modsMix(utils, "Mods", "Interpolate between the vibrato's modulators.", modSys6::PID::ModsMix, modulatables, gui::ParameterType::Knob),
     dryWetMix(utils, "Mix", "Define the dry/wet ratio of the effect.", modSys6::PID::DryWetMix, modulatables, gui::ParameterType::Knob),
     gainWet(utils, "Gain", "The output gain of the wet signal.", modSys6::PID::WetGain, modulatables, gui::ParameterType::Knob),
     stereoConfig(utils, "StereoConfig", "Configurate if effect is applied to l/r or m/s", modSys6::PID::StereoConfig, modulatables, gui::ParameterType::Switch),
-	feedback(utils, "Feedback", "Dial in some feedback to this vibrato's delay.", modSys6::PID::Feedback, modulatables, gui::ParameterType::Knob),
+	feedback(utils, "FB", "Dial in some feedback to this vibrato's delay.", modSys6::PID::Feedback, modulatables, gui::ParameterType::Knob),
 	damp(utils, "Damp", "This is a lowpass filter in the feedback path.", modSys6::PID::Damp, modulatables, gui::ParameterType::Knob),
 	
     macro0Dragger(utils, 0, modulatables),
@@ -317,7 +317,7 @@ void Nel19AudioProcessorEditor::resized()
 #endif
     layoutTopBar.place(hq,              3, 0, 1, 1, 0.f, true);
 	layoutTopBar.place(lookahead,       4, 0, 1, 1, 0.f, true);
-    layoutTopBar.place(nelLabel,        5, 0, 1, 1);
+    layoutTopBar.place(nelLabel,        5, 0, 1, 1, thicc * 4.f);
     {
         auto area = layoutMainParams(0, 0, 2, 1);
         area.setY(layoutTopBar.getY(0));
@@ -325,9 +325,14 @@ void Nel19AudioProcessorEditor::resized()
 
         visualizer.setBounds(area.toNearestInt());
     }
+    
+    {
+        const auto w = static_cast<int>(thicc * 25.f);
+        const auto h = w * 75 / 100;
 
-    popUp.setBounds({ 0, 0, 100, 50 });
-    enterValue.setBounds({ 0, 0, 100, 50 });
+        popUp.setBounds({ 0, 0, w, h });
+        enterValue.setBounds({ 0, 0, w, h });
+    }
 
 #if PresetsExist
     layout.place(presetBrowser, 1, 1, 2, 1, 0.f);

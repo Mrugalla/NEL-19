@@ -1,4 +1,5 @@
 #pragma once
+#include <cmath>
 
 namespace approx
 {
@@ -38,6 +39,26 @@ namespace approx
             x4 * static_cast<Float>(.0416666666667) -
             x6 * static_cast<Float>(.00138888888889) +
             x8 * static_cast<Float>(.0000248015873016);
+    }
+
+    template<typename Float>
+    inline Float sin(Float x) noexcept
+    {
+        const Float epsilon = static_cast<Float>(1e-8);  // Desired precision
+        Float result = x;
+        Float term = x;
+        Float power = x;
+        Float factorial = static_cast<Float>(1);
+
+        for (Float i = static_cast<Float>(1); std::abs(term) > epsilon; i += static_cast<Float>(2))
+        {
+            power *= -x * x;
+            factorial *= (i + static_cast<Float>(1)) * (i + static_cast<Float>(2));
+            term = power / factorial;
+            result += term;
+        }
+
+        return result;
     }
 
     /* if x == -3: y = -1, if x == 3: y = 1 */

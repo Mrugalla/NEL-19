@@ -18,6 +18,8 @@ namespace vibrato
 
 	using SmoothD = smooth::Smooth<double>;
 	using String = juce::String;
+	using Identifier = juce::Identifier;
+	using ValueTree = juce::ValueTree;
 
 	enum class ObjType
 	{
@@ -25,6 +27,7 @@ namespace vibrato
 		InterpolationType,
 		DelaySize,
 		Wavetable,
+		PerlinSeed,
 		NumTypes
 	};
 	
@@ -36,6 +39,7 @@ namespace vibrato
 		case ObjType::InterpolationType: return "InterpolationType";
 		case ObjType::DelaySize: return "DelaySize";
 		case ObjType::Wavetable: return "Wavetable";
+		case ObjType::PerlinSeed: return "PerlinSeed";
 		default: return "";
 		}
 	}
@@ -263,7 +267,7 @@ namespace vibrato
 			Perlin() :
 				perlin(),
 				rateHz(1.), rateBeats(1.),
-				octaves(1.), width(0.), phs(0.),
+				octaves(1.), width(0.), phs(0.), bias(0.),
 				shape(Shape::Spline),
 				temposync(false), procedural(true)
 			{
@@ -275,7 +279,7 @@ namespace vibrato
 			}
 
 			void setParameters(double _rateHz, double _rateBeats,
-				double _octaves, double _width, double _phs,
+				double _octaves, double _width, double _phs, double _bias,
 				Shape _shape, bool _temposync, bool _procedural) noexcept
 			{
 				rateHz = _rateHz;
@@ -283,6 +287,7 @@ namespace vibrato
 				octaves = _octaves;
 				width = _width;
 				phs = _phs;
+				bias = _bias;
 				shape = _shape;
 				temposync = _temposync;
 				procedural = _procedural;
@@ -304,16 +309,27 @@ namespace vibrato
 					octaves,
 					width,
 					phs,
+					bias,
 					shape,
 					temposync,
 					procedural
 				);
 			}
 		
+			const int getSeed() const noexcept
+			{
+				return perlin.seed.load();
+			}
+
+			void setSeed(int s) noexcept
+			{
+				perlin.setSeed(s);
+			}
+
 		protected:
 			perlin::Perlin2 perlin;
 			double rateHz, rateBeats;
-			double octaves, width, phs;
+			double octaves, width, phs, bias;
 			Shape shape;
 			bool temposync, procedural;
 		};
@@ -1073,33 +1089,58 @@ namespace vibrato
 		{
 			tables.makeTablesWeierstrass();
 		}
-
-		void loadPatch(juce::ValueTree& state, int mIdx)
+		
+		void savePatch(ValueTree& state, int mIdx)
 		{
-			const juce::Identifier id(toString(ObjType::Wavetable) + juce::String(mIdx));
-			const auto child = state.getChildWithName(id);
-			if (child.isValid())
 			{
-				const auto tableType = child.getProperty(id).toString();
-				if (tableType == toString(dsp::TableType::Weierstrass))
-					tables.makeTablesWeierstrass();
-				else if (tableType == toString(dsp::TableType::Tri))
-					tables.makeTablesTriangles();
-				else if (tableType == toString(dsp::TableType::Sinc))
-					tables.makeTablesSinc();
+				const Identifier id(toString(ObjType::Wavetable) + String(mIdx));
+				auto child = state.getChildWithName(id);
+				if (!child.isValid())
+				{
+					child = ValueTree(id);
+					state.appendChild(child, nullptr);
+				}
+				child.setProperty(id, tables.name, nullptr);
+			}
+			const auto firstTime = static_cast<bool>(state.getProperty("firstTimeUwU", true));
+			if(firstTime)
+			{
+				const Identifier id(toString(ObjType::PerlinSeed) + String(mIdx));
+				auto child = state.getChildWithName(id);
+				if (!child.isValid())
+				{
+					child = ValueTree(id);
+					state.appendChild(child, nullptr);
+				}
+				child.setProperty(id, perlin.getSeed(), nullptr);
 			}
 		}
 
-		void savePatch(juce::ValueTree& state, int mIdx)
+		void loadPatch(ValueTree& state, int mIdx)
 		{
-			const juce::Identifier id(toString(ObjType::Wavetable) + juce::String(mIdx));
-			auto child = state.getChildWithName(id);
-			if (!child.isValid())
 			{
-				child = juce::ValueTree(id);
-				state.appendChild(child, nullptr);
+				const Identifier id(toString(ObjType::Wavetable) + String(mIdx));
+				const auto child = state.getChildWithName(id);
+				if (child.isValid())
+				{
+					const auto tableType = child.getProperty(id).toString();
+					if (tableType == toString(dsp::TableType::Weierstrass))
+						tables.makeTablesWeierstrass();
+					else if (tableType == toString(dsp::TableType::Tri))
+						tables.makeTablesTriangles();
+					else if (tableType == toString(dsp::TableType::Sinc))
+						tables.makeTablesSinc();
+				}
 			}
-			child.setProperty(id, tables.name, nullptr);
+			{
+				const Identifier id(toString(ObjType::PerlinSeed) + String(mIdx));
+				const auto child = state.getChildWithName(id);
+				if (child.isValid())
+				{
+					const auto seed = static_cast<int>(child.getProperty(id));
+					perlin.setSeed(seed);
+				}
+			}
 		}
 
 		void setType(ModType t) noexcept { type = t; }
@@ -1117,12 +1158,17 @@ namespace vibrato
 			lfo.prepare(sampleRate, maxBlockSize, static_cast<double>(latency), oversamplingFactor);
 		}
 
+		int getSeed() const noexcept
+		{
+			return perlin.getSeed();
+		}
+
 		// parameters
 		void setParametersPerlin(double _rateHz, double _rateBeats,
-			double _octaves, double _width, double _phs,
+			double _octaves, double _width, double _phs, double _bias,
 			perlin::Shape _shape, bool _temposync, bool _procedural) noexcept
 		{
-			perlin.setParameters(_rateHz, _rateBeats, _octaves, _width, _phs, _shape, _temposync, _procedural);
+			perlin.setParameters(_rateHz, _rateBeats, _octaves, _width, _phs, _bias, _shape, _temposync, _procedural);
 		}
 		
 		void setParametersAudioRate(double oct, double semi, double fine, double width, double retuneSpeed,

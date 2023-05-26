@@ -84,34 +84,35 @@ namespace gui
             ShapeLerp,
             ShapeRound,
             RandType,
+            Bias,
             NumParams
         };
 
-        ModCompPerlin(Utils& u, std::vector<Paramtr*>& modulatables, int mOff = 0) :
+        ModCompPerlin(Utils& u, std::vector<Paramtr*>& modulatables, int _mOff = 0) :
             Comp(u, "", CursorType::Default),
             layout
             (
-                { 1, 13, 21, 34, 1 },
+                { 1, 8, 13, 34, 1 },
                 { 3, 8 }
             ),
+            mOff(_mOff),
             params
             {
                 Paramtr(u, "Rate", "The rate of the perlin noise mod in hz.", withOffset(PID::Perlin0RateHz, mOff), modulatables),
 				Paramtr(u, "Rate", "The rate of the perlin noise mod in beats.", withOffset(PID::Perlin0RateBeats, mOff), modulatables),
                 Paramtr(u, "Oct", "More octaves add complexity to the signal.", withOffset(PID::Perlin0Octaves, mOff), modulatables),
-                Paramtr(u, "Width", "This parameter adds a phase offset to the right channel.", withOffset(PID::Perlin0Width, mOff), modulatables),
+                Paramtr(u, "Wdth", "This parameter adds a phase offset to the right channel.", withOffset(PID::Perlin0Width, mOff), modulatables),
 				Paramtr(u, "Temposync", "Switch between the rate units, free running (hz) or temposync (beats).", withOffset(PID::Perlin0RateType, mOff), modulatables, ParameterType::Switch),
-				Paramtr(u, "Phase", "Apply a phase shift to the signal.", withOffset(PID::Perlin0Phase, mOff), modulatables),
+				Paramtr(u, "Phs", "Apply a phase shift to the signal.", withOffset(PID::Perlin0Phase, mOff), modulatables),
 				Paramtr(u, "Steppy", "The steppy shape makes the playhead jump in discontinuous steps.", withOffset(PID::Perlin0Shape, mOff), modulatables, ParameterType::RadioButton),
                 Paramtr(u, "Lerp", "Lerp linearly interpolates between the values of the noise.", withOffset(PID::Perlin0Shape, mOff), modulatables, ParameterType::RadioButton),
                 Paramtr(u, "Round", "The round shape creates smooth perlin noise.", withOffset(PID::Perlin0Shape, mOff), modulatables, ParameterType::RadioButton),
-				Paramtr(u, "Proc", "Every noise segment corresponds to a distinct combination of rate, bpm and transport info.", withOffset(PID::Perlin0RandType, mOff), modulatables, ParameterType::Switch)
+				Paramtr(u, "Proc", "Every noise segment corresponds to a distinct combination of rate, bpm and transport info.", withOffset(PID::Perlin0RandType, mOff), modulatables, ParameterType::Switch),
+				Paramtr(u, "Bias", "Dial it in to make higher values less likely.", withOffset(PID::Perlin0Bias, mOff), modulatables)
             }
         {
             for (auto& p : params)
-            {
                 addAndMakeVisible(p);
-            }
 
 			using Stroke = juce::PathStrokeType;
 			using Path = juce::Path;
@@ -172,8 +173,14 @@ namespace gui
             setVisible(true);
         }
 
-        void paint(juce::Graphics&) override
+        void paint(Graphics& g) override
         {
+            g.setColour(Shared::shared.colour(ColourID::Hover));
+
+            const auto mIdx = mOff == 0 ? 0 : 1;
+            const auto seed = utils.audioProcessor.modulators[mIdx].getSeed();
+
+            g.drawFittedText("seed: " + String(seed), getLocalBounds(), Just::centredBottom, 1);
         }
 
         void resized() override
@@ -186,7 +193,7 @@ namespace gui
             {
                 const auto shapeBounds = layout(3, 0, 1, 1);
                 const auto y = shapeBounds.getY();
-                const auto w = shapeBounds.getWidth() / 3.f;
+                const auto w = shapeBounds.getWidth() / 4.f;
                 const auto h = shapeBounds.getHeight();
 				auto x = shapeBounds.getX();
                 params[ShapeSteppy].setBounds(BoundsF(x, y, w, h).toNearestInt());
@@ -194,6 +201,8 @@ namespace gui
 				params[ShapeLerp].setBounds(BoundsF(x, y, w, h).toNearestInt());
 				x += w;
 				params[ShapeRound].setBounds(BoundsF(x, y, w, h).toNearestInt());
+                x += w;
+				params[Bias].setBounds(BoundsF(x, y, w, h).toNearestInt());
             }
             
             {
@@ -238,6 +247,7 @@ namespace gui
         
     protected:
         Layout layout;
+        int mOff;
         std::array<Paramtr, NumParams> params;
     };
 
@@ -489,8 +499,8 @@ namespace gui
                 Paramtr(u, "Oct", "Transpose the oscillator in octave steps.", withOffset(PID::AudioRate0Oct, mOff), modulatables),
                 Paramtr(u, "Semi", "Transpose the oscillator in semitone steps.", withOffset(PID::AudioRate0Semi, mOff), modulatables),
                 Paramtr(u, "Fine", "Transpose the oscillator in finetone steps.", withOffset(PID::AudioRate0Fine, mOff), modulatables),
-                Paramtr(u, "Width", "Defines this modulator's stereo-width.", withOffset(PID::AudioRate0Width, mOff), modulatables),
-                Paramtr(u, "Legato", "Defines this oscillator's retune speed.", withOffset(PID::AudioRate0RetuneSpeed, mOff), modulatables),
+                Paramtr(u, "Wdth", "Defines this modulator's stereo-width.", withOffset(PID::AudioRate0Width, mOff), modulatables),
+                Paramtr(u, "Glide", "Defines this oscillator's retune speed.", withOffset(PID::AudioRate0RetuneSpeed, mOff), modulatables),
                 Paramtr(u, "A", "Defines the envelope's attack value.", withOffset(PID::AudioRate0Atk, mOff), modulatables),
                 Paramtr(u, "D", "Defines the envelope's decay value.", withOffset(PID::AudioRate0Dcy, mOff), modulatables),
                 Paramtr(u, "S", "Defines the envelope's sustain value.", withOffset(PID::AudioRate0Sus, mOff), modulatables),
@@ -525,7 +535,7 @@ namespace gui
         {
             for (auto& param : params)
                 param.updateTimer();
-
+			
             adsr->update(false);
             if (wantsToReplaceADSR)
             {
@@ -650,7 +660,7 @@ namespace gui
                 Paramtr(u, "Attack", "The envelope follower's attack time in milliseconds.", withOffset(PID::EnvFol0Attack, mOff), modulatables),
                 Paramtr(u, "Release", "The envelope follower's release time in milliseconds.", withOffset(PID::EnvFol0Release, mOff), modulatables),
                 Paramtr(u, "Gain", "This modulator's input gain.", withOffset(PID::EnvFol0Gain, mOff), modulatables),
-                Paramtr(u, "Width", "The modulator's stereo-width", withOffset(PID::EnvFol0Width, mOff), modulatables),
+                Paramtr(u, "Wdth", "The modulator's stereo-width", withOffset(PID::EnvFol0Width, mOff), modulatables),
 				Paramtr(u, "SC", "If enabled the envelope follower is synthesized from the sidechain input.", withOffset(PID::EnvFol0SC, mOff), modulatables, ParameterType::Switch)
             }
         {
@@ -794,8 +804,8 @@ namespace gui
                 Paramtr(u, "Rate", "Adjust the frequency of the LFO in hz.", withOffset(PID::LFO0RateFree, mOff), modulatables),
                 Paramtr(u, "Rate", "Adjust the frequency of the LFO in beats.", withOffset(PID::LFO0RateSync, mOff), modulatables),
                 Paramtr(u, "WT", "Interpolate between the waveforms of the selected wavetable.", withOffset(PID::LFO0Waveform, mOff), modulatables),
-                Paramtr(u, "Phase", "Add a phase offset to the LFO.", withOffset(PID::LFO0Phase, mOff), modulatables),
-                Paramtr(u, "Width", "Add a phase offset to the right channel of the LFO.", withOffset(PID::LFO0Width, mOff), modulatables)
+                Paramtr(u, "Phs", "Add a phase offset to the LFO.", withOffset(PID::LFO0Phase, mOff), modulatables),
+                Paramtr(u, "Wdth", "Add a phase offset to the right channel of the LFO.", withOffset(PID::LFO0Width, mOff), modulatables)
             },
             lfoWaveformParam(u.getParam(PID::LFO0Waveform, mOff)),
             tables(_tables),
@@ -1047,8 +1057,8 @@ namespace gui
             Comp(u, makeNotify(*this), "", CursorType::Default),
             layout
             (
-                { 8, 1, 1 },
-                { 3, 8 }
+                { 8, 8, 1, 1 },
+                { 2, 8 }
             ),
             modType(ModType::NumMods),
             modDepth(0.f),
@@ -1072,6 +1082,7 @@ namespace gui
             selector(nullptr)
         {
             label.font = Shared::shared.font;
+            label.just = Just::left;
             selectorButton.onPaint = makeTextButtonOnPaint("<<");
             selectorButton.onClick = [this]()
             {
@@ -1090,7 +1101,8 @@ namespace gui
 
             addAndMakeVisible(label);
             addAndMakeVisible(inputLabel);
-            inputLabel.setJustifaction(juce::Justification::left);
+            inputLabel.just = Just::right;
+            inputLabel.font = Shared::shared.fontFlx;
                 
             addChildComponent(perlin);
             addChildComponent(audioRate);
@@ -1207,13 +1219,13 @@ namespace gui
 
             layout.setBounds(getLocalBounds().toFloat().reduced(thicc4));
 
-            layout.place(label, 0, 0, 1, 1, thicc4, false);
+            layout.place(label, 1, 0, 1, 1, thicc4, false);
             layout.place(inputLabel, 0, 0, 1, 1, thicc4, false);
-            layout.place(randomizer, 1, 0, 1, 1, thicc, true);
-            layout.place(selectorButton, 2, 0, 1, 1, thicc, true);
+            layout.place(randomizer, 2, 0, 1, 1, 0.f, true);
+            layout.place(selectorButton, 3, 0, 1, 1, 0.f, true);
 
             {
-                const auto bounds = layout(0, 1, 3, 1, thicc, false).toNearestInt();
+                const auto bounds = layout(0, 1, 4, 1, 0.f, false).toNearestInt();
                 perlin.setBounds(bounds);
                 audioRate.setBounds(bounds);
                 dropout.setBounds(bounds);

@@ -160,17 +160,34 @@ namespace gui
         return rows;
     }
 
-    inline PointF boundsOf(const Font& font, const String& txt) noexcept
+    inline BoundsF boundsOf(const Font& font, const String& text) noexcept
     {
-        const auto w = font.getStringWidthFloat(txt);
-            
-        auto numLines = 2.f;
-        for (auto t = 0; t < txt.length() - 1; ++t)
-            if (txt[t] == '\n')
-                ++numLines;
+        auto maxStrWidth = 0.f;
+        auto numLines = 1.f;
+        {
+            auto sIdx = 0;
+            for (auto i = 1; i < text.length(); ++i)
+            {
+                if (text[i] == '\n' || text[i] == '\r')
+                {
+                    const auto lineWidth = font.getStringWidthFloat(text.substring(sIdx, i));
+                    if (maxStrWidth < lineWidth)
+                        maxStrWidth = lineWidth;
+                    ++i;
+                    sIdx = i;
+                    ++numLines;
+                }
+            }
+            const auto lineWidth = font.getStringWidthFloat(text.substring(sIdx));
+            if (maxStrWidth < lineWidth)
+                maxStrWidth = lineWidth;
+        }
 
-        const auto h = font.getHeightInPoints() * numLines;
-        return { w, h };
+        auto fontHeight = font.getHeight();
+
+        const auto strHeight = fontHeight * numLines;
+
+        return { 0.f, 0.f, maxStrWidth, strHeight };
     }
 
     inline void repaintWithChildren(Component* comp)
@@ -841,10 +858,42 @@ namespace gui
             }
         }
     };
+    
+    inline float getFontHeight(Comp* comp, const Font& font,
+        const String& text, float minFontHeight) noexcept
+    {
+        float nHeight = font.getHeight();
+
+        const auto thicc = comp->utils.thicc;
+        const auto width = static_cast<float>(comp->getWidth());
+        const auto height = static_cast<float>(comp->getHeight());
+
+        const auto fontBounds = boundsOf(font, text);
+
+        if (fontBounds.getWidth() != 0.f)
+        {
+            const PointF dif
+            (
+                fontBounds.getWidth() - width,
+                fontBounds.getHeight() - height
+            );
+
+            float ratio;
+            if (dif.x > dif.y)
+                ratio = width / fontBounds.getWidth();
+            else
+                ratio = height / fontBounds.getHeight();
+
+            nHeight = std::max(minFontHeight, font.getHeight() * ratio - thicc);
+        }
+        return nHeight;
+    }
 
     struct Label :
         public Comp
     {
+        static constexpr float MinHeight = 4.f;
+
         Label(Utils& u, String&& _txt, ColourID _bgC = ColourID::Transp,
             ColourID _outlineC = ColourID::Transp, ColourID _txtC = ColourID::Txt) :
             Comp(u, "", CursorType::Default),
@@ -873,8 +922,11 @@ namespace gui
 
         void setText(const String& t)
         {
+            if (txt == t)
+                return;
             txt = t;
-            updateBounds();
+            
+            font.setHeight(getFontHeight(this, font, txt, MinHeight));
         }
             
         void setText(String&& t)
@@ -904,7 +956,8 @@ namespace gui
 
         void resized() override
         {
-            updateBounds();
+            font.setHeight(getFontHeight(this, font, txt, MinHeight));
+            font.setHeight(getFontHeight(this, font, txt, MinHeight));
         }
 
         void paint(Graphics& g) override
@@ -917,12 +970,10 @@ namespace gui
             g.setColour(Shared::shared.colour(outlineC));
             g.drawRoundedRectangle(bounds, thicc, thicc);
             g.setColour(Shared::shared.colour(txtC));
-            g.drawFittedText
-            (
-                txt, getLocalBounds(), just, 1
-            );
+            g.drawFittedText(txt, getLocalBounds(), just, 1);
         }
-
+        
+        /*
         void updateBounds()
         {
             const auto height = static_cast<float>(getHeight());
@@ -938,9 +989,9 @@ namespace gui
                 setBounds(x, y, w, h);
             }
         }
-
+        */
+        
         Font font;
-    protected:
         String txt;
         ColourID bgC, outlineC, txtC;
         Just just;
@@ -1281,6 +1332,297 @@ namespace gui
         };
     }
 
+    struct TextEditor :
+        public Comp
+    {
+        TextEditor(Utils& u, const String& _tooltip, Notify&& _notify, const String& _emptyString) :
+            Comp(u, std::move(_notify), _tooltip),
+            onEscape([]() { return true; }),
+            onReturn([]() { return true; }),
+            onType([]() { return true; }),
+            onRemove([]() { return true; }),
+            onClick([]() { return true; }),
+
+            label(u, ""),
+            emptyString(_emptyString), txt(""),
+            tickIdx(0),
+            drawTick(false),
+            timerIdx(0),
+            timerRunning(false),
+            multiLine(true)
+        {
+            addAndMakeVisible(label);
+            setWantsKeyboardFocus(true);
+            setInterceptsMouseClicks(true, true);
+        }
+
+        TextEditor(Utils& u, const String& _tooltip, const String& _emptyString) :
+            Comp(u, _tooltip),
+            onEscape([]() { return true; }),
+            onReturn([]() { return true; }),
+            onType([]() { return true; }),
+            onRemove([]() { return true; }),
+            onClick([]() { return true; }),
+
+            label(u, ""),
+            emptyString(_emptyString), txt(""),
+            tickIdx(0),
+            drawTick(false),
+            timerIdx(0),
+            timerRunning(false),
+            multiLine(true)
+        {
+            addAndMakeVisible(label);
+            setWantsKeyboardFocus(true);
+        }
+
+        void addText(const String& text)
+        {
+            auto nText = text;
+            removeMultiLine(nText);
+            txt = txt.substring(0, tickIdx) + nText + txt.substring(tickIdx);
+
+            tickIdx += nText.length();
+            updateLabel();
+        }
+
+        void setVisible(bool e)
+        {
+            if (e)
+                Comp::setVisible(e);
+            else
+            {
+                disable();
+                clear();
+                Comp::setVisible(e);
+            }
+        }
+
+        void enable()
+        {
+            if (isEnabled() || !isShowing())
+                return;
+            setVisible(true);
+            tickIdx = getText().length();
+            drawTick = true;
+            grabKeyboardFocus();
+			timerRunning = true;
+        }
+
+        bool isEnabled() const noexcept
+        {
+            return timerRunning && hasKeyboardFocus(false);
+        }
+
+        void disable()
+        {
+            timerRunning = false;
+            drawTick = false;
+            updateLabel();
+        }
+
+        const String& getText() const noexcept
+        {
+            return txt;
+        }
+
+        void setText(const String& str)
+        {
+            if (txt == str)
+                return;
+            txt = str;
+            removeMultiLine(txt);
+            tickIdx = juce::jlimit(0, txt.length(), tickIdx);
+            updateLabel();
+        }
+
+        bool isEmpty() const noexcept
+        {
+            return getText().isEmpty();
+        }
+
+        bool isNotEmpty() const noexcept
+        {
+            return getText().isNotEmpty();
+        }
+
+        void clear()
+        {
+            txt.clear();
+            tickIdx = 0;
+            repaintWithChildren(this);
+        }
+
+        void mouseUp(const Mouse& mouse) override
+        {
+            if (txt.isNotEmpty())
+            {
+                const auto x = mouse.position.x;
+                const auto w = static_cast<float>(getWidth());
+                const auto& font = label.font;
+                const auto strWidth = font.getStringWidthFloat(txt);
+                const auto xOff = (w - strWidth) * .5f;
+                const auto xShifted = x - xOff;
+                const auto strLen = static_cast<float>(txt.length());
+                auto xRatio = xShifted / strWidth;
+                auto xMapped = xRatio * strLen;
+                auto xLimited = juce::jlimit(0.f, strLen, xMapped);
+                tickIdx = static_cast<int>(std::round(xLimited));
+            }
+
+            enable();
+            updateLabel();
+            onClick();
+        }
+
+        void paint(Graphics& g) override
+        {
+            const auto thicc = utils.thicc;
+            g.setColour(Shared::shared.colour(ColourID::Interact));
+            g.drawRoundedRectangle(getLocalBounds().toFloat(), thicc, thicc);
+        }
+
+        void resized() override
+        {
+            label.setBounds(getLocalBounds());
+        }
+
+        void updateLabel()
+        {
+            if (txt.isEmpty())
+            {
+                label.setText(emptyString + (drawTick ? "|" : ""));
+                label.txtC = ColourID::Hover;
+            }
+            else
+            {
+                label.txtC = ColourID::Txt;
+                if (drawTick)
+                    label.setText(txt.substring(0, tickIdx) + "|" + txt.substring(tickIdx));
+                else
+                    label.setText(txt);
+            }
+            label.repaint();
+        }
+
+        void updateTimer() override
+        {
+            if (!timerRunning)
+                return;
+
+            ++timerIdx;
+            if (timerIdx < 15)
+                return;
+			timerIdx = 0;
+            
+            if (!hasKeyboardFocus(true))
+                return disable();
+            drawTick = !drawTick;
+            updateLabel();
+        }
+
+        bool keyPressed(const KeyPress& key)
+        {
+            if (key == KeyPress::createFromDescription("ctrl+c"))
+            {
+                if (!txt.isEmpty())
+                {
+                    juce::SystemClipboard::copyTextToClipboard(txt);
+                    return true;
+                }
+            }
+            if (key == KeyPress::createFromDescription("ctrl+v"))
+            {
+                addText(juce::SystemClipboard::getTextFromClipboard());
+                onType();
+                return true;
+            }
+            if (key == key.escapeKey)
+            {
+                onEscape();
+                txt = "";
+                giveAwayKeyboardFocus();
+                return true;
+            }
+            else if (key == key.returnKey)
+            {
+                onReturn();
+                return true;
+            }
+            else if (key == key.leftKey)
+            {
+                if (tickIdx > 0)
+                    --tickIdx;
+                drawTick = true;
+                updateLabel();
+                return true;
+            }
+            else if (key == key.rightKey)
+            {
+                if (tickIdx < txt.length())
+                    ++tickIdx;
+                drawTick = true;
+                updateLabel();
+                return true;
+            }
+            else if (key == key.backspaceKey)
+            {
+                onRemove();
+                txt = txt.substring(0, tickIdx - 1) + txt.substring(tickIdx);
+                if (tickIdx > 0)
+                    --tickIdx;
+                drawTick = true;
+                updateLabel();
+                onType();
+                return true;
+            }
+            else if (key == key.deleteKey)
+            {
+                onRemove();
+                txt = txt.substring(0, tickIdx) + txt.substring(tickIdx + 1);
+                drawTick = true;
+                updateLabel();
+                onType();
+                return true;
+            }
+            else
+            {
+                const auto chr = key.getTextCharacter();
+                if (!multiLine)
+                    if (chr == '\n' || chr == '\r')
+                        return false;
+                txt = txt.substring(0, tickIdx) + chr + txt.substring(tickIdx);
+                ++tickIdx;
+                drawTick = true;
+                updateLabel();
+                onType();
+                return true;
+            }
+        }
+
+        void removeMultiLine(String& text)
+        {
+            if (!multiLine)
+            {
+                text = text.replace("\r", "");
+                text = text.replace("\n", "");
+            }
+        }
+
+        std::function<bool()> onEscape, onReturn, onType, onRemove, onClick;
+
+        Label label;
+    protected:
+        String emptyString, txt;
+        int tickIdx;
+        bool drawTick;
+
+        int timerIdx;
+        bool timerRunning;
+    public:
+        bool multiLine;
+    };
+    
     static constexpr float LockAlpha = .3f;
 
     inline void makeLockButton(Button& button, PID pID)
@@ -1818,7 +2160,7 @@ namespace gui
         {
             const auto thicc = utils.thicc;
             const auto bounds = getLocalBounds().toFloat().reduced(thicc);
-            label.setBounds(bounds.toNearestInt());
+            label.setBounds(maxQuadIn(bounds).reduced(Tau * 2.f).toNearestInt());
             {
                 const auto w = bounds.getWidth() * .33333333f;
                 const auto h = bounds.getHeight() * .33333333f;
@@ -2283,8 +2625,7 @@ namespace gui
             label.setText(txt);
             label.setVisible(true);
             freezeIdx = 0;
-            const auto txtBounds = boundsOf(label.font, label.getText()).toInt();
-            setSize(txtBounds.x, txtBounds.y);
+            const auto txtBounds = boundsOf(label.font, label.getText()).toNearestInt();
             label.repaint();
         }
             
@@ -2514,22 +2855,20 @@ namespace gui
         {
             const auto thicc = utils.thicc;
             const auto bounds = getLocalBounds().toFloat().reduced(thicc);
+            g.setFont(Shared::shared.fontFlx);
             g.setColour(Shared::shared.colour(ColourID::Bg));
             g.fillRoundedRectangle(bounds, thicc);
             g.setColour(Shared::shared.colour(ColourID::Txt));
             g.drawRoundedRectangle(bounds, thicc, thicc);
-            if (drawTick)
-                g.drawFittedText
-                (
-                    txt.substring(0, tickIdx) + "| " + txt.substring(tickIdx),
-                    bounds.toNearestInt(), Just::centred, 1
-                );
-            else
-                g.drawFittedText
-                (
-                    txt, bounds.toNearestInt(), Just::centred, 1
-                );
+			String txtToDraw = drawTick ? (txt.substring(0, tickIdx) + "| " + txt.substring(tickIdx)) : txt;
+            const auto fontHeight = getFontHeight(this, Shared::shared.fontFlx, txtToDraw, 12.f);
+            g.setFont(fontHeight);
+            g.drawFittedText
+            (
+                txtToDraw, bounds.toNearestInt(), Just::centred, 1
+            );
         }
+        
     protected:
         String txt;
         Param* param;

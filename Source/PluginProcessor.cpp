@@ -42,30 +42,15 @@ Nel19AudioProcessor::Nel19AudioProcessor()
 #endif
 {
     appProperties.setStorageParameters(makeOptions());
-    
-    /*
-    auto user = appProperties.getUserSettings();
-    { // MAKE PRESETS
-        auto& userFile = user->getFile();
-        auto file = userFile.getParentDirectory();
-        file = file.getChildFile("Presets");
-        if (!file.exists())
-            file.createDirectory();
-        {
-            const auto make = [&f = file](String name, const char* data, const int size)
-            {
-                const auto txt = String::fromUTF8(data, size);
-                auto nFile = f.getChildFile(name + ".nel");
-                if (nFile.existsAsFile())
-                    nFile.deleteFile();
-                nFile.create();
-                nFile.appendText(txt, false, false);
-            };
-        }
-    }
-    */
 
     startTimerHz(4);
+}
+
+Nel19AudioProcessor::~Nel19AudioProcessor()
+{
+    auto user = appProperties.getUserSettings();
+    user->setValue("firstTimeUwU", false);
+    user->save();
 }
 
 bool Nel19AudioProcessor::canAddBus(bool isInput) const
@@ -369,9 +354,10 @@ void Nel19AudioProcessor::processBlockVibrato(AudioBufferD& bufferAll, const Mid
             (
                 static_cast<double>(params(withOffset(PID::Perlin0RateHz, offset)).getValSumDenorm()),
                 static_cast<double>(params(withOffset(PID::Perlin0RateBeats, offset)).getValSumDenorm()),
-                params(withOffset(PID::Perlin0Octaves, offset)).getValSumDenorm(),
-                params(withOffset(PID::Perlin0Width, offset)).getValSumDenorm(),
-                params(withOffset(PID::Perlin0Phase, offset)).getValSumDenorm(),
+                static_cast<double>(params(withOffset(PID::Perlin0Octaves, offset)).getValSumDenorm()),
+                static_cast<double>(params(withOffset(PID::Perlin0Width, offset)).getValSumDenorm()),
+                static_cast<double>(params(withOffset(PID::Perlin0Phase, offset)).getValSumDenorm()),
+                static_cast<double>(params(withOffset(PID::Perlin0Bias, offset)).getValueSum()),
                 perlin::Shape(std::round(params(withOffset(PID::Perlin0Shape, offset)).getValSumDenorm())),
                 params(withOffset(PID::Perlin0RateType, offset)).getValueSum() > .5f,
                 params(withOffset(PID::Perlin0RandType, offset)).getValSumDenorm() > .5f
@@ -563,6 +549,8 @@ void Nel19AudioProcessor::savePatch()
     }
     for (auto m = 0; m < NumActiveMods; ++m)
         modulators[m].savePatch(params.state, m);
+    
+    params.state.setProperty("firstTimeUwU", false, nullptr);
 }
 
 void Nel19AudioProcessor::setStateInformation(const void* data, int sizeInBytes)
@@ -589,7 +577,7 @@ void Nel19AudioProcessor::loadPatch()
         {
             for (auto m = 0; m < NumActiveMods; ++m)
             {
-                const auto propID = modTypeID + static_cast<juce::String>(m);
+                const auto propID = modTypeID + static_cast<String>(m);
                 const auto typeProp = modTypeState.getProperty(propID).toString();
                 for (auto i = 0; i < static_cast<int>(vibrato::ModType::NumMods); ++i)
                 {

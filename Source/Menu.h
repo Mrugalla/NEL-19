@@ -31,6 +31,7 @@ namespace menu2
 	using Random = juce::Random;
 	using ValueTree = juce::ValueTree;
 	using Identifier = juce::Identifier;
+	using Time = juce::Time;
 
 	inline void paintMenuButton(Graphics& g, Button& b, const Utils& utils, bool selected = false)
 	{
@@ -592,10 +593,215 @@ namespace menu2
 		}
 	};
 
+	struct ErkenntnisseComp :
+		public Comp
+	{
+		ErkenntnisseComp(Utils& u) :
+			Comp(u, "", CursorType::Default),
+			layout
+			{
+				{ 1, 1, 1, 1, 1 },
+				{ 13, 1, 3 }
+			},
+			editor(u, "Enter or edit wisdom.", "Enter wisdom..."),
+			date(u, ""),
+			manifest(u, "Click here to manifest wisdom to the manifest of wisdom!"),
+			inspire(u, "Click here to get inspired by past wisdom of the manifest of wisdom!"),
+			reveal(u, "Click here to reveal wisdom from the manifest of wisdom!"),
+			clear(u, "Click here to clear the wisdom editor to write more wisdom!"),
+			paste(u, "Click here to paste wisdom from the clipboard to the wisdom editor!"),
+
+			timerIdx(0)
+		{
+			editor.label.font = Shared::shared.fontFlx;
+			date.font = Shared::shared.fontFlx;
+				
+			const File folder(getFolder());
+			if (!folder.exists())
+				folder.createDirectory();
+
+			addAndMakeVisible(editor);
+			addAndMakeVisible(date);
+
+			addAndMakeVisible(manifest);
+			addAndMakeVisible(inspire);
+			addAndMakeVisible(reveal);
+			addAndMakeVisible(clear);
+			addAndMakeVisible(paste);
+			
+			manifest.onPaint = makeTextButtonOnPaint("Manifest");
+			inspire.onPaint = makeTextButtonOnPaint("Inspire");
+			reveal.onPaint = makeTextButtonOnPaint("Reveal");
+			clear.onPaint = makeTextButtonOnPaint("Clear");
+			paste.onPaint = makeTextButtonOnPaint("Paste");
+
+			editor.onReturn = [&]()
+			{
+				saveToDisk();
+				return true;
+			};
+
+			editor.onClick = [&]()
+			{
+				editor.enable();
+				return true;
+			};
+
+			manifest.onClick = [&]()
+			{
+				saveToDisk();
+			};
+
+			inspire.onClick = [&]()
+			{
+				const File folder(getFolder());
+
+				const auto fileTypes = File::TypesOfFileToFind::findFiles;
+				const String extension(".txt");
+				const auto wildCard = "*" + extension;
+				const auto numFiles = folder.getNumberOfChildFiles(fileTypes, wildCard);
+				if (numFiles == 0)
+					return parse("I am deeply sorry. There is no wisdom in the manifest of wisdom yet.");
+
+				Random rand;
+				auto idx = rand.nextInt(numFiles);
+
+				const juce::RangedDirectoryIterator files
+				(
+					folder,
+					false,
+					wildCard,
+					fileTypes
+				);
+
+				for (const auto& it : files)
+				{
+					if (idx == 0)
+					{
+						const File file(it.getFile());
+						parse(file.getFileName());
+						editor.setText(file.loadFileAsString());
+						editor.disable();
+						return;
+					}
+					else
+						--idx;
+				}
+			};
+
+			reveal.onClick = [&]()
+			{
+				const File file(getFolder() + date.getText());
+				if (file.exists())
+					file.revealToUser();
+
+				const File folder(getFolder());
+				folder.revealToUser();
+			};
+
+			clear.onClick = [&]()
+			{
+				editor.clear();
+				editor.enable();
+				parse("");
+			};
+
+			paste.onClick = [&]()
+			{
+				const auto cbTxt = juce::SystemClipboard::getTextFromClipboard();
+				if (cbTxt.isEmpty())
+					return;
+				editor.addText(editor.getText() + cbTxt);
+			};
+		}
+
+		void updateTimer() override
+		{
+			editor.updateTimer();
+			date.updateTimer();
+			manifest.updateTimer();
+			inspire.updateTimer();
+			reveal.updateTimer();
+			clear.updateTimer();
+			paste.updateTimer();
+
+			++timerIdx;
+			if (timerIdx < 15)
+				return;
+			timerIdx = 0;
+
+			editor.enable();
+		}
+
+		void resized() override
+		{
+			layout.setBounds(getLocalBounds().toFloat());
+
+			layout.place(editor, 0, 0, 5, 1, false);
+			layout.place(date, 0, 1, 5, 1, false);
+
+			layout.place(manifest, 0, 2, 1, 1, false);
+			layout.place(inspire, 1, 2, 1, 1, false);
+			layout.place(reveal, 2, 2, 1, 1, false);
+			layout.place(clear, 3, 2, 1, 1, false);
+			layout.place(paste, 4, 2, 1, 1, false);
+		}
+
+		void paint(Graphics& g) override
+		{
+			g.setColour(Shared::shared.colour(ColourID::Bg));
+			g.fillRect(editor.getBounds().toFloat());
+			//g.setColour(Shared::shared.colour(ColourID::Hover));
+			g.fillRect(date.getBounds().toFloat());
+		}
+
+		String getFolder()
+		{
+			const auto slash = File::getSeparatorString();
+			const auto specialLoc = File::getSpecialLocation(File::SpecialLocationType::userApplicationDataDirectory);
+
+			return specialLoc.getFullPathName() + slash + "Mrugalla" + slash + "SharedState" + slash + "TheManifestOfWisdom" + slash;
+		}
+
+		void saveToDisk()
+		{
+			if (editor.isEmpty())
+				return parse("You have to enter some wisdom in order to manifest it.");
+
+			const auto now = Time::getCurrentTime();
+			const auto nowStr = now.toString(true, true, false, true).replaceCharacters(" ", "_").replaceCharacters(":", "_");
+
+			File file(getFolder() + nowStr + ".txt");
+
+			if (!file.existsAsFile())
+				file.create();
+			else
+				return parse("Relax! You can only manifest 1 wisdom per minute.");
+
+			file.appendText(editor.getText());
+			editor.disable();
+
+			parse("Manifested: " + nowStr);
+		}
+
+		void parse(String&& msg)
+		{
+			date.setText(msg);
+			date.repaint();
+		}
+
+		Layout layout;
+		TextEditor editor;
+		Label date;
+		Button manifest, inspire, reveal, clear, paste;
+
+		int timerIdx;
+	};
+
 	struct Menu :
 		public Comp
 	{
-		enum ID { ID, MENU, TOOLTIP, COLOURSELECTOR, SWITCH, TEXTBOX, IMGSTRIP, TXT, LINK, LINKSTRIP, NumIDs };
+		enum ID { ID, MENU, TOOLTIP, COLOURSELECTOR, WISDOM, SWITCH, TEXTBOX, IMGSTRIP, TXT, LINK, LINKSTRIP, NumIDs };
 
 		Menu(Nel19AudioProcessor& p, Utils& u, ValueTree _xml, Menu* _parent = nullptr) :
 			Comp(u, ""),
@@ -604,6 +810,7 @@ namespace menu2
 			nameLabel(u, xml.getProperty("id", "")),
 			subMenu(nullptr),
 			colourSelector(u),
+			erkenntnisse(u),
 			parent(_parent)
 		{
 			nameLabel.font = Shared::shared.fontFlx; nameLabel.font.setHeight(30.f);
@@ -613,6 +820,7 @@ namespace menu2
 				"menu",
 				"tooltip",
 				"colourselector",
+				"wisdom",
 				"switch",
 				"textbox",
 				"imgStrip",
@@ -625,6 +833,7 @@ namespace menu2
 
 			auto& top = utils.pluginTop;
 			top.addChildComponent(colourSelector);
+			top.addChildComponent(erkenntnisse);
 		}
 		
 		Nel19AudioProcessor& processor;
@@ -633,6 +842,7 @@ namespace menu2
 		std::vector<std::unique_ptr<Comp>> entries;
 		std::unique_ptr<Menu> subMenu;
 		ColourSelector colourSelector;
+		ErkenntnisseComp erkenntnisse;
 		Menu* parent;
 
 		void setVisibleAllMenus(bool e)
@@ -682,7 +892,10 @@ namespace menu2
 				const auto topBounds = top.getBounds();
 				const auto minDimen = std::min(topBounds.getWidth(), topBounds.getHeight());
 				const auto reduced = minDimen / 6;
-				colourSelector.setBounds(top.getLocalBounds().reduced(reduced));
+
+				const auto nBounds = top.getLocalBounds().reduced(reduced);
+				colourSelector.setBounds(nBounds);
+				erkenntnisse.setBounds(nBounds);
 			}
 		}
 	
@@ -694,6 +907,7 @@ namespace menu2
 			if(subMenu != nullptr)
 				subMenu->updateTimer();
 			colourSelector.updateTimer();
+			erkenntnisse.updateTimer();
 		}
 
 	private:
@@ -707,6 +921,8 @@ namespace menu2
 					addSubMenuButton(id, child, i);
 				else if (type == id[COLOURSELECTOR])
 					addColourSelector(id, child);
+				else if (type == id[WISDOM])
+					addManifestOfWisdom(id, child);
 				else if (type == id[SWITCH])
 					addSwitchButton(id, child, i);
 				else if (type == id[TEXTBOX])
@@ -776,6 +992,31 @@ namespace menu2
 			};
 		}
 		
+		void addManifestOfWisdom(const std::array<juce::Identifier, NumIDs>& id, ValueTree child)
+		{
+			const auto _tooltip = child.getProperty(id[TOOLTIP]).toString();
+			entries.push_back(std::make_unique<Button>(utils, _tooltip));
+			auto& btn = *reinterpret_cast<Button*>(entries.back().get());
+			btn.setName("Manifest Of Wisdom");
+			addAndMakeVisible(btn);
+
+			btn.onPaint = [](Graphics& g, Button& b)
+			{
+				paintMenuButton(g, b, b.utils);
+			};
+
+			btn.onClick = [&]()
+			{
+				auto& top = utils.pluginTop;
+				erkenntnisse.setVisible(true);
+				const auto bounds = top.getBounds();
+				const auto minDimen = std::min(bounds.getWidth(), bounds.getHeight());
+				const auto reduced = minDimen / 6;
+				erkenntnisse.setBounds(top.getLocalBounds().reduced(reduced));
+				setVisibleAllMenus(false);
+			};
+		}
+
 		void addSwitchButton(const std::array<juce::Identifier, NumIDs>& id, juce::ValueTree child, const int,
 			std::function<void(int)> onSwitch, const juce::String& buttonName, std::function<bool(int)> onIsEnabled)
 		{

@@ -50,7 +50,7 @@ namespace modSys6
 	{
 		MSMacro0, MSMacro1, MSMacro2, MSMacro3,
 		
-		Perlin0RateHz, Perlin0RateBeats, Perlin0Octaves, Perlin0Width, Perlin0RateType, Perlin0Phase, Perlin0Shape, Perlin0RandType,
+		Perlin0RateHz, Perlin0RateBeats, Perlin0Octaves, Perlin0Width, Perlin0RateType, Perlin0Phase, Perlin0Shape, Perlin0RandType, Perlin0Bias,
 		AudioRate0Oct, AudioRate0Semi, AudioRate0Fine, AudioRate0Width, AudioRate0RetuneSpeed, AudioRate0Atk, AudioRate0Dcy, AudioRate0Sus, AudioRate0Rls,
 		Dropout0Decay, Dropout0Spin, Dropout0Chance, Dropout0Smooth, Dropout0Width,
 		EnvFol0Attack, EnvFol0Release, EnvFol0Gain, EnvFol0Width, EnvFol0SC,
@@ -58,7 +58,7 @@ namespace modSys6
 		Pitchbend0Smooth,
 		LFO0FreeSync, LFO0RateFree, LFO0RateSync, LFO0Waveform, LFO0Phase, LFO0Width,
 
-		Perlin1RateHz, Perlin1RateBeats, Perlin1Octaves, Perlin1Width, Perlin1RateType, Perlin1Phase, Perlin1Shape, Perlin1RandType,
+		Perlin1RateHz, Perlin1RateBeats, Perlin1Octaves, Perlin1Width, Perlin1RateType, Perlin1Phase, Perlin1Shape, Perlin1RandType, Perlin1Bias,
 		AudioRate1Oct, AudioRate1Semi, AudioRate1Fine, AudioRate1Width, AudioRate1RetuneSpeed, AudioRate1Atk, AudioRate1Dcy, AudioRate1Sus, AudioRate1Rls,
 		Dropout1Decay, Dropout1Spin, Dropout1Chance, Dropout1Smooth, Dropout1Width,
 		EnvFol1Attack, EnvFol1Release, EnvFol1Gain, EnvFol1Width, EnvFol1SC,
@@ -92,6 +92,7 @@ namespace modSys6
 		case PID::Perlin0Phase: return "Perlin 0 Phase";
 		case PID::Perlin0Shape: return "Perlin 0 Shape";
 		case PID::Perlin0RandType: return "Perlin 0 Rand Type";
+		case PID::Perlin0Bias: return "Perlin 0 Bias";
 		case PID::AudioRate0Oct: return "AudioRate 0 Oct";
 		case PID::AudioRate0Semi: return "AudioRate 0 Semi";
 		case PID::AudioRate0Fine: return "AudioRate 0 Fine";
@@ -128,6 +129,7 @@ namespace modSys6
 		case PID::Perlin1Phase: return "Perlin 1 Phase";
 		case PID::Perlin1Shape: return "Perlin 1 Shape";
 		case PID::Perlin1RandType: return "Perlin 1 Rand Type";
+		case PID::Perlin1Bias: return "Perlin 1 Bias";
 		case PID::AudioRate1Oct: return "AudioRate 1 Oct";
 		case PID::AudioRate1Semi: return "AudioRate 1 Semi";
 		case PID::AudioRate1Fine: return "AudioRate 1 Fine";
@@ -1180,6 +1182,7 @@ namespace modSys6
 				params.push_back(new Param(withOffset(PID::Perlin0Phase, offset), makeRange::quad(0.f, 2.f, 1), 0.f, valToStrPhase360, strToValPhase360, Unit::Degree));
 				params.push_back(new Param(withOffset(PID::Perlin0Shape, offset), makeRange::stepped(0.f, 2.f), 2.f, valToStrShape, strToValShape, Unit::PerlinShape));
 				params.push_back(new Param(withOffset(PID::Perlin0RandType, offset), makeRange::toggle(), 1.f, valToStrRandType, strToValRandType, Unit::PerlinRandType));
+				params.push_back(new Param(withOffset(PID::Perlin0Bias, offset), makeRange::lin(0.f, 1.f), 0.f, valToStrPercent, strToValPercent, Unit::Percent));
 
 				params.push_back(new Param(withOffset(PID::AudioRate0Oct, offset), makeRange::stepped(-3.f * 12.f, 3.f * 12.f, 12.f), 0.f, valToStrOct2, strToValOct2, Unit::Octaves));
 				params.push_back(new Param(withOffset(PID::AudioRate0Semi, offset), makeRange::stepped(-12.f, 12.f, 1.f), 0.f, valToStrSemi, strToValSemi, Unit::Semi));
