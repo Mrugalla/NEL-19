@@ -54,7 +54,7 @@ namespace modSys6
 		AudioRate0Oct, AudioRate0Semi, AudioRate0Fine, AudioRate0Width, AudioRate0RetuneSpeed, AudioRate0Atk, AudioRate0Dcy, AudioRate0Sus, AudioRate0Rls,
 		Dropout0Decay, Dropout0Spin, Dropout0Chance, Dropout0Smooth, Dropout0Width,
 		EnvFol0Attack, EnvFol0Release, EnvFol0Gain, EnvFol0Width, EnvFol0SC,
-		Macro0,
+		Macro0, Macro0Smooth, Macro0SCGain,
 		Pitchbend0Smooth,
 		LFO0FreeSync, LFO0RateFree, LFO0RateSync, LFO0Waveform, LFO0Phase, LFO0Width,
 
@@ -62,7 +62,7 @@ namespace modSys6
 		AudioRate1Oct, AudioRate1Semi, AudioRate1Fine, AudioRate1Width, AudioRate1RetuneSpeed, AudioRate1Atk, AudioRate1Dcy, AudioRate1Sus, AudioRate1Rls,
 		Dropout1Decay, Dropout1Spin, Dropout1Chance, Dropout1Smooth, Dropout1Width,
 		EnvFol1Attack, EnvFol1Release, EnvFol1Gain, EnvFol1Width, EnvFol1SC,
-		Macro1,
+		Macro1, Macro1Smooth, Macro1SCGain,
 		Pitchbend1Smooth,
 		LFO1FreeSync, LFO1RateFree, LFO1RateSync, LFO1Waveform, LFO1Phase, LFO1Width,
 
@@ -112,6 +112,8 @@ namespace modSys6
 		case PID::EnvFol0Width: return "EnvFol 0 Width";
 		case PID::EnvFol0SC: return "EnvFol 0 SC";
 		case PID::Macro0: return "Macro 0";
+		case PID::Macro0Smooth: return "Macro 0 Smooth";
+		case PID::Macro0SCGain: return "Macro 0 SC Gain";
 		case PID::Pitchbend0Smooth: return "Pitchbend 0 Smooth";
 		case PID::LFO0FreeSync: return "LFO 0 FreeSync";
 		case PID::LFO0RateFree: return "LFO 0 Rate Free";
@@ -148,6 +150,8 @@ namespace modSys6
 		case PID::EnvFol1Width: return "EnvFol 1 Width";
 		case PID::EnvFol1SC: return "EnvFol 1 SC";
 		case PID::Macro1: return "Macro 1";
+		case PID::Macro1Smooth: return "Macro 1 Smooth";
+		case PID::Macro1SCGain: return "Macro 1 SC Gain";
 		case PID::Pitchbend1Smooth: return "Pitchbend 1 Smooth";
 		case PID::LFO1FreeSync: return "LFO 1 FreeSync";
 		case PID::LFO1RateFree: return "LFO 1 Rate Free";
@@ -1204,6 +1208,9 @@ namespace modSys6
 				params.push_back(new Param(withOffset(PID::EnvFol0SC, offset), makeRange::toggle(), 0.f, valToStrPower, strToValPower, Unit::Power));
 
 				params.push_back(new Param(withOffset(PID::Macro0, offset), makeRange::biasXL(-1.f, 1.f, 0.f), 0.f, valToStrPercent, strToValPercent, Unit::Percent));
+				params.push_back(new Param(withOffset(PID::Macro0Smooth, offset), makeRange::withCentre(1.f, 420.f, 20.f), 20.f, valToStrHz, strToValHz, Unit::Hz));
+				params.push_back(new Param(withOffset(PID::Macro0SCGain, offset), makeRange::withCentre(-120.f, 24.f, 0.f), -120.f, valToStrDb, strToValDb));
+				
 				params.push_back(new Param(withOffset(PID::Pitchbend0Smooth, offset), makeRange::biasXL(1.f, 1000.f, -.97f), 30.f, valToStrMs, strToValMs, Unit::Ms));
 
 				static constexpr float LFOPhaseStep = 5.f / 360.f;

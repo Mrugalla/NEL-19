@@ -684,24 +684,24 @@ namespace gui
     struct ModCompMacro :
         public Comp
     {
-        enum { Macro, NumParams };
+        enum { Macro, Smoothing, SC, NumParams };
 
         ModCompMacro(Utils& u, std::vector<Paramtr*>& modulatables, int mOff = 0) :
             Comp(u, "", CursorType::Default),
             layout
             (
-                { 1 },
+                { 1, 3, 2, 3, 1 },
                 { 1 }
             ),
             params
             {
-                Paramtr(u, "Macro", "Directly manipulate the vibrato's internal delay time", withOffset(PID::Macro0, mOff), modulatables)
+                Paramtr(u, "Macro", "Directly manipulate the vibrato's internal delay time", withOffset(PID::Macro0, mOff), modulatables),
+				Paramtr(u, "Smooth", "Smoothen the macro's value changes in hz.", withOffset(PID::Macro0Smooth, mOff), modulatables),
+				Paramtr(u, "SC Gain", "Define the sidechain audio input's gain.", withOffset(PID::Macro0SCGain, mOff), modulatables)
             }
         {
             for (auto& p : params)
-            {
                 addAndMakeVisible(p);
-            }
         }
         
         void activate(ParamtrRandomizer& randomizer)
@@ -718,7 +718,9 @@ namespace gui
         void resized() override
         {
             layout.setBounds(getLocalBounds().toFloat());
-            layout.place(params[Macro], 0, 0, 1, 1, 0.f, true);
+            layout.place(params[Macro], 1, 0, 1, 1);
+			layout.place(params[Smoothing], 3, 0, 1, 1);
+			layout.place(params[SC], 2, 0, 1, 1);
         }
         
 		void updateTimer() override
@@ -1278,7 +1280,5 @@ namespace gui
 }
 
 /*
-
-seed
 
 */

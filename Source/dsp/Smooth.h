@@ -75,6 +75,15 @@ namespace smooth
 
 		Smooth(Float /*startVal*/ = static_cast<Float>(0));
 
+		void operator=(Smooth<Float>& other) noexcept
+		{
+			block.curVal = other.block.curVal;
+			lowpass.copyCutoffFrom(other.lowpass);
+			cur = other.cur;
+			dest = other.dest;
+			smoothing = other.smoothing;
+		}
+
 		/* bufferOut, bufferIn, numSamples */
 		void operator()(Float*, Float*, int) noexcept;
 

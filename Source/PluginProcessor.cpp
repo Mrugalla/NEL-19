@@ -385,7 +385,9 @@ void Nel19AudioProcessor::processBlockVibrato(AudioBufferD& bufferAll, const Mid
         case vibrato::ModType::Macro:
             mod.setParametersMacro
             (
-                params(withOffset(PID::Macro0, offset)).getValSumDenorm()
+                params(withOffset(PID::Macro0, offset)).getValSumDenorm(),
+                params(withOffset(PID::Macro0Smooth, offset)).getValSumDenorm(),
+				params(withOffset(PID::Macro0SCGain, offset)).getValSumDenorm()
             );
             break;
         case vibrato::ModType::Pitchwheel:

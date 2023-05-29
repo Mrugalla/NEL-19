@@ -7,6 +7,7 @@
 #include "Perlin.h"
 #include "Wavetable.h"
 #include "LFO2.h"
+#include "Macro.h"
 
 #define DebugAudioRateEnv false
 
@@ -20,6 +21,7 @@ namespace vibrato
 	using String = juce::String;
 	using Identifier = juce::Identifier;
 	using ValueTree = juce::ValueTree;
+	using SIMD = juce::FloatVectorOperations;
 
 	enum class ObjType
 	{
@@ -908,35 +910,29 @@ namespace vibrato
 		struct Macro
 		{
 			Macro() :
-				smooth(0.),
-				macro(0.)
+				macaroni()
 			{}
 			
-			void prepare(double sampleRate) noexcept
+			void prepare(double sampleRate, int blockSize) noexcept
 			{
-				smooth.makeFromDecayInMs(8., sampleRate);
+				macaroni.prepare(sampleRate, blockSize);
 			}
 			
-			void setParameters(double _macro) noexcept
+			void setParameters(double macro, double smoothingHz, double scGain) noexcept
 			{
-				macro = _macro;
+				macaroni.setParameters(macro, smoothingHz, scGain);
 			}
 			
-			void operator()(Buffer& buffer, int numChannels, int numSamples) noexcept
+			void operator()(Buffer& buffer, const double* const* scSamples,
+				int numChannels, int numSamples) noexcept
 			{
-				const auto smoothing = smooth(buffer[0].data(), macro, numSamples);
-				if(!smoothing)
-					juce::FloatVectorOperations::fill(buffer[0].data(), macro, numSamples);
+				double* samples[] = { buffer[0].data(), buffer[1].data() };
 
-				if (numChannels != 2)
-					return;
-				
-				juce::FloatVectorOperations::copy(buffer[1].data(), buffer[0].data(), numSamples);
+				macaroni(samples, scSamples, numChannels, numSamples);
 			}
 			
 		protected:
-			SmoothD smooth;
-			double macro;
+			macro::Macro macaroni;
 		};
 
 		struct Pitchbend
@@ -1151,7 +1147,7 @@ namespace vibrato
 			audioRate.prepare(sampleRate, maxBlockSize);
 			dropout.prepare(sampleRate, maxBlockSize);
 			envFol.prepare(sampleRate, maxBlockSize);
-			macro.prepare(sampleRate);
+			macro.prepare(sampleRate, maxBlockSize);
 			pitchbend.prepare(sampleRate);
 			lfo.prepare(sampleRate, maxBlockSize, static_cast<double>(latency), oversamplingFactor);
 		}
@@ -1186,9 +1182,9 @@ namespace vibrato
 			envFol.setParameters(atk, rls, gain, width, scEnabled);
 		}
 		
-		void setParametersMacro(double m) noexcept
+		void setParametersMacro(double m, double smoothingHz, double scGain) noexcept
 		{
-			macro.setParameters(m);
+			macro.setParameters(m, smoothingHz, scGain);
 		}
 		
 		void setParametersPitchbend(double rate) noexcept
@@ -1212,7 +1208,7 @@ namespace vibrato
 			case ModType::AudioRate: return audioRate(buffer, midi, numChannels, numSamples);
 			case ModType::Dropout: return dropout(buffer, numChannels, numSamples);
 			case ModType::EnvFol: return envFol(buffer, samples, samplesSC, numChannels, numChannelsSC, numSamples);
-			case ModType::Macro: return macro(buffer, numChannels, numSamples);
+			case ModType::Macro: return macro(buffer, samplesSC, numChannels, numSamples);
 			case ModType::Pitchwheel: return pitchbend(buffer, numChannels, numSamples, midi);
 			case ModType::LFO: return lfo(buffer, numChannels, numSamples, transport);
 			}
