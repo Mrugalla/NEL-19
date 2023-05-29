@@ -269,7 +269,7 @@ namespace vibrato
 				rateHz(1.), rateBeats(1.),
 				octaves(1.), width(0.), phs(0.), bias(0.),
 				shape(Shape::Spline),
-				temposync(false), procedural(true)
+				temposync(false)
 			{
 			}
 
@@ -280,7 +280,7 @@ namespace vibrato
 
 			void setParameters(double _rateHz, double _rateBeats,
 				double _octaves, double _width, double _phs, double _bias,
-				Shape _shape, bool _temposync, bool _procedural) noexcept
+				Shape _shape, bool _temposync) noexcept
 			{
 				rateHz = _rateHz;
 				rateBeats = _rateBeats;
@@ -290,7 +290,6 @@ namespace vibrato
 				bias = _bias;
 				shape = _shape;
 				temposync = _temposync;
-				procedural = _procedural;
 			}
 
 			void operator()(Buffer& buffer, int numChannels, int numSamples,
@@ -311,8 +310,7 @@ namespace vibrato
 					phs,
 					bias,
 					shape,
-					temposync,
-					procedural
+					temposync
 				);
 			}
 		
@@ -331,7 +329,7 @@ namespace vibrato
 			double rateHz, rateBeats;
 			double octaves, width, phs, bias;
 			Shape shape;
-			bool temposync, procedural;
+			bool temposync;
 		};
 
 		class AudioRate
@@ -1166,9 +1164,9 @@ namespace vibrato
 		// parameters
 		void setParametersPerlin(double _rateHz, double _rateBeats,
 			double _octaves, double _width, double _phs, double _bias,
-			perlin::Shape _shape, bool _temposync, bool _procedural) noexcept
+			perlin::Shape _shape, bool _temposync) noexcept
 		{
-			perlin.setParameters(_rateHz, _rateBeats, _octaves, _width, _phs, _bias, _shape, _temposync, _procedural);
+			perlin.setParameters(_rateHz, _rateBeats, _octaves, _width, _phs, _bias, _shape, _temposync);
 		}
 		
 		void setParametersAudioRate(double oct, double semi, double fine, double width, double retuneSpeed,

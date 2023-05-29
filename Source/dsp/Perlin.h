@@ -425,17 +425,17 @@ namespace perlin
 
 		/* samples, numChannels, numSamples, playHeadPos,
 		rateHz, rateBeats, octaves, width, phs, bias[0,1]
-		shape, temposync, procedural */
+		shape, temposync */
 		void operator()(double* const* samples, int numChannels, int numSamples,
 			const PlayHeadPos& playHeadPos,
 			double _rateHz, double _rateBeats,
 			double octaves, double width, double phs, double bias,
-			Shape shape, bool temposync, bool procedural) noexcept
+			Shape shape, bool temposync) noexcept
 		{
 			if (temposync)
-				processSync(playHeadPos, numSamples, _rateBeats, procedural);
+				processSync(playHeadPos, numSamples, _rateBeats);
 			else
-				processFree(playHeadPos, numSamples, _rateHz, procedural);
+				processFree(playHeadPos, numSamples, _rateHz);
 			
 			lastBlockWasTemposync = temposync;
 
@@ -509,9 +509,9 @@ namespace perlin
 		int latency;
 
 		// PROCESS FREE
-		void processFree(const PlayHeadPos& playHeadPos, int numSamples, double _rateHz, bool procedural) noexcept
+		void processFree(const PlayHeadPos& playHeadPos, int numSamples, double _rateHz) noexcept
 		{
-			if (procedural && playHeadPos.isPlaying)
+			if (playHeadPos.isPlaying)
 				processFreeProcedural(playHeadPos, _rateHz, numSamples);
 			else
 				processFreeRandom(_rateHz);
@@ -547,9 +547,9 @@ namespace perlin
 		}
 
 		// PROCESS TEMPOSYNC
-		void processSync(const PlayHeadPos& playHeadPos, int numSamples, double _rateBeats, bool procedural) noexcept
+		void processSync(const PlayHeadPos& playHeadPos, int numSamples, double _rateBeats) noexcept
 		{
-			if (procedural && playHeadPos.isPlaying)
+			if (playHeadPos.isPlaying)
 				processSyncProcedural(playHeadPos, _rateBeats, numSamples);
 			else
 				processSyncRandom(playHeadPos, _rateBeats);

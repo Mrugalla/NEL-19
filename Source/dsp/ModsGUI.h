@@ -83,7 +83,6 @@ namespace gui
             ShapeSteppy,
             ShapeLerp,
             ShapeRound,
-            RandType,
             Bias,
             NumParams
         };
@@ -92,7 +91,7 @@ namespace gui
             Comp(u, "", CursorType::Default),
             layout
             (
-                { 1, 8, 13, 34, 1 },
+                { 1, 2, 5, 8, 1 },
                 { 3, 8 }
             ),
             mOff(_mOff),
@@ -107,7 +106,6 @@ namespace gui
 				Paramtr(u, "Steppy", "The steppy shape makes the playhead jump in discontinuous steps.", withOffset(PID::Perlin0Shape, mOff), modulatables, ParameterType::RadioButton),
                 Paramtr(u, "Lerp", "Lerp linearly interpolates between the values of the noise.", withOffset(PID::Perlin0Shape, mOff), modulatables, ParameterType::RadioButton),
                 Paramtr(u, "Round", "The round shape creates smooth perlin noise.", withOffset(PID::Perlin0Shape, mOff), modulatables, ParameterType::RadioButton),
-				Paramtr(u, "Proc", "Every noise segment corresponds to a distinct combination of rate, bpm and transport info.", withOffset(PID::Perlin0RandType, mOff), modulatables, ParameterType::Switch),
 				Paramtr(u, "Bias", "Dial it in to make higher values less likely.", withOffset(PID::Perlin0Bias, mOff), modulatables)
             }
         {
@@ -153,12 +151,6 @@ namespace gui
                 g.strokePath(arc, stroke);
             };
             params[RateType].targetToggleState = 1;
-
-            params[RandType].onPaint = [&](Graphics& g)
-            {
-				g.drawFittedText("P", params[RandType].getLocalBounds(), Just::centred, 1);
-            };
-			params[RandType].targetToggleState = 1;
             
             params[ShapeSteppy].targetToggleState = 0;
 			params[ShapeLerp].targetToggleState = 1;
@@ -219,20 +211,7 @@ namespace gui
                 x += knobW;
                 params[Width].setBounds(BoundsF(x, y, knobW, h).toNearestInt());
             }
-            //layout.place(seed, 1, 1, 1, 1);
-            {
-                const auto area = layout(1, 1, 1, 1);
-                const auto w = area.getWidth();
-                const auto h = area.getHeight();
-                auto x = area.getX();
-                auto y = area.getY();
-
-                const auto buttonW = w * .5f;
-
-                params[RateType].setBounds(maxQuadIn(BoundsF(x, y, w - buttonW, h)).toNearestInt());
-                x += buttonW;
-                params[RandType].setBounds(maxQuadIn(BoundsF(x, y, w - buttonW, h)).toNearestInt());
-            }
+            layout.place(params[RateType], 1, 1, 1, 1, 0.f, true);
         }
 
         void updateTimer() override
