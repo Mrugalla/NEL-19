@@ -63,6 +63,7 @@ namespace macro
 					auto scSmpls = scSamples[ch];
 
 					SIMD::addWithMultiply(smpls, scSmpls, scGainInfo.buf, numSamples);
+					linFold(smpls, numSamples);
 					limit(smpls, numSamples);
 				}
 			}
@@ -74,6 +75,7 @@ namespace macro
 					auto scSmpls = scSamples[ch];
 
 					SIMD::addWithMultiply(smpls, scSmpls, scGainAmp, numSamples);
+					linFold(smpls, numSamples);
 					limit(smpls, numSamples);
 				}
 			}
@@ -99,6 +101,17 @@ namespace macro
 					smpls[s] = 1.;
 				else if (smpls[s] < -1.)
 					smpls[s] = -1.;
+		}
+
+		void linFold(double* smpls, int numSamples) noexcept
+		{
+			for (auto s = 0; s < numSamples; ++s)
+			{
+				if (smpls[s] > 1.)
+					smpls[s] = 2. - smpls[s];
+				else if (smpls[s] < -1.)
+					smpls[s] = -2. - smpls[s];
+			}
 		}
 	};
 }

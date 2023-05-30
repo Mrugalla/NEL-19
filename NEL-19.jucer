@@ -41,6 +41,8 @@
       <GROUP id="{64C413BA-3699-8A57-746B-A094BA76D880}" name="dsp">
         <FILE id="mnD5YL" name="DryWetProcessor.h" compile="0" resource="0"
               file="Source/dsp/DryWetProcessor.h"/>
+        <FILE id="YWCsOq" name="EnvelopeFollower.h" compile="0" resource="0"
+              file="Source/dsp/EnvelopeFollower.h"/>
         <FILE id="s09m9X" name="LFO2.h" compile="0" resource="0" file="Source/dsp/LFO2.h"/>
         <FILE id="rcBpKy" name="Macro.h" compile="0" resource="0" file="Source/dsp/Macro.h"/>
         <FILE id="bv92ia" name="MidSideEncoder.h" compile="0" resource="0"

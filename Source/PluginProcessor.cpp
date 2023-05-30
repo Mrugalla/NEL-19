@@ -416,7 +416,6 @@ void Nel19AudioProcessor::processBlockVibrato(AudioBufferD& bufferAll, const Mid
             midi,
             standalonePlayHead.posInfo,
             numChannels,
-            sidechain.numChannelsSC,
             numSamples
         );
     }

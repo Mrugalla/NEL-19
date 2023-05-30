@@ -8,6 +8,7 @@
 #include "Wavetable.h"
 #include "LFO2.h"
 #include "Macro.h"
+#include "EnvelopeFollower.h"
 
 #define DebugAudioRateEnv false
 
@@ -746,165 +747,41 @@ namespace vibrato
 		struct EnvFol
 		{
 			EnvFol() :
-				gainSmooth(0.), widthSmooth(0.),
-				widthBuf(),
-
-				envelope{ 0., 0. },
-				envSmooth(),
-				Fs(1.),
-
-				attackInMs(-1.), releaseInMs(-1.), gain(-420.),
-
-				attackV(1.), releaseV(1.), gainV(1.), widthV(0.),
-				autogainV(1.),
+				envFol(),
+				attackMs(1.),
+				releaseMs(1.),
+				gain(1.),
+				width(0.),
 				scEnabled(false)
 			{}
 			
 			void prepare(double sampleRate, int blockSize)
 			{
-				Fs = sampleRate;
-				gainSmooth.makeFromDecayInMs(10., Fs);
-				widthSmooth.makeFromDecayInMs(10., Fs);
-				widthBuf.resize(blockSize);
-				for (auto ch = 0; ch < 2; ++ch)
-					envSmooth[ch].makeFromDecayInMs(20., Fs);
-				{
-					const auto inSamples = attackInMs * Fs * .001;
-					attackV = 1. / inSamples;
-					updateAutogainV();
-				}
-				{
-					const auto inSamples = releaseInMs * Fs * .001;
-					releaseV = 1. / inSamples;
-					updateAutogainV();
-				}
-				updateAutogainV();
+				envFol.prepare(sampleRate, blockSize);
 			}
 			
-			void setParameters(double _attackInMs, double _releaseInMs, double _gain, double _width, bool _scEnabled) noexcept
+			void setParameters(double _attackMs, double _releaseMs, double _gain, double _width, bool _scEnabled) noexcept
 			{
-				if (attackInMs != _attackInMs)
-				{
-					attackInMs = _attackInMs;
-					const auto inSamples = attackInMs * Fs * .001;
-					attackV = 1. / inSamples;
-					updateAutogainV();
-				}
-				if (releaseInMs != _releaseInMs)
-				{
-					releaseInMs = _releaseInMs;
-					const auto inSamples = releaseInMs * Fs * .001;
-					releaseV = 1. / inSamples;
-					updateAutogainV();
-				}
-				if (gain != _gain)
-				{
-					gain = _gain;
-					gainV = juce::Decibels::decibelsToGain(gain);
-				}
-				widthV = _width;
+				attackMs = _attackMs;
+				releaseMs = _releaseMs;
+				gain = _gain;
+				width = _width;
 				scEnabled = _scEnabled;
 			}
 			
-			void operator()(Buffer& buffer, const double* const* samples,
-				const double* const* samplesSC, int numChannels, int numChannelsSC,
-				int numSamples) noexcept
+			void operator()(Buffer& buffer, const double* const* samples, const double* const* samplesSC,
+				int numChannels, int numSamples) noexcept
 			{
-				auto gainBuf = buffer[2].data();
-				{ // PROCESS GAIN SMOOTH
-					const auto gVal = gainV * autogainV;
-					const auto gainSmoothing = gainSmooth(gainBuf, gVal, numSamples);
-					if(!gainSmoothing)
-						juce::FloatVectorOperations::fill(gainBuf, gVal, numSamples);
-				}
-				{ // SYNTHESIZE ENVELOPE FROM SAMPLES
-					const auto samplesInput = scEnabled ? samplesSC : samples;
+				double* samplesIn[] = { buffer[0].data(), buffer[1].data() };
+				for(auto ch = 0; ch < numChannels; ++ch)
+					SIMD::copy(samplesIn[ch], samples[ch], numSamples);
 
-					{
-						auto& env = envelope[0];
-						const auto smpls = samplesInput[0];
-						auto buf = buffer[0].data();
-
-						for (auto s = 0; s < numSamples; ++s)
-						{
-							const auto smpl = gainBuf[s] * smpls[s] * smpls[s];
-							if (env < smpl)
-								env += attackV * (smpl - env);
-							else
-								env += releaseV * (smpl - env);
-							buf[s] = env;
-						}
-					}
-					if (numChannels == 2)
-					{
-						auto& env = envelope[1];
-						const auto smpls = samplesInput[1 % numChannelsSC];
-						auto buf = buffer[1].data();
-
-						for (auto s = 0; s < numSamples; ++s)
-						{
-							const auto smpl = gainBuf[s] * smpls[s] * smpls[s];
-							if (env < smpl)
-								env += attackV * (smpl - env);
-							else
-								env += releaseV * (smpl - env);
-							buf[s] = env;
-						}
-
-						{ // PROCESS WIDTH
-							if (numChannels != 2)
-								return;
-							
-							auto widthSmoothing = widthSmooth(widthBuf.data(), widthV, numSamples);
-
-							if (widthSmoothing)
-									for (auto s = 0; s < numSamples; ++s)
-										buffer[1][s] = buffer[0][s] + widthBuf[s] * (buffer[1][s] - buffer[0][s]);
-							else
-								for (auto s = 0; s < numSamples; ++s)
-									buffer[1][s] = buffer[0][s] + widthV * (buffer[1][s] - buffer[0][s]);
-						}
-					}
-				}
-				{ // PROCESS ANTI-CLIPPING
-					for (auto ch = 0; ch < numChannels; ++ch)
-					{
-						auto buf = buffer[ch].data();
-						auto& smooth = envSmooth[ch];
-
-						for (auto s = 0; s < numSamples; ++s)
-							buf[s] = smooth(buf[s] < 1. ? buf[s] : 1.);
-					}
-				}
-				{ // MAP TO [-1,1]
-					for (auto ch = 0; ch < numChannels; ++ch)
-					{
-						auto buf = buffer[ch].data();
-						juce::FloatVectorOperations::multiply(buf, 2., numSamples);
-						for (auto s = 0; s < numSamples; ++s)
-							buf[s] -= 1.;
-					}
-				}
+				envFol(samplesIn, samplesSC, attackMs, releaseMs, gain, width, numChannels, numSamples, scEnabled);
 			}
 			
 		protected:
-			SmoothD gainSmooth, widthSmooth;
-			std::vector<double> widthBuf;
-
-			std::array<double, 2> envelope;
-			std::array<SmoothD, 2> envSmooth;
-			double Fs;
-
-			double attackInMs, releaseInMs, gain;
-
-			double attackV, releaseV, gainV, widthV;
-			double autogainV;
-			bool scEnabled;
-
-			void updateAutogainV() noexcept
-			{
-				autogainV = attackV != 0. ? 1. + std::sqrt(releaseV / attackV) : 1.;
-			}
+			envfol::EnvFol envFol;
+			double attackMs, releaseMs, gain, width, scEnabled;
 		};
 
 		struct Macro
@@ -1199,15 +1076,14 @@ namespace vibrato
 
 		void processBlock(const double* const* samples, const double* const* samplesSC,
 			const juce::MidiBuffer& midi, const PosInfo& transport,
-			int numChannels, int numChannelsSC,
-			int numSamples) noexcept
+			int numChannels, int numSamples) noexcept
 		{
 			switch (type)
 			{
 			case ModType::Perlin: return perlin(buffer, numChannels, numSamples, transport);
 			case ModType::AudioRate: return audioRate(buffer, midi, numChannels, numSamples);
 			case ModType::Dropout: return dropout(buffer, numChannels, numSamples);
-			case ModType::EnvFol: return envFol(buffer, samples, samplesSC, numChannels, numChannelsSC, numSamples);
+			case ModType::EnvFol: return envFol(buffer, samples, samplesSC, numChannels, numSamples);
 			case ModType::Macro: return macro(buffer, samplesSC, numChannels, numSamples);
 			case ModType::Pitchwheel: return pitchbend(buffer, numChannels, numSamples, midi);
 			case ModType::LFO: return lfo(buffer, numChannels, numSamples, transport);
