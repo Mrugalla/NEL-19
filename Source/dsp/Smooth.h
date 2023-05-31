@@ -36,7 +36,7 @@ namespace smooth
 		void makeFromDecayInSamples(Float) noexcept;
 		/* decay, Fs */
 		void makeFromDecayInSecs(Float, Float) noexcept;
-		/* decay */
+		/* fc */
 		void makeFromDecayInFc(Float) noexcept;
 		/* decay, Fs */
 		void makeFromDecayInHz(Float, Float) noexcept;

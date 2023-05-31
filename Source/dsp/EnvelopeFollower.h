@@ -7,10 +7,11 @@
 
 namespace envfol
 {
-	using Smooth = smooth::Smooth<double>;
+	using Lowpass = smooth::Lowpass<double>;
 	using PRM = dsp::PRMD;
 	using PRMInfo = dsp::PRMInfoD;
 	using SIMD = juce::FloatVectorOperations;
+	using AudioBuffer = juce::AudioBuffer<double>;
 
 	inline double msInSamples(double ms, double Fs) noexcept
 	{
@@ -22,27 +23,83 @@ namespace envfol
 		return std::pow(10., db * .05);
 	}
 
+	struct HighPass
+	{
+		HighPass() :
+			filters{ 0., 0. },
+			freqPRM(1.),
+			sampleRate(1.),
+			sampleRateInv(1.)
+		{}
+
+		void prepare(double _sampleRate, int blockSize)
+		{
+			sampleRate = _sampleRate;
+			sampleRateInv = 1. / sampleRate;
+			freqPRM.prepare(sampleRate, blockSize, 10.);
+		}
+
+		void operator()(double* const* samples, double freqHz,
+			int numChannels, int numSamples) noexcept
+		{
+			const auto freqFc = freqHz * sampleRateInv;
+			const auto freqInfo = freqPRM(freqFc, numSamples);
+			
+			if (!freqInfo.smoothing)
+				for (auto ch = 0; ch < numChannels; ++ch)
+					for (auto s = 0; s < numSamples; ++s)
+						samples[ch][s] -= filters[ch](samples[ch][s]);
+			else
+			{
+				const auto freqBuf = freqInfo.buf;
+
+				for (auto ch = 0; ch < numChannels; ++ch)
+				{
+					auto smpls = samples[ch];
+					auto& filter = filters[ch];
+
+					for (auto s = 0; s < numSamples; ++s)
+					{
+						const auto fc = freqBuf[s];
+						filter.makeFromDecayInFc(fc);
+						smpls[s] -= filter(smpls[s]);
+					}
+				}
+				
+			}
+		}
+
+	protected:
+		std::array<Lowpass, 2> filters;
+		PRM freqPRM;
+		double sampleRate, sampleRateInv;
+	};
+
 	struct EnvFol
 	{
 		EnvFol() :
+			inputBuffer(),
 			atkPRM(1.),
 			rlsPRM(1.),
 			gainPRM(0.),
 			widthPRM(0.),
 			envelope{ 0., 0. },
 			envSmooth{ 0., 0. },
+			hp(),
 			sampleRate(1.)
 		{}
 
 		void prepare(double _sampleRate, int blockSize)
 		{
 			sampleRate = _sampleRate;
+			inputBuffer.setSize(2, blockSize, false, false, false);
 			atkPRM.prepare(sampleRate, blockSize, 10.);
 			rlsPRM.prepare(sampleRate, blockSize, 10.);
 			gainPRM.prepare(sampleRate, blockSize, 10.);
 			widthPRM.prepare(sampleRate, blockSize, 10.);
 			for (auto ch = 0; ch < 2; ++ch)
 				envSmooth[ch].makeFromDecayInMs(20., sampleRate);
+			hp.prepare(sampleRate, blockSize);
 		}
 
 		void operator()(double* const* samples,
@@ -54,7 +111,8 @@ namespace envfol
 			const auto rlsBuf = synthesizeRlsBuf(releaseMs, numSamples);
 			const auto gainBuf = synthesizeGainBuf(gainDb, atkBuf, rlsBuf, numSamples);
 			
-			const auto samplesInput = scEnabled ? samplesSC : samples;
+			auto samplesInput = getSamplesInput(samples, samplesSC, numChannels, numSamples, scEnabled);
+			hp(samplesInput, 1., numChannels, numSamples);
 
 			synthesizeEnvelope(samples[0], samplesInput[0], atkBuf, rlsBuf, gainBuf, envelope[0], numSamples);
 			
@@ -69,10 +127,25 @@ namespace envfol
 		}
 
 	protected:
+		AudioBuffer inputBuffer;
 		PRM atkPRM, rlsPRM, gainPRM, widthPRM;
 		std::array<double, 2> envelope;
-		std::array<Smooth, 2> envSmooth;
+		std::array<Lowpass, 2> envSmooth;
+		HighPass hp;
 		double sampleRate;
+
+		double* const* getSamplesInput(double* const* samples, const double* const* samplesSC,
+			int numChannels, int numSamples, bool scEnabled)
+		{
+			if (scEnabled)
+			{
+				auto inputSamples = inputBuffer.getArrayOfWritePointers();
+				for(auto ch = 0; ch < numChannels; ++ch)
+					SIMD::copy(inputSamples[ch], samplesSC[ch], numSamples);
+				return inputSamples;
+			}
+			return samples;
+		}
 
 		const double* synthesizeAtkBuf(double attackMs, int numSamples) noexcept
 		{
