@@ -3,7 +3,7 @@
 #include <thread>
 #include "Wavetable.h"
 #include "Modulator.h"
-#include "../modSys/ModSysGUI.h"
+#include "../modsys/ModSysGUI.h"
 
 namespace gui
 {
