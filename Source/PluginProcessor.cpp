@@ -358,7 +358,7 @@ void Nel19AudioProcessor::processBlockVibrato(AudioBufferD& bufferAll, const Mid
                 static_cast<double>(params(withOffset(PID::Perlin0Width, offset)).getValSumDenorm()),
                 static_cast<double>(params(withOffset(PID::Perlin0Phase, offset)).getValSumDenorm()),
                 static_cast<double>(params(withOffset(PID::Perlin0Bias, offset)).getValueSum()),
-                perlin::Shape(std::round(params(withOffset(PID::Perlin0Shape, offset)).getValSumDenorm())),
+                perlin2::Shape(std::round(params(withOffset(PID::Perlin0Shape, offset)).getValSumDenorm())),
                 params(withOffset(PID::Perlin0RateType, offset)).getValueSum() > .5f
             );
             break;

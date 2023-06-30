@@ -4,7 +4,7 @@
 #include "../Approx.h"
 #include <random>
 #include "Smooth.h"
-#include "Perlin.h"
+#include "Perlin2.h"
 #include "Wavetable.h"
 #include "LFO2.h"
 #include "Macro.h"
@@ -262,8 +262,8 @@ namespace vibrato
 
 		struct Perlin
 		{
-			using PlayHeadPos = perlin::PlayHeadPos;
-			using Shape = perlin::Shape;
+			using PlayHeadPos = perlin2::PlayHeadPos;
+			using Shape = perlin2::Shape;
 
 			Perlin() :
 				perlin(),
@@ -274,9 +274,9 @@ namespace vibrato
 			{
 			}
 
-			void prepare(double sampleRate, int blockSize, int latency)
+			void prepare(double sampleRate, int blockSize, int latency, int osFactor)
 			{
-				perlin.prepare(sampleRate, blockSize, latency);
+				perlin.prepare(sampleRate, blockSize, latency, osFactor);
 			}
 
 			void setParameters(double _rateHz, double _rateBeats,
@@ -326,7 +326,7 @@ namespace vibrato
 			}
 
 		protected:
-			perlin::Perlin2 perlin;
+			perlin2::Perlin2 perlin;
 			double rateHz, rateBeats;
 			double octaves, width, phs, bias;
 			Shape shape;
@@ -867,7 +867,7 @@ namespace vibrato
 		{
 			for(auto& b: buffer)
 				b.resize(maxBlockSize + 4, 0.f); // compensate for potential spline interpolation
-			perlin.prepare(sampleRate, maxBlockSize, latency);
+			perlin.prepare(sampleRate, maxBlockSize, latency, oversamplingFactor);
 			audioRate.prepare(sampleRate, maxBlockSize);
 			envFol.prepare(sampleRate, maxBlockSize);
 			macro.prepare(sampleRate, maxBlockSize);
@@ -883,7 +883,7 @@ namespace vibrato
 		// parameters
 		void setParametersPerlin(double _rateHz, double _rateBeats,
 			double _octaves, double _width, double _phs, double _bias,
-			perlin::Shape _shape, bool _temposync) noexcept
+			perlin2::Shape _shape, bool _temposync) noexcept
 		{
 			perlin.setParameters(_rateHz, _rateBeats, _octaves, _width, _phs, _bias, _shape, _temposync);
 		}

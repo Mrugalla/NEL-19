@@ -135,30 +135,14 @@ namespace perlin2
 		void updatePosition(double newPhase) noexcept
 		{
 			const auto newPhaseFloor = std::floor(newPhase);
-
 			noiseIdx = static_cast<int>(newPhaseFloor) & NoiseSizeMax;
 			phasor.phase.phase = newPhase - newPhaseFloor;
 		}
-
-		/* playHeadPos, rateBeatsInv */
-		void updatePositionSyncProcedural(double ppq, double rateBeatsInv) noexcept
-		{
-			ppq = ppq * rateBeatsInv + .5;
-			updatePosition(ppq);
-		}
-
+		
 		/* rateHzInv */
 		void updateSpeed(double rateHzInv) noexcept
 		{
 			phasor.inc = rateHzInv;
-		}
-
-		/*  timeInSecs, rateHz */
-		void updatePosition(double timeInSecs, double rateHz) noexcept
-		{
-			const auto timeSecs = timeInSecs;
-			const auto timeHz = timeSecs * rateHz;
-			updatePosition(timeHz);
 		}
 
 		/* samples, noise, gainBuffer,
@@ -225,7 +209,6 @@ namespace perlin2
 			else
 				processOctavesSmoothing(smpls, octavesInfo.buf, noise, gainBuffer, shape, numSamples);
 		}
-
 
 		/* smpls, noise, gainBuffer, octaves, shape, numSamples */
 		void processOctavesNotSmoothing(double* smpls, const double* noise, const double* gainBuffer, double octaves,
@@ -521,7 +504,7 @@ namespace perlin2
 
 			if (transport.isPlaying)
 			{
-				updatePosition(perlins[mixer.idx], transport.ppqPosition, transport.timeInSeconds, temposync);
+				//updatePosition(perlins[mixer.idx], transport.ppqPosition, transport.timeInSeconds, temposync);
 				posEstimate = transport.timeInSamples + numSamples / oversamplingFactor;
 			}
 			else
@@ -530,7 +513,7 @@ namespace perlin2
 
 		void updateSpeed(double nBpm, double _rateHz, double _rateBeats, Int64 timeInSamples, bool temposync) noexcept
 		{
-			double nBps = bpm / 60.;
+			double nBps = nBpm / 60.;
 			const auto nRateInv = .25 / _rateBeats;
 
 			double nInc = 0.;
@@ -540,9 +523,7 @@ namespace perlin2
 				nInc = nRateInv * bpSamples;
 			}
 			else
-			{
 				nInc = _rateHz * sampleRateInv;
-			}
 
 			if (isLooping(timeInSamples) || (changesSpeed(nBpm, nInc) && !mixer.stillFading()))
 				initXFade(nInc, nBpm, nBps, nRateInv, _rateHz, _rateBeats);
@@ -554,12 +535,13 @@ namespace perlin2
 			{
 				const auto latencyInPPQ = latency * bps * sampleRateInv;
 				const auto ppq = ppqPosition - latencyInPPQ;
-
-				perlin.updatePositionSyncProcedural(ppq, rateInv);
+				const auto nPhase = ppq * rateInv + .5;
+				perlin.updatePosition(nPhase);
 			}
 			else
 			{
-				perlin.updatePosition(timeInSecs, rateHz);
+				const auto nPhase = timeInSecs * rateHz;
+				perlin.updatePosition(nPhase);
 			}
 		}
 
@@ -589,7 +571,6 @@ namespace perlin2
 			rateInv = nRateInv;
 			rateHz = _rateHz;
 			rateBeats = _rateBeats;
-			// update member variables
 			mixer.init();
 			perlins[mixer.idx].updateSpeed(inc);
 		}
