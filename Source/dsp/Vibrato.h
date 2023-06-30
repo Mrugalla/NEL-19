@@ -14,7 +14,7 @@ namespace vibrato
 	using WHead = dsp::WHead;
 	using PRMInfo = dsp::PRMInfo<double>;
 	using PRM = dsp::PRM<double>;
-	using LP = smooth::Lowpass<double>;
+	using LP = smooth::Lowpass<double, true>;
 
 	/* buffer, x, size */
 	using InterpolationFunc = double(*)(const double*, double, int) noexcept;

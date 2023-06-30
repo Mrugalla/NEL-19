@@ -563,75 +563,16 @@ namespace gui
         bool wantsToReplaceADSR;
     };
 
-    struct ModCompDropout :
-        public Comp
-    {
-        enum { Decay, Spin, Chance, Smooth, Width, NumParams };
-
-        ModCompDropout(Utils& u, std::vector<Paramtr*>& modulatables, int mOff = 0) :
-            Comp(u, "", CursorType::Default),
-            layout
-            (
-                { 5, 5, 5, 5, 5, 3 },
-                { 2, 8 }
-            ),
-            params
-            {
-                Paramtr(u, "Decay", "The approximate decay of the dropout.", withOffset(PID::Dropout0Decay, mOff), modulatables),
-                Paramtr(u, "Spin", "Give it a little spin.", withOffset(PID::Dropout0Spin, mOff), modulatables),
-                Paramtr(u, "Chance", "The likelyness of new dropouts to appear.", withOffset(PID::Dropout0Chance, mOff), modulatables),
-                Paramtr(u, "Hard", "Defines the smoothness of the dropouts.", withOffset(PID::Dropout0Smooth, mOff), modulatables),
-                Paramtr(u, "Width", "The modulator's stereo-width", withOffset(PID::Dropout0Width, mOff), modulatables)
-            }
-        {
-            for (auto& p : params)
-            {
-                addAndMakeVisible(p);
-            }
-        }
-        
-        void activate(ParamtrRandomizer& randomizer)
-        {
-            for (auto& p : params)
-                randomizer.add(&p);
-            setVisible(true);
-        }
-        
-        void paint(Graphics&) override
-        {
-        }
-
-        void resized() override
-        {
-            layout.setBounds(getLocalBounds().toFloat());
-            layout.place(params[Decay], 0, 1, 1, 1, 0.f, true);
-            layout.place(params[Spin], 1, 0, 1, 2, 0.f, true);
-            layout.place(params[Chance], 2, 1, 1, 1, 0.f, true);
-            layout.place(params[Smooth], 3, 0, 1, 2, 0.f, true);
-            layout.place(params[Width], 4, 1, 1, 1, 0.f, true);
-        }
-        
-        void updateTimer() override
-        {
-			for (auto& param : params)
-				param.updateTimer();
-        }
-        
-    protected:
-        Layout layout;
-        std::array<Paramtr, NumParams> params;
-    };
-
     struct ModCompEnvFol :
         public Comp
     {
-        enum { Attack, Release, Gain, Width, SC, NumParams };
+        enum { Attack, Release, Gain, Width, SC, HP, NumParams };
 
         ModCompEnvFol(Utils& u, std::vector<Paramtr*>& modulatables, int mOff = 0) :
             Comp(u, "", CursorType::Default),
             layout
             (
-                { 2, 3, 5, 5, 3 },
+                { 2, 3, 3, 5, 5, 3 },
                 { 2, 8 }
             ),
             params
@@ -640,13 +581,12 @@ namespace gui
                 Paramtr(u, "Release", "The envelope follower's release time in milliseconds.", withOffset(PID::EnvFol0Release, mOff), modulatables),
                 Paramtr(u, "Gain", "This modulator's input gain.", withOffset(PID::EnvFol0Gain, mOff), modulatables),
                 Paramtr(u, "Wdth", "The modulator's stereo-width", withOffset(PID::EnvFol0Width, mOff), modulatables),
-				Paramtr(u, "SC", "If enabled the envelope follower is synthesized from the sidechain input.", withOffset(PID::EnvFol0SC, mOff), modulatables, ParameterType::Switch)
+				Paramtr(u, "SC", "If enabled the envelope follower is synthesized from the sidechain input.", withOffset(PID::EnvFol0SC, mOff), modulatables, ParameterType::Switch),
+				Paramtr(u, "HP", "A highpassed envelope follower reacts more to the highend.", withOffset(PID::EnvFol0HighPass, mOff), modulatables)
             }
         {
             for (auto& p : params)
-            {
                 addAndMakeVisible(p);
-            }
         }
         
         void activate(ParamtrRandomizer& randomizer)
@@ -664,10 +604,11 @@ namespace gui
         {
             layout.setBounds(getLocalBounds().toFloat());
             layout.place(params[SC], 0, 1, 1, 1, 0.f, true);
-            layout.place(params[Gain], 1, 1, 1, 1, 0.f, true);
-            layout.place(params[Attack], 2, 0, 1, 2, 0.f, true);
-            layout.place(params[Release], 3, 0, 1, 2, 0.f, true);
-            layout.place(params[Width], 4, 1, 1, 1, 0.f, true);
+            layout.place(params[HP], 1, 1, 1, 1, 0.f, true);
+            layout.place(params[Gain], 2, 1, 1, 1, 0.f, true);
+            layout.place(params[Attack], 3, 0, 1, 2, 0.f, true);
+            layout.place(params[Release], 4, 0, 1, 2, 0.f, true);
+            layout.place(params[Width], 5, 1, 1, 1, 0.f, true);
         }
         
         void updateTimer() override
@@ -943,12 +884,11 @@ namespace gui
                 Comp(u, ""),
                 layout
                 (
-                    { 1, 1, 1, 1 },
+                    { 1, 1, 1 },
                     { 1, 1 }
                 ),
                 perlin(u, "The perlin noise modulator uses natural noise to modulate the vibrato."),
                 audioRate(u, "The audio rate modulator uses a midi-note-controlled oscillator to modulate the vibrato."),
-                dropout(u, "The dropout modulator simulates random pitch dropouts similiar to tape artefacts."),
                 envFol(u, "The envelope follower modulates the vibrato according to your input signal's energy."),
                 macro(u, "Directly manipulate the vibrato's internal delay with this modulator."),
                 pitchbend(u, "Use your pitchbend wheel to modulate the vibrato with this modulator."),
@@ -956,7 +896,6 @@ namespace gui
             {
                 perlin.onPaint = makeTextButtonOnPaint("Perlin");
                 audioRate.onPaint = makeTextButtonOnPaint("Audio\nRate");
-                dropout.onPaint = makeTextButtonOnPaint("Dropout");
                 envFol.onPaint = makeTextButtonOnPaint("Env\nFol");
                 macro.onPaint = makeTextButtonOnPaint("Macro");
                 pitchbend.onPaint = makeTextButtonOnPaint("Pitch\nBend");
@@ -964,7 +903,6 @@ namespace gui
 
                 perlin.onClick = makeOnClick(modComp, vibrato::ModType::Perlin);
                 audioRate.onClick = makeOnClick(modComp, vibrato::ModType::AudioRate);
-                dropout.onClick = makeOnClick(modComp, vibrato::ModType::Dropout);
                 envFol.onClick = makeOnClick(modComp, vibrato::ModType::EnvFol);
                 macro.onClick = makeOnClick(modComp, vibrato::ModType::Macro);
                 pitchbend.onClick = makeOnClick(modComp, vibrato::ModType::Pitchwheel);
@@ -972,7 +910,6 @@ namespace gui
 
                 addAndMakeVisible(perlin);
                 addAndMakeVisible(audioRate);
-                addAndMakeVisible(dropout);
                 addAndMakeVisible(envFol);
                 addAndMakeVisible(macro);
                 addAndMakeVisible(pitchbend);
@@ -995,8 +932,7 @@ namespace gui
 
                 layout.place(perlin, 0, 0, 1, 1, thicc, false);
                 layout.place(audioRate, 1, 0, 1, 1, thicc, false);
-                layout.place(dropout, 2, 0, 1, 1, thicc, false);
-                layout.place(envFol, 3, 0, 1, 1, thicc, false);
+                layout.place(envFol, 2, 0, 1, 1, thicc, false);
                 layout.place(macro, 0, 1, 1, 1, thicc, false);
                 layout.place(pitchbend, 1, 1, 1, 1, thicc, false);
                 layout.place(lfo, 2, 1, 1, 1, thicc, false);
@@ -1006,7 +942,6 @@ namespace gui
             {
 				perlin.updateTimer();
 				audioRate.updateTimer();
-				dropout.updateTimer();
 				envFol.updateTimer();
 				macro.updateTimer();
 				pitchbend.updateTimer();
@@ -1015,7 +950,7 @@ namespace gui
             
         protected:
             Layout layout;
-            Button perlin, audioRate, dropout, envFol, macro, pitchbend, lfo;
+            Button perlin, audioRate, envFol, macro, pitchbend, lfo;
         };
 
         inline Notify makeNotify(ModComp& modComp)
@@ -1051,7 +986,6 @@ namespace gui
 
             perlin(u, modulatables, mOff),
             audioRate(u, modulatables, mOff),
-            dropout(u, modulatables, mOff),
             envFol(u, modulatables, mOff),
             macro(u, modulatables, mOff),
             pitchbend(u, modulatables, mOff),
@@ -1069,15 +1003,13 @@ namespace gui
             {
                 if (selector == nullptr)
                 {
-                    selector = std::make_unique<Selector>(this->utils, *this);
+                    selector = std::make_unique<Selector>(utils, *this);
                     layout.place(*selector, 0, 1, 3, 1, 0.f, false);
                     addAndMakeVisible(*selector);
                     notify(NotificationType::KillPopUp);
                 }
                 else
-                {
                     selector.reset(nullptr);
-                }
             };
 
             addAndMakeVisible(label);
@@ -1087,7 +1019,6 @@ namespace gui
                 
             addChildComponent(perlin);
             addChildComponent(audioRate);
-            addChildComponent(dropout);
             addChildComponent(envFol);
             addChildComponent(macro);
             addChildComponent(pitchbend);
@@ -1116,7 +1047,6 @@ namespace gui
             modType = t;
             perlin.setVisible(false);
             audioRate.setVisible(false);
-            dropout.setVisible(false);
             envFol.setVisible(false);
             macro.setVisible(false);
             pitchbend.setVisible(false);
@@ -1135,10 +1065,6 @@ namespace gui
                 audioRate.activate(randomizer);
                 label.setText("AudioRate");
                 inputLabel.setText("midi in >>");
-                break;
-            case ModType::Dropout:
-                dropout.activate(randomizer);
-                label.setText("Dropout");
                 break;
             case ModType::EnvFol:
                 envFol.activate(randomizer);
@@ -1209,7 +1135,6 @@ namespace gui
                 const auto bounds = layout(0, 1, 4, 1, 0.f, false).toNearestInt();
                 perlin.setBounds(bounds);
                 audioRate.setBounds(bounds);
-                dropout.setBounds(bounds);
                 envFol.setBounds(bounds);
                 macro.setBounds(bounds);
                 pitchbend.setBounds(bounds);
@@ -1229,9 +1154,6 @@ namespace gui
 				break;
 			case ModType::AudioRate:
 				audioRate.updateTimer();
-				break;
-			case ModType::Dropout:
-				dropout.updateTimer();
 				break;
 			case ModType::EnvFol:
 				envFol.updateTimer();
@@ -1266,7 +1188,6 @@ namespace gui
 
         ModCompPerlin perlin;
         ModCompAudioRate audioRate;
-        ModCompDropout dropout;
         ModCompEnvFol envFol;
         ModCompMacro macro;
         ModCompPitchbend pitchbend;

@@ -21,7 +21,8 @@ namespace smooth
 		Float curVal;
 	};
 
-	template<typename Float>
+	/* Float-Type, AutoGain */
+	template<typename Float, bool AutoGain>
 	struct Lowpass
 	{
 		static constexpr Float Pi = static_cast<Float>(3.14159265359);
@@ -43,9 +44,9 @@ namespace smooth
 		/* decay, Fs */
 		void makeFromDecayInMs(Float, Float) noexcept;
 
-		void copyCutoffFrom(const Lowpass<Float>&) noexcept;
+		void copyCutoffFrom(const Lowpass<Float, AutoGain>&) noexcept;
 
-		/* startVal */
+		/* startVal, autogain */
 		Lowpass(const Float = static_cast<Float>(0));
 
 		void reset();
@@ -98,7 +99,7 @@ namespace smooth
 
 	protected:
 		Block<Float> block;
-		Lowpass<Float> lowpass;
+		Lowpass<Float, false> lowpass;
 		Float cur, dest;
 		bool smoothing;
 	};

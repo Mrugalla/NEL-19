@@ -190,10 +190,10 @@ namespace dsp
             
             {
                 auto& track = mixer[0];
-                auto xSamples = mixer.getSamples(0);
-
+                
                 if (track.isEnabled())
                 {
+                    auto xSamples = mixer.getSamples(0);
                     track.synthesizeGainValues(xSamples[2], numSamples);
 
                     lfos[0]

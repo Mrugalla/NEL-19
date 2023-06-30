@@ -50,6 +50,7 @@
         <FILE id="sWUzN7" name="ModsGUI.h" compile="0" resource="0" file="Source/dsp/ModsGUI.h"/>
         <FILE id="LZVNwr" name="Modulator.h" compile="0" resource="0" file="Source/dsp/Modulator.h"/>
         <FILE id="A464RP" name="Perlin.h" compile="0" resource="0" file="Source/dsp/Perlin.h"/>
+        <FILE id="Nm3hTa" name="Perlin2.h" compile="0" resource="0" file="Source/dsp/Perlin2.h"/>
         <FILE id="wIesez" name="Phasor.h" compile="0" resource="0" file="Source/dsp/Phasor.h"/>
         <FILE id="nVcp5W" name="PRM.h" compile="0" resource="0" file="Source/dsp/PRM.h"/>
         <FILE id="BOsKKr" name="Sidechain.h" compile="0" resource="0" file="Source/dsp/Sidechain.h"/>
@@ -61,10 +62,6 @@
         <FILE id="O7aCGe" name="Wavetable.h" compile="0" resource="0" file="Source/dsp/Wavetable.h"/>
         <FILE id="mhVKy8" name="WHead.h" compile="0" resource="0" file="Source/dsp/WHead.h"/>
         <FILE id="Ee3rkw" name="XFade.h" compile="0" resource="0" file="Source/dsp/XFade.h"/>
-      </GROUP>
-      <GROUP id="{DF5CA124-D2C0-471E-8D17-297CEBC9FA0F}" name="releasePool">
-        <FILE id="ZsHHV2" name="ReleasePool.cpp" compile="1" resource="0" file="Source/releasePool/ReleasePool.cpp"/>
-        <FILE id="wMeHhK" name="ReleasePool.h" compile="0" resource="0" file="Source/releasePool/ReleasePool.h"/>
       </GROUP>
       <GROUP id="{EB637F68-8B54-CF39-23F4-99282698FA6E}" name="Img">
         <FILE id="qMlrvH" name="cursorCross.png" compile="0" resource="1" file="Source/Img/cursorCross.png"/>

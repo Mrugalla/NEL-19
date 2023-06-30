@@ -52,16 +52,14 @@ namespace modSys6
 		
 		Perlin0RateHz, Perlin0RateBeats, Perlin0Octaves, Perlin0Width, Perlin0RateType, Perlin0Phase, Perlin0Shape, Perlin0Bias,
 		AudioRate0Oct, AudioRate0Semi, AudioRate0Fine, AudioRate0Width, AudioRate0RetuneSpeed, AudioRate0Atk, AudioRate0Dcy, AudioRate0Sus, AudioRate0Rls,
-		Dropout0Decay, Dropout0Spin, Dropout0Chance, Dropout0Smooth, Dropout0Width,
-		EnvFol0Attack, EnvFol0Release, EnvFol0Gain, EnvFol0Width, EnvFol0SC,
+		EnvFol0Attack, EnvFol0Release, EnvFol0Gain, EnvFol0Width, EnvFol0SC, EnvFol0HighPass,
 		Macro0, Macro0Smooth, Macro0SCGain,
 		Pitchbend0Smooth,
 		LFO0FreeSync, LFO0RateFree, LFO0RateSync, LFO0Waveform, LFO0Phase, LFO0Width,
 
 		Perlin1RateHz, Perlin1RateBeats, Perlin1Octaves, Perlin1Width, Perlin1RateType, Perlin1Phase, Perlin1Shape, Perlin1Bias,
 		AudioRate1Oct, AudioRate1Semi, AudioRate1Fine, AudioRate1Width, AudioRate1RetuneSpeed, AudioRate1Atk, AudioRate1Dcy, AudioRate1Sus, AudioRate1Rls,
-		Dropout1Decay, Dropout1Spin, Dropout1Chance, Dropout1Smooth, Dropout1Width,
-		EnvFol1Attack, EnvFol1Release, EnvFol1Gain, EnvFol1Width, EnvFol1SC,
+		EnvFol1Attack, EnvFol1Release, EnvFol1Gain, EnvFol1Width, EnvFol1SC, EnvFol1HighPass,
 		Macro1, Macro1Smooth, Macro1SCGain,
 		Pitchbend1Smooth,
 		LFO1FreeSync, LFO1RateFree, LFO1RateSync, LFO1Waveform, LFO1Phase, LFO1Width,
@@ -101,16 +99,12 @@ namespace modSys6
 		case PID::AudioRate0Dcy: return "AudioRate 0 Decay";
 		case PID::AudioRate0Sus: return "AudioRate 0 Sustain";
 		case PID::AudioRate0Rls: return "AudioRate 0 Release";
-		case PID::Dropout0Decay: return "Dropout 0 Decay";
-		case PID::Dropout0Spin: return "Dropout 0 Spin";
-		case PID::Dropout0Chance: return "Dropout 0 Chance";
-		case PID::Dropout0Smooth: return "Dropout 0 Smooth";
-		case PID::Dropout0Width: return "Dropout 0 Width";
 		case PID::EnvFol0Attack: return "EnvFol 0 Attack";
 		case PID::EnvFol0Release: return "EnvFol 0 Release";
 		case PID::EnvFol0Gain: return "EnvFol 0 Gain";
 		case PID::EnvFol0Width: return "EnvFol 0 Width";
 		case PID::EnvFol0SC: return "EnvFol 0 SC";
+		case PID::EnvFol0HighPass: return "EnvFol 0 HighPass";
 		case PID::Macro0: return "Macro 0";
 		case PID::Macro0Smooth: return "Macro 0 Smooth";
 		case PID::Macro0SCGain: return "Macro 0 SC Gain";
@@ -139,16 +133,12 @@ namespace modSys6
 		case PID::AudioRate1Dcy: return "AudioRate 1 Decay";
 		case PID::AudioRate1Sus: return "AudioRate 1 Sustain";
 		case PID::AudioRate1Rls: return "AudioRate 1 Release";
-		case PID::Dropout1Decay: return "Dropout 1 Decay";
-		case PID::Dropout1Spin: return "Dropout 1 Spin";
-		case PID::Dropout1Chance: return "Dropout 1 Chance";
-		case PID::Dropout1Smooth: return "Dropout 1 Smooth";
-		case PID::Dropout1Width: return "Dropout 1 Width";
 		case PID::EnvFol1Attack: return "EnvFol 1 Attack";
 		case PID::EnvFol1Release: return "EnvFol 1 Release";
 		case PID::EnvFol1Gain: return "EnvFol 1 Gain";
 		case PID::EnvFol1Width: return "EnvFol 1 Width";
 		case PID::EnvFol1SC: return "EnvFol 1 SC";
+		case PID::EnvFol1HighPass: return "EnvFol 1 HighPass";
 		case PID::Macro1: return "Macro 1";
 		case PID::Macro1Smooth: return "Macro 1 Smooth";
 		case PID::Macro1SCGain: return "Macro 1 SC Gain";
@@ -1195,17 +1185,12 @@ namespace modSys6
 				params.push_back(new Param(withOffset(PID::AudioRate0Sus, offset), makeRange::biasXL(0.f, 1.f, 0.f), 1.f, valToStrPercent, strToValPercent, Unit::Percent));
 				params.push_back(new Param(withOffset(PID::AudioRate0Rls, offset), makeRange::biasXL(1.f, 2000.f, -.9f), 20.f, valToStrMs, strToValMs, Unit::Ms));
 
-				params.push_back(new Param(withOffset(PID::Dropout0Decay, offset), makeRange::quad(10.f, 10000.f, 3), 1000.f, valToStrMs, strToValMs, Unit::Ms));
-				params.push_back(new Param(withOffset(PID::Dropout0Spin, offset), makeRange::biasXL(.1f, 40.f, -.6f), 4.f, valToStrHz, strToValHz, Unit::Hz));
-				params.push_back(new Param(withOffset(PID::Dropout0Chance, offset), makeRange::quad(10.f, 10000.f, 2), 1000.f, valToStrMs, strToValMs, Unit::Ms));
-				params.push_back(new Param(withOffset(PID::Dropout0Smooth, offset), makeRange::withCentre(.01f, 20.f, 2.f), 4.f, valToStrHz, strToValHz, Unit::Hz));
-				params.push_back(new Param(withOffset(PID::Dropout0Width, offset), makeRange::biasXL(0.f, 1.f, 0.f), 0.f, valToStrPercent, strToValPercent, Unit::Percent));
-
 				params.push_back(new Param(withOffset(PID::EnvFol0Attack, offset), makeRange::biasXL(1.f, 2000.f, -.9f), 80.f, valToStrMs, strToValMs, Unit::Ms));
 				params.push_back(new Param(withOffset(PID::EnvFol0Release, offset), makeRange::biasXL(1.f, 2000.f, -.9f), 250.f, valToStrMs, strToValMs, Unit::Ms));
 				params.push_back(new Param(withOffset(PID::EnvFol0Gain, offset), makeRange::biasXL(-20.f, 80.f, 0.f), 0.f, valToStrDb, strToValDb, Unit::Decibel));
 				params.push_back(new Param(withOffset(PID::EnvFol0Width, offset), makeRange::biasXL(0.f, 1.f, 0.f), 0.f, valToStrPercent, strToValPercent, Unit::Percent));
 				params.push_back(new Param(withOffset(PID::EnvFol0SC, offset), makeRange::toggle(), 0.f, valToStrPower, strToValPower, Unit::Power));
+				params.push_back(new Param(withOffset(PID::EnvFol0HighPass, offset), makeRange::quad(20.f, 10000.f, 2), 20.f, valToStrHz, strToValHz, Unit::Hz));
 
 				params.push_back(new Param(withOffset(PID::Macro0, offset), makeRange::biasXL(-1.f, 1.f, 0.f), 0.f, valToStrPercent, strToValPercent, Unit::Percent));
 				params.push_back(new Param(withOffset(PID::Macro0Smooth, offset), makeRange::withCentre(1.f, 420.f, 20.f), 20.f, valToStrHz, strToValHz, Unit::Hz));

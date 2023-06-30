@@ -56,7 +56,6 @@ namespace vibrato
 	{
 		Perlin,
 		AudioRate,
-		Dropout,
 		EnvFol,
 		Macro,
 		Pitchwheel,
@@ -71,7 +70,6 @@ namespace vibrato
 		{
 		case ModType::Perlin: return "Perlin";
 		case ModType::AudioRate: return "AudioRate";
-		case ModType::Dropout: return "Dropout";
 		case ModType::EnvFol: return "EnvFol";
 		case ModType::Macro: return "Macro";
 		case ModType::Pitchwheel: return "Pitchwheel";
@@ -589,161 +587,6 @@ namespace vibrato
 			double Fs;
 		};
 
-		class Dropout
-		{
-			static constexpr double FreqCoeff = Pi * 10. * 10. * 10. * 10. * 10.;
-		
-		public:
-			Dropout() :
-				widthSmooth(0.),
-				widthBuf(),
-				
-				phasor(),
-				decay(1.), spin(1.), freqChance(0.), freqSmooth(0.), width(0.),
-				rand(),
-
-				accel{ 0., 0. },
-				speed{ 0., 0. },
-				dest{ 0., 0. },
-				env{ 0., 0. },
-				smooth{ 0., 0. },
-				fs(44100.), dcy(1.), spinV(420.)
-			{}
-			
-			void prepare(double sampleRate, int blockSize)
-			{
-				fs = sampleRate;
-
-				for (auto& p : phasor)
-				{
-					p.prepare(fs);
-					p.setFrequencyMs(freqChance);
-				}
-				
-				dcy = 1. - 1. / (decay * fs * .001);
-				for (auto& p : phasor)
-					p.setFrequencyMs(freqChance);
-				
-				for (auto& s : smooth)
-					s.makeFromFreqInHz(freqSmooth, fs);
-				
-				spinV = 1. / (fs * FreqCoeff / (spin * spin));
-				
-				widthSmooth.makeFromDecayInMs(10., fs);
-				widthBuf.resize(blockSize);
-			}
-			
-			void setParameters(double _decay, double _spin,
-				double _freqChance, double _freqSmooth, double _width) noexcept
-			{
-				if (decay != _decay)
-				{
-					decay = _decay;
-					dcy = 1. - 1. / (decay * fs * .001);
-				}
-				if (spin != _spin)
-				{
-					spin = _spin;
-					const auto spin2 = spin * spin;
-					spinV = 1. / (fs * FreqCoeff / spin2);
-				}
-				if (freqChance != _freqChance)
-				{
-					freqChance = _freqChance;
-					for (auto& p : phasor)
-						p.setFrequencyMs(freqChance);
-
-				}
-				freqSmooth = _freqSmooth;
-				width = _width;
-			}
-			
-			void operator()(Buffer& buffer, int numChannels, int numSamples) noexcept
-			{
-				{ // FILL BUFFERS WITH IMPULSES
-					for (auto ch = 0; ch < numChannels; ++ch)
-					{
-						auto& phasr = phasor[ch];
-						auto impulseBuf = buffer[ch].data();
-						juce::FloatVectorOperations::fill(impulseBuf, 0., numSamples);
-						for (auto s = 0; s < numSamples; ++s)
-							if (phasr())
-								impulseBuf[s] = 2. * (rand.nextDouble() - .5);
-					}
-				}
-				
-				{ // SYNTHESIZE MOD
-					for (auto ch = 0; ch < numChannels; ++ch)
-					{
-						auto buf = buffer[ch].data();
-						
-						{
-							auto& ac = accel[ch];
-							auto& velo = speed[ch];
-							auto& dst = dest[ch];
-							auto& en = env[ch];
-
-							for (auto s = 0; s < numSamples; ++s)
-							{
-								auto& smpl = buf[s];
-								if (smpl != 0.)
-								{
-									en = smpl;
-									dst = 0.;
-									ac = 0.;
-									velo = 0.;
-								}
-								const auto dist = dst - en;
-								const auto direc = dist < 0. ? -1. : 1.;
-
-								ac = (velo * direc + dist) * spinV;
-								velo += ac;
-								en = (en + velo) * dcy;
-								smpl = en;
-							}
-						}
-						
-						for (auto s = 0; s < numSamples; ++s)
-						{
-							auto& smpl = buf[s];
-							smpl = approx::tanh(PiHalf * smpl * smpl * smpl);
-						}
-
-						smooth[ch].makeFromFreqInHz(freqSmooth, fs);
-						for (auto s = 0; s < numSamples; ++s)
-						{
-							auto& smpl = buf[s];
-							smpl = static_cast<float>(smooth[ch](smpl));
-						}	
-					}
-				}
-				
-				if (numChannels == 2)
-				{
-					const auto widthSmoothing = widthSmooth(widthBuf.data(), width, numSamples);
-					
-					if(widthSmoothing)
-						for (auto s = 0; s < numSamples; ++s)
-							buffer[1][s] = buffer[0][s] + widthBuf[s] * (buffer[1][s] - buffer[0][s]);
-					else
-						for (auto s = 0; s < numSamples; ++s)
-							buffer[1][s] = buffer[0][s] + width * (buffer[1][s] - buffer[0][s]);
-				}
-			}
-			
-		protected:
-			SmoothD widthSmooth;
-			std::vector<double> widthBuf;
-
-			std::array<Phasor<double>, 2> phasor;
-			double decay, spin, freqChance, freqSmooth, width;
-			juce::Random rand;
-
-			std::array<double, 2> accel, speed, dest, env;
-			std::array<SmoothD, 2> smooth;
-			double fs, dcy, spinV;
-		};
-
 		struct EnvFol
 		{
 			EnvFol() :
@@ -752,6 +595,7 @@ namespace vibrato
 				releaseMs(1.),
 				gain(1.),
 				width(0.),
+				cutoffHP(20.),
 				scEnabled(false)
 			{}
 			
@@ -760,12 +604,13 @@ namespace vibrato
 				envFol.prepare(sampleRate, blockSize);
 			}
 			
-			void setParameters(double _attackMs, double _releaseMs, double _gain, double _width, bool _scEnabled) noexcept
+			void setParameters(double _attackMs, double _releaseMs, double _gain, double _width, double _cutoffHP, bool _scEnabled) noexcept
 			{
 				attackMs = _attackMs;
 				releaseMs = _releaseMs;
 				gain = _gain;
 				width = _width;
+				cutoffHP = _cutoffHP;
 				scEnabled = _scEnabled;
 			}
 			
@@ -776,12 +621,12 @@ namespace vibrato
 				for(auto ch = 0; ch < numChannels; ++ch)
 					SIMD::copy(samplesIn[ch], samples[ch], numSamples);
 
-				envFol(samplesIn, samplesSC, attackMs, releaseMs, gain, width, numChannels, numSamples, scEnabled);
+				envFol(samplesIn, samplesSC, attackMs, releaseMs, gain, width, cutoffHP, numChannels, numSamples, scEnabled);
 			}
 			
 		protected:
 			envfol::EnvFol envFol;
-			double attackMs, releaseMs, gain, width, scEnabled;
+			double attackMs, releaseMs, gain, width, cutoffHP, scEnabled;
 		};
 
 		struct Macro
@@ -950,7 +795,6 @@ namespace vibrato
 			tables(),
 			perlin(),
 			audioRate(),
-			dropout(),
 			envFol(),
 			macro(),
 			pitchbend(),
@@ -1014,7 +858,10 @@ namespace vibrato
 			}
 		}
 
-		void setType(ModType t) noexcept { type = t; }
+		void setType(ModType t) noexcept
+		{
+			type = t;
+		}
 		
 		void prepare(double sampleRate, int maxBlockSize, int latency, int oversamplingFactor)
 		{
@@ -1022,7 +869,6 @@ namespace vibrato
 				b.resize(maxBlockSize + 4, 0.f); // compensate for potential spline interpolation
 			perlin.prepare(sampleRate, maxBlockSize, latency);
 			audioRate.prepare(sampleRate, maxBlockSize);
-			dropout.prepare(sampleRate, maxBlockSize);
 			envFol.prepare(sampleRate, maxBlockSize);
 			macro.prepare(sampleRate, maxBlockSize);
 			pitchbend.prepare(sampleRate);
@@ -1049,14 +895,9 @@ namespace vibrato
 			audioRate.setParameters(noteOffset, width, retuneSpeed, attack, decay, sustain, release);
 		}
 		
-		void setParametersDropout(double decay, double spin, double freqChance, double freqSmooth, double width) noexcept
+		void setParametersEnvFol(double atk, double rls, double gain, double width, bool scEnabled, double cutoffHP) noexcept
 		{
-			dropout.setParameters(decay, spin, freqChance, freqSmooth, width);
-		}
-		
-		void setParametersEnvFol(double atk, double rls, double gain, double width, bool scEnabled) noexcept
-		{
-			envFol.setParameters(atk, rls, gain, width, scEnabled);
+			envFol.setParameters(atk, rls, gain, width, cutoffHP, scEnabled);
 		}
 		
 		void setParametersMacro(double m, double smoothingHz, double scGain) noexcept
@@ -1082,7 +923,6 @@ namespace vibrato
 			{
 			case ModType::Perlin: return perlin(buffer, numChannels, numSamples, transport);
 			case ModType::AudioRate: return audioRate(buffer, midi, numChannels, numSamples);
-			case ModType::Dropout: return dropout(buffer, numChannels, numSamples);
 			case ModType::EnvFol: return envFol(buffer, samples, samplesSC, numChannels, numSamples);
 			case ModType::Macro: return macro(buffer, samplesSC, numChannels, numSamples);
 			case ModType::Pitchwheel: return pitchbend(buffer, numChannels, numSamples, midi);
@@ -1106,7 +946,6 @@ namespace vibrato
 
 		Perlin perlin;
 		AudioRate audioRate;
-		Dropout dropout;
 		EnvFol envFol;
 		Macro macro;
 		Pitchbend pitchbend;
@@ -1121,10 +960,6 @@ namespace vibrato
 pitchbend range define globally or so?
 	useful for audiorate mod
 
-dropout
-	another dropout mode (biased smoothed random values)
-	temposync?
-
 lfo mod
 	improve wavetable browser
 		to make room for more wavetables
@@ -1137,6 +972,22 @@ make trigger mod
 
 envFol
 	lookahead?
+
+new modulator ideas (need 2 mods)
+	step sequencer / performer (massive)
+	onset detection
+	spline
+dimensions
+	vibrato (delay) + feedback, damp
+	tremolo (gain)
+	drive (drive)
+	balance (balance)
+	lp4 (lowpass filter)
+	bounce (frequency shifter)
+vibrato method
+	delay/allpass
+post-modulator waveshapers
+fixed blocksize
 
 make konami mod
 

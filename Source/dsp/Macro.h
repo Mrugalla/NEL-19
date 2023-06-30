@@ -7,7 +7,7 @@ namespace macro
 	using PRM = dsp::PRMD;
 	using PRMInfo = dsp::PRMInfoD;
 	using SIMD = juce::FloatVectorOperations;
-	using Smooth = smooth::Lowpass<double>;
+	using Smooth = smooth::Lowpass<double, false>;
 
 	inline double dbToGain(double db, double minDb) noexcept
 	{

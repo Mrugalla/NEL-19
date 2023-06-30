@@ -362,16 +362,6 @@ void Nel19AudioProcessor::processBlockVibrato(AudioBufferD& bufferAll, const Mid
                 params(withOffset(PID::Perlin0RateType, offset)).getValueSum() > .5f
             );
             break;
-        case vibrato::ModType::Dropout:
-            mod.setParametersDropout
-            (
-                params(withOffset(PID::Dropout0Decay, offset)).getValSumDenorm(),
-                params(withOffset(PID::Dropout0Spin, offset)).getValSumDenorm(),
-                params(withOffset(PID::Dropout0Chance, offset)).getValSumDenorm(),
-                params(withOffset(PID::Dropout0Smooth, offset)).getValSumDenorm(),
-                params(withOffset(PID::Dropout0Width, offset)).getValueSum()
-            );
-            break;
         case vibrato::ModType::EnvFol:
             mod.setParametersEnvFol
             (
@@ -379,7 +369,8 @@ void Nel19AudioProcessor::processBlockVibrato(AudioBufferD& bufferAll, const Mid
                 params(withOffset(PID::EnvFol0Release, offset)).getValSumDenorm(),
                 params(withOffset(PID::EnvFol0Gain, offset)).getValSumDenorm(),
                 params(withOffset(PID::EnvFol0Width, offset)).getValueSum(),
-                params(withOffset(PID::EnvFol0SC, offset)).getValueSum() > .5f
+                params(withOffset(PID::EnvFol0SC, offset)).getValueSum() > .5f,
+				params(withOffset(PID::EnvFol0HighPass, offset)).getValSumDenorm()
             );
             break;
         case vibrato::ModType::Macro:

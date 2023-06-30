@@ -7,7 +7,8 @@
 
 namespace envfol
 {
-	using Lowpass = smooth::Lowpass<double>;
+	using Lowpass = smooth::Lowpass<double, false>;
+	using LowpassGain = smooth::Lowpass<double, true>;
 	using PRM = dsp::PRMD;
 	using PRMInfo = dsp::PRMInfoD;
 	using SIMD = juce::FloatVectorOperations;
@@ -70,7 +71,7 @@ namespace envfol
 		}
 
 	protected:
-		std::array<Lowpass, 2> filters;
+		std::array<LowpassGain, 2> filters;
 		PRM freqPRM;
 		double sampleRate, sampleRateInv;
 	};
@@ -104,7 +105,7 @@ namespace envfol
 
 		void operator()(double* const* samples,
 			const double* const* samplesSC,
-			double attackMs, double releaseMs, double gainDb, double width,
+			double attackMs, double releaseMs, double gainDb, double width, double cutoffHP,
 			int numChannels, int numSamples, bool scEnabled) noexcept
 		{
 			const auto atkBuf = synthesizeAtkBuf(attackMs, numSamples);
@@ -112,7 +113,7 @@ namespace envfol
 			const auto gainBuf = synthesizeGainBuf(gainDb, atkBuf, rlsBuf, numSamples);
 			
 			auto samplesInput = getSamplesInput(samples, samplesSC, numChannels, numSamples, scEnabled);
-			hp(samplesInput, 1., numChannels, numSamples);
+			hp(samplesInput, cutoffHP, numChannels, numSamples);
 
 			synthesizeEnvelope(samples[0], samplesInput[0], atkBuf, rlsBuf, gainBuf, envelope[0], numSamples);
 			
