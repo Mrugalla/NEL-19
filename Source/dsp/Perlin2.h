@@ -365,8 +365,8 @@ namespace perlin2
 			octavesPRM(1.),
 			widthPRM(0.),
 			phsPRM(0.),
-			rateBeats(-1.),
-			rateHz(-1.),
+			rateBeats(1.),
+			rateHz(1.),
 			inc(1.),
 			bpm(1.), bps(1.),
 			// noise seed
@@ -432,7 +432,7 @@ namespace perlin2
 
 					perlins[0]
 					(
-						samples,
+						xSamples,
 						noise.data(),
 						gainBuffer.data(),
 						octavesInfo,
@@ -462,7 +462,7 @@ namespace perlin2
 
 					perlins[i]
 					(
-						samples,
+						xSamples,
 						noise.data(),
 						gainBuffer.data(),
 						octavesInfo,
@@ -504,17 +504,17 @@ namespace perlin2
 
 			if (transport.isPlaying)
 			{
-				//updatePosition(perlins[mixer.idx], transport.ppqPosition, transport.timeInSeconds, temposync);
+				updatePosition(perlins[mixer.idx], transport.ppqPosition, transport.timeInSeconds, temposync);
 				posEstimate = transport.timeInSamples + numSamples / oversamplingFactor;
 			}
 			else
 				posEstimate = transport.timeInSamples;
 		}
 
-		void updateSpeed(double nBpm, double _rateHz, double _rateBeats, Int64 timeInSamples, bool temposync) noexcept
+		void updateSpeed(double nBpm, double nRateHz, double nRateBeats, Int64 timeInSamples, bool temposync) noexcept
 		{
 			double nBps = nBpm / 60.;
-			const auto nRateInv = .25 / _rateBeats;
+			const auto nRateInv = .25 * nRateBeats;
 
 			double nInc = 0.;
 			if (temposync)
@@ -523,10 +523,10 @@ namespace perlin2
 				nInc = nRateInv * bpSamples;
 			}
 			else
-				nInc = _rateHz * sampleRateInv;
+				nInc = nRateHz * sampleRateInv;
 
 			if (isLooping(timeInSamples) || (changesSpeed(nBpm, nInc) && !mixer.stillFading()))
-				initXFade(nInc, nBpm, nBps, nRateInv, _rateHz, _rateBeats);
+				initXFade(nInc, nBpm, nBps, nRateInv, nRateHz, nRateBeats);
 		}
 
 		void updatePosition(Perlin& perlin, double ppqPosition, double timeInSecs, bool temposync) noexcept
