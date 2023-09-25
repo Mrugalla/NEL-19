@@ -547,6 +547,7 @@ namespace gui
         {
             audioProcessor.suspendProcessing(true);
             audioProcessor.params.updatePatch(state);
+            audioProcessor.loadPatch();
             audioProcessor.forcePrepare();
         }
 
@@ -1332,6 +1333,33 @@ namespace gui
         };
     }
 
+    struct TimeConstrainer
+    {
+        static constexpr juce::uint32 IntervalMs = 10;
+
+        TimeConstrainer() :
+            timeStart(0)
+        {
+        }
+
+        bool isReady() noexcept
+		{
+            if (timeStart == 0)
+            {
+                timeStart = juce::Time::getMillisecondCounter();
+                return true;
+            }
+            const auto newTime = juce::Time::getMillisecondCounter() - timeStart;
+            if (newTime < IntervalMs)
+                return false;
+            timeStart = juce::Time::getMillisecondCounter();
+            return true;
+		}
+
+    protected:
+        juce::uint32 timeStart;
+    };
+
     struct TextEditor :
         public Comp
     {
@@ -1344,6 +1372,7 @@ namespace gui
             onClick([]() { return true; }),
 
             label(u, ""),
+            timeConstrainer(),
             emptyString(_emptyString), txt(""),
             tickIdx(0),
             drawTick(false),
@@ -1365,6 +1394,7 @@ namespace gui
             onClick([]() { return true; }),
 
             label(u, ""),
+            timeConstrainer(),
             emptyString(_emptyString), txt(""),
             tickIdx(0),
             drawTick(false),
@@ -1523,6 +1553,9 @@ namespace gui
 
         bool keyPressed(const KeyPress& key)
         {
+            if (!timeConstrainer.isReady())
+                return true;
+
             if (key == KeyPress::createFromDescription("ctrl+c"))
             {
                 if (!txt.isEmpty())
@@ -1613,6 +1646,7 @@ namespace gui
 
         Label label;
     protected:
+        TimeConstrainer timeConstrainer;
         String emptyString, txt;
         int tickIdx;
         bool drawTick;
@@ -2706,6 +2740,7 @@ namespace gui
     public:    
         EnterValueComp(Utils& u) :
             Comp(u, makeNotify(*this), "Enter a new value for this parameter."),
+            timeConstrainer(),
             txt(""),
             param(nullptr),
             initValue(0.f),
@@ -2763,6 +2798,9 @@ namespace gui
             
         bool keyPressed(const juce::KeyPress& key) override
         {
+            if (!timeConstrainer.isReady())
+                return true;
+
             if (key == key.escapeKey)
             {
                 disable();
@@ -2870,6 +2908,7 @@ namespace gui
         }
         
     protected:
+        TimeConstrainer timeConstrainer;
         String txt;
         Param* param;
         float initValue;

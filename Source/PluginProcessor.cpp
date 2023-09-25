@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "presets/Presets.h"
 #define RemoveValueTree false
 #define OversamplingEnabled true
 #define DebugModsBuffer false
@@ -42,6 +43,7 @@ Nel19AudioProcessor::Nel19AudioProcessor()
 #endif
 {
     appProperties.setStorageParameters(makeOptions());
+    presets::init(appProperties);
 
     startTimerHz(4);
 }
@@ -583,9 +585,6 @@ void Nel19AudioProcessor::loadPatch()
         modulators[m].loadPatch(params.state, m);
     
     prepareToPlay(getSampleRate(), getBlockSize());
-
-    //benchmark::processBlock(*this);
-
     suspendProcessing(false);
 }
 

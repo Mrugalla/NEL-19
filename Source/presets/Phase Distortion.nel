@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<state firstTimeUwU="0">
+  <params>
+    <msmacro0 value="0.8504353761672974" moddepth0="0.0" modbias0="0.5" moddepth1="0.0"
+              modbias1="0.5" moddepth2="0.0" modbias2="0.5" moddepth3="0.0"
+              modbias3="0.5"/>
+    <msmacro1 value="0.6713045835494995" moddepth0="0.0" modbias0="0.5" moddepth1="0.0"
+              modbias1="0.5" moddepth2="0.0" modbias2="0.5" moddepth3="0.0"
+              modbias3="0.5"/>
+    <msmacro2 value="1.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+              moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <msmacro3 value="1.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+              moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <perlin0ratehz value="0.4199999868869781" moddepth0="0.0" modbias0="0.5" moddepth1="0.0"
+                   modbias1="0.5" moddepth2="0.0" modbias2="0.5" moddepth3="0.0"
+                   modbias3="0.5"/>
+    <perlin0ratebeats value="4.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                      moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <perlin0octaves value="3.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                    moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <perlin0width value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                  moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <perlin0ratetype value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                     moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <perlin0phase value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                  moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <perlin0shape value="2.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                  moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <perlin0bias value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                 moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <audiorate0oct value="-0.2504310607910156" moddepth0="0.0" modbias0="0.5" moddepth1="0.0"
+                   modbias1="0.5" moddepth2="0.0" modbias2="0.5" moddepth3="0.0"
+                   modbias3="0.5"/>
+    <audiorate0semi value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                    moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <audiorate0fine value="0.0" moddepth0="-0.1286956369876862" modbias0="0.5" moddepth1="0.0"
+                    modbias1="0.5" moddepth2="0.0" modbias2="0.5" moddepth3="0.0"
+                    modbias3="0.5"/>
+    <audiorate0width value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.3269565403461456"
+                     modbias1="0.5" moddepth2="0.0" modbias2="0.5" moddepth3="0.0"
+                     modbias3="0.5"/>
+    <audiorate0retunespeed value="1.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                           moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <audiorate0attack value="1.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                      moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <audiorate0decay value="20.50382232666016" moddepth0="0.0" modbias0="0.5" moddepth1="0.0"
+                     modbias1="0.5" moddepth2="0.0" modbias2="0.5" moddepth3="0.0"
+                     modbias3="0.5"/>
+    <audiorate0sustain value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                       moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <audiorate0release value="34.50409698486328" moddepth0="0.0" modbias0="0.5" moddepth1="0.0"
+                       modbias1="0.5" moddepth2="0.0" modbias2="0.5" moddepth3="0.0"
+                       modbias3="0.5"/>
+    <envfol0attack value="80.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                   moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <envfol0release value="250.0000610351562" moddepth0="0.0" modbias0="0.5" moddepth1="0.0"
+                    modbias1="0.5" moddepth2="0.0" modbias2="0.5" moddepth3="0.0"
+                    modbias3="0.5"/>
+    <envfol0gain value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                 moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <envfol0width value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                  moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <envfol0sc value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+               moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <envfol0highpass value="20.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                     moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <macro0 value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+            moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <macro0smooth value="20.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                  moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <macro0scgain value="-120.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0"
+                  modbias1="0.5" moddepth2="0.0" modbias2="0.5" moddepth3="0.0"
+                  modbias3="0.5"/>
+    <pitchbend0smooth value="29.99999809265137" moddepth0="0.0" modbias0="0.5" moddepth1="0.0"
+                      modbias1="0.5" moddepth2="0.0" modbias2="0.5" moddepth3="0.0"
+                      modbias3="0.5"/>
+    <lfo0freesync value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                  moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <lfo0ratefree value="3.199999570846558" moddepth0="0.0" modbias0="0.5" moddepth1="0.0"
+                  modbias1="0.5" moddepth2="0.0" modbias2="0.5" moddepth3="0.0"
+                  modbias3="0.5"/>
+    <lfo0ratesync value="8.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                  moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <lfo0waveform value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                  moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <lfo0phase value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+               moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <lfo0width value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+               moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <perlin1ratehz value="0.4199999868869781" moddepth0="0.0" modbias0="0.5" moddepth1="0.0"
+                   modbias1="0.5" moddepth2="0.0" modbias2="0.5" moddepth3="0.0"
+                   modbias3="0.5"/>
+    <perlin1ratebeats value="4.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                      moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <perlin1octaves value="3.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                    moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <perlin1width value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                  moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <perlin1ratetype value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                     moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <perlin1phase value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                  moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <perlin1shape value="2.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                  moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <perlin1bias value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                 moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <audiorate1oct value="6.511348724365234" moddepth0="0.0" modbias0="0.5" moddepth1="0.0"
+                   modbias1="0.5" moddepth2="0.0" modbias2="0.5" moddepth3="0.0"
+                   modbias3="0.5"/>
+    <audiorate1semi value="7.012218475341797" moddepth0="0.0" modbias0="0.5" moddepth1="0.0"
+                    modbias1="0.5" moddepth2="0.0" modbias2="0.5" moddepth3="0.0"
+                    modbias3="0.5"/>
+    <audiorate1fine value="0.0" moddepth0="0.08347825706005096" modbias0="0.5" moddepth1="0.0"
+                    modbias1="0.5" moddepth2="0.0" modbias2="0.5" moddepth3="0.0"
+                    modbias3="0.5"/>
+    <audiorate1width value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="-0.3304348289966583"
+                     modbias1="0.5" moddepth2="0.0" modbias2="0.5" moddepth3="0.0"
+                     modbias3="0.5"/>
+    <audiorate1retunespeed value="1.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                           moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <audiorate1attack value="3.239985942840576" moddepth0="0.0" modbias0="0.5" moddepth1="0.0"
+                      modbias1="0.5" moddepth2="0.0" modbias2="0.5" moddepth3="0.0"
+                      modbias3="0.5"/>
+    <audiorate1decay value="40.98256301879883" moddepth0="0.0" modbias0="0.5" moddepth1="0.0"
+                     modbias1="0.5" moddepth2="0.0" modbias2="0.5" moddepth3="0.0"
+                     modbias3="0.5"/>
+    <audiorate1sustain value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                       moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <audiorate1release value="19.99999809265137" moddepth0="0.0" modbias0="0.5" moddepth1="0.0"
+                       modbias1="0.5" moddepth2="0.0" modbias2="0.5" moddepth3="0.0"
+                       modbias3="0.5"/>
+    <envfol1attack value="80.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                   moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <envfol1release value="250.0000610351562" moddepth0="0.0" modbias0="0.5" moddepth1="0.0"
+                    modbias1="0.5" moddepth2="0.0" modbias2="0.5" moddepth3="0.0"
+                    modbias3="0.5"/>
+    <envfol1gain value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                 moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <envfol1width value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                  moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <envfol1sc value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+               moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <envfol1highpass value="20.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                     moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <macro1 value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+            moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <macro1smooth value="20.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                  moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <macro1scgain value="-120.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0"
+                  modbias1="0.5" moddepth2="0.0" modbias2="0.5" moddepth3="0.0"
+                  modbias3="0.5"/>
+    <pitchbend1smooth value="29.99999809265137" moddepth0="0.0" modbias0="0.5" moddepth1="0.0"
+                      modbias1="0.5" moddepth2="0.0" modbias2="0.5" moddepth3="0.0"
+                      modbias3="0.5"/>
+    <lfo1freesync value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                  moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <lfo1ratefree value="3.199999570846558" moddepth0="0.0" modbias0="0.5" moddepth1="0.0"
+                  modbias1="0.5" moddepth2="0.0" modbias2="0.5" moddepth3="0.0"
+                  modbias3="0.5"/>
+    <lfo1ratesync value="8.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                  moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <lfo1waveform value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                  moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <lfo1phase value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+               moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <lfo1width value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+               moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <depth value="1.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+           moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <modsmix value="0.0" moddepth0="0.4226086735725403" modbias0="0.5" moddepth1="0.0"
+             modbias1="0.5" moddepth2="0.0" modbias2="0.5" moddepth3="0.0"
+             modbias3="0.5"/>
+    <drywetmix value="1.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+               moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <gainwet value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+             moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <stereoconfig value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                  moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <feedback value="0.0" moddepth0="0.0" modbias0="0.5" moddepth1="1.0" modbias1="0.5765223503112793"
+              moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <damp value="8000.0" moddepth0="0.0" modbias0="0.5" moddepth1="-0.5356522798538208"
+          modbias1="0.3086965978145599" moddepth2="0.0" modbias2="0.5"
+          moddepth3="0.0" modbias3="0.5"/>
+    <hq value="1.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+        moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <lookahead value="1.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+               moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+    <buffersize value="4.0" moddepth0="0.0" modbias0="0.5" moddepth1="0.0" modbias1="0.5"
+                moddepth2="0.0" modbias2="0.5" moddepth3="0.0" modbias3="0.5"/>
+  </params>
+  <ModType ModType0="AudioRate" ModType1="AudioRate"/>
+  <Wavetable0 Wavetable0="Weierstrass"/>
+  <PerlinSeed0 PerlinSeed0="-1161682256"/>
+  <Wavetable1 Wavetable1="Weierstrass"/>
+  <PerlinSeed1 PerlinSeed1="562321280"/>
+</state>

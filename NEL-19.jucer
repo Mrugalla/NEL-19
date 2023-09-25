@@ -9,26 +9,22 @@
               cppLanguageStandard="20">
   <MAINGROUP id="V2oOlh" name="NEL">
     <GROUP id="{FF8BE835-9B90-31CB-45F4-D4B15FDEFD04}" name="Source">
+      <GROUP id="{AD2612AD-4146-A5AF-D547-014EA9244D4E}" name="presets">
+        <FILE id="eXWtdA" name="Drums.nel" compile="0" resource="1" file="Source/presets/Drums.nel"/>
+        <FILE id="aphkSI" name="Flanger.nel" compile="0" resource="1" file="Source/presets/Flanger.nel"/>
+        <FILE id="mzNiOF" name="Lofi.nel" compile="0" resource="1" file="Source/presets/Lofi.nel"/>
+        <FILE id="RGuyZ4" name="Lunatic.nel" compile="0" resource="1" file="Source/presets/Lunatic.nel"/>
+        <FILE id="faF09w" name="Phase Distortion.nel" compile="0" resource="1"
+              file="Source/presets/Phase Distortion.nel"/>
+        <FILE id="MMNeU9" name="Presets.h" compile="0" resource="0" file="Source/presets/Presets.h"/>
+        <FILE id="bqtXnN" name="Vibrato.nel" compile="0" resource="1" file="Source/presets/Vibrato.nel"/>
+      </GROUP>
       <GROUP id="{8EC0EF39-024B-4AE6-4857-5AD651D74232}" name="modsys">
         <FILE id="nECyrZ" name="ModSys.h" compile="0" resource="0" file="Source/modsys/ModSys.h"/>
         <FILE id="IhYJlR" name="ModSysGUI.cpp" compile="1" resource="0" file="Source/modsys/ModSysGUI.cpp"/>
         <FILE id="C8d7qo" name="ModSysGUI.h" compile="0" resource="0" file="Source/modsys/ModSysGUI.h"/>
       </GROUP>
       <GROUP id="{37A90D57-856D-DDA5-A367-4EC832EDC7CF}" name="xml">
-        <GROUP id="{E731FF33-6A25-2972-1315-42CDC87CE522}" name="presets">
-          <FILE id="UgRv1h" name="AudioRate Arp (midi).nel" compile="0" resource="1"
-                file="Source/xml/presets/AudioRate Arp (midi).nel"/>
-          <FILE id="oZQjfg" name="Broken Tape.nel" compile="0" resource="1" file="Source/xml/presets/Broken Tape.nel"/>
-          <FILE id="XUW7Jp" name="Dream Arp EnvFol.nel" compile="0" resource="1"
-                file="Source/xml/presets/Dream Arp EnvFol.nel"/>
-          <FILE id="ql7Hov" name="Flanger.nel" compile="0" resource="1" file="Source/xml/presets/Flanger.nel"/>
-          <FILE id="cpAPfJ" name="Init.nel" compile="0" resource="1" file="Source/xml/presets/Init.nel"/>
-          <FILE id="NsQUlc" name="Psychosis.nel" compile="0" resource="1" file="Source/xml/presets/Psychosis.nel"/>
-          <FILE id="rokh6X" name="Resample.nel" compile="0" resource="1" file="Source/xml/presets/Resample.nel"/>
-          <FILE id="UHRvg8" name="Shoegaze.nel" compile="0" resource="1" file="Source/xml/presets/Shoegaze.nel"/>
-          <FILE id="Ufdy47" name="Sines.nel" compile="0" resource="1" file="Source/xml/presets/Sines.nel"/>
-          <FILE id="gn5TrZ" name="Thicc.nel" compile="0" resource="1" file="Source/xml/presets/Thicc.nel"/>
-        </GROUP>
         <FILE id="x2tTLB" name="menu.xml" compile="0" resource="1" file="Source/xml/menu.xml"/>
       </GROUP>
       <GROUP id="{FE66FC35-0867-A645-7FF8-6E8DD7C732A0}" name="oversampling">
