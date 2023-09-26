@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <JUCERPROJECT id="z7Rdwx" name="NEL" projectType="audioplug" useAppConfig="0"
-              addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginFormats="buildStandalone,buildVST3"
+              addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginFormats="buildAU,buildStandalone,buildVST3"
               pluginName="NEL" pluginDesc="Creative Vibrato For Travellers"
               pluginManufacturer="Florian Mrugalla" pluginVST3Category="Modulation"
               pluginRTASCategory="32" pluginAAXCategory="32" pluginCharacteristicsValue="pluginWantsMidiIn"
