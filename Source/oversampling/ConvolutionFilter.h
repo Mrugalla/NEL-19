@@ -173,7 +173,7 @@ namespace oversampling
 	struct ConvolutionFilter
 	{
 		using Convolution = Convolution<Float>;
-		using IR = Convolution::IR;
+        using IR = typename Convolution::IR;
 		
 		ConvolutionFilter(Float _Fs = static_cast<Float>(1),
 			Float _cutoff = static_cast<Float>(.25), Float _bandwidth = static_cast<Float>(.25),
