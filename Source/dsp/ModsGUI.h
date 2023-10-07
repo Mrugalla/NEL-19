@@ -871,11 +871,12 @@ namespace gui
         class Selector :
             public Comp
         {
-            inline std::function<void()> makeOnClick(ModComp& modComp, vibrato::ModType modType)
+            inline std::function<void()> makeOnClick(Selector& selector, ModComp& modComp, vibrato::ModType modType)
             {
-                return [&comp = modComp, type = modType]()
+                return [&sel = selector, &comp = modComp, type = modType]()
                 {
-                    comp.setMod(type, true);
+                    comp.setMod(type);
+                    sel.setVisible(false);
                 };
             }
         
@@ -901,12 +902,12 @@ namespace gui
                 pitchbend.onPaint = makeTextButtonOnPaint("Pitch\nBend");
                 lfo.onPaint = makeTextButtonOnPaint("LFO");
 
-                perlin.onClick = makeOnClick(modComp, vibrato::ModType::Perlin);
-                audioRate.onClick = makeOnClick(modComp, vibrato::ModType::AudioRate);
-                envFol.onClick = makeOnClick(modComp, vibrato::ModType::EnvFol);
-                macro.onClick = makeOnClick(modComp, vibrato::ModType::Macro);
-                pitchbend.onClick = makeOnClick(modComp, vibrato::ModType::Pitchwheel);
-                lfo.onClick = makeOnClick(modComp, vibrato::ModType::LFO);
+                perlin.onClick = makeOnClick(*this, modComp, vibrato::ModType::Perlin);
+                audioRate.onClick = makeOnClick(*this, modComp, vibrato::ModType::AudioRate);
+                envFol.onClick = makeOnClick(*this, modComp, vibrato::ModType::EnvFol);
+                macro.onClick = makeOnClick(*this, modComp, vibrato::ModType::Macro);
+                pitchbend.onClick = makeOnClick(*this, modComp, vibrato::ModType::Pitchwheel);
+                lfo.onClick = makeOnClick(*this, modComp, vibrato::ModType::LFO);
 
                 addAndMakeVisible(perlin);
                 addAndMakeVisible(audioRate);
@@ -993,23 +994,19 @@ namespace gui
 
             randomizer(u),
             selectorButton(u, "Select another modulator for this slot."),
-
-            selector(nullptr)
+            selector(u, *this)
         {
             label.font = Shared::shared.font;
             label.just = Just::left;
             selectorButton.onPaint = makeTextButtonOnPaint("<<");
             selectorButton.onClick = [this]()
             {
-                if (selector == nullptr)
+                if (!selector.isVisible())
                 {
-                    selector = std::make_unique<Selector>(utils, *this);
-                    layout.place(*selector, 0, 1, 3, 1, 0.f, false);
-                    addAndMakeVisible(*selector);
+                    selector.setVisible(true);
+                    layout.place(selector, 0, 1, 3, 1, 0.f, false);
                     notify(NotificationType::KillPopUp);
                 }
-                else
-                    selector.reset(nullptr);
             };
 
             addAndMakeVisible(label);
@@ -1026,6 +1023,7 @@ namespace gui
 
             addAndMakeVisible(randomizer);
             addAndMakeVisible(selectorButton);
+            addChildComponent(selector);
                 
             setBufferedToImage(false);
         }
@@ -1035,14 +1033,10 @@ namespace gui
             setMod(getModType());
         }
             
-        void setMod(ModType t, bool resetSelector = false)
+        void setMod(ModType t)
         {
             if (modType == t)
-            {
-                if(resetSelector)
-                    selector.reset(nullptr);
                 return;
-            }
                 
             modType = t;
             perlin.setVisible(false);
@@ -1088,7 +1082,7 @@ namespace gui
 
             label.repaint();
             inputLabel.repaint();
-            selector.reset(nullptr);
+            selector.setVisible(false);
 
             onModChange(t);
         }
@@ -1130,6 +1124,7 @@ namespace gui
             layout.place(inputLabel, 0, 0, 1, 1, thicc4, false);
             layout.place(randomizer, 2, 0, 1, 1, 0.f, true);
             layout.place(selectorButton, 3, 0, 1, 1, 0.f, true);
+            layout.place(selector, 0, 1, 3, 1, 0.f, false);
 
             {
                 const auto bounds = layout(0, 1, 4, 1, 0.f, false).toNearestInt();
@@ -1144,8 +1139,7 @@ namespace gui
 
         void updateTimer() override
         {
-			auto _modType = getModType();
-            setMod(_modType);
+			setMod(getModType());
 
             switch (modType)
             {
@@ -1196,7 +1190,7 @@ namespace gui
         ParamtrRandomizer randomizer;
         Button selectorButton;
 
-        std::unique_ptr<Selector> selector;
+        Selector selector;
     };
 }
 

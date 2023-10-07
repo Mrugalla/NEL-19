@@ -2740,7 +2740,6 @@ namespace gui
     public:    
         EnterValueComp(Utils& u) :
             Comp(u, makeNotify(*this), "Enter a new value for this parameter."),
-            timeConstrainer(),
             txt(""),
             param(nullptr),
             initValue(0.f),
@@ -2798,9 +2797,6 @@ namespace gui
             
         bool keyPressed(const juce::KeyPress& key) override
         {
-            if (!timeConstrainer.isReady())
-                return true;
-
             if (key == key.escapeKey)
             {
                 disable();
@@ -2908,7 +2904,6 @@ namespace gui
         }
         
     protected:
-        TimeConstrainer timeConstrainer;
         String txt;
         Param* param;
         float initValue;
