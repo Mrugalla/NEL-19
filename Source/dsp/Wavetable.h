@@ -143,7 +143,7 @@ namespace dsp
 	{
 		static constexpr Float MaxTablesF = static_cast<Float>(NumTables - 1);
 		using Table = Wavetable<Float, WTSize>;
-		using Func = Table::Func;
+        using Func = typename Table::Func;
 		using Tables = std::array<Table, NumTables + 1>;
 
 		Wavetable2D() :
@@ -211,7 +211,7 @@ namespace dsp
 		static constexpr Float NumTablesInv = static_cast<Float>(1) / static_cast<Float>(NumTables);
 
 		using Table = Wavetable2D<Float, WTSize, NumTables>;
-		using Func = Table::Func;
+        using Func = typename Table::Func;
 		using Funcs = std::array<Func, NumTables>;
 
 		void makeTablesWeierstrass()
