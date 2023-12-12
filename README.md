@@ -1,4 +1,4 @@
-# NEL - VST3 - 64bit - Windows only
+# NEL - VST3 - 64bit - Windows/Mac
 An open-source creative vibrato.
 
 ![2023_06_12_NEL](https://github.com/Mrugalla/NEL-19/assets/54960398/a2f9e52b-6c93-4413-b9db-1be1e5f34eb1)
