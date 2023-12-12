@@ -20,6 +20,10 @@ If you're a musician / producer / beat maker / mixing engineer (or whatever)
 just download NEL from the release section of this page.
 (It's to the right somewhere and says DOWNLOAD)
 
+My old presets don't work anymore :<
+
+That's not a question. Anyway, sorry about that. I changed a lot about the plugin in the meantime and some of things I did in the beginning were not written very well, so I couldn't make it backwards compatible. Now we should be safe though! Make new presets, please :>
+
 ---
 
 Why does the plugin not show up in my DAW?
