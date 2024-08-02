@@ -1,4 +1,4 @@
-# NEL - VST3 - 64bit - Windows only
+# NEL - VST3 - 64bit - Win/Mac/Linux
 An open-source creative vibrato.
 
 ![2023_06_12_NEL](https://github.com/Mrugalla/NEL-19/assets/54960398/a2f9e52b-6c93-4413-b9db-1be1e5f34eb1)
@@ -19,6 +19,10 @@ What do I need to download from all these files?
 If you're a musician / producer / beat maker / mixing engineer (or whatever)
 just download NEL from the release section of this page.
 (It's to the right somewhere and says DOWNLOAD)
+
+My old presets don't work anymore :<
+
+That's not a question. Anyway, sorry about that. I changed a lot about the plugin in the meantime and some of things I did in the beginning were not written very well, so I couldn't make it backwards compatible. Now we should be safe though! Make new presets, please :>
 
 ---
 
