@@ -860,6 +860,17 @@ namespace gui
                     wavetableBrowser.setVisible(false);
                 }
             );
+            wavetableBrowser.addEntry
+            (
+                "Power Sine",
+                "It's a funny sine wave",
+                [this]()
+                {
+                    tables.makeTablesPowerSine();
+                    tableView.repaint();
+                    wavetableBrowser.setVisible(false);
+                }
+            );
         }
     };
 

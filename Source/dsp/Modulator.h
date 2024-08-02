@@ -845,6 +845,8 @@ namespace vibrato
 						tables.makeTablesTriangles();
 					else if (tableType == toString(dsp::TableType::Sinc))
 						tables.makeTablesSinc();
+					else if (tableType == toString(dsp::TableType::PowerSine))
+						tables.makeTablesPowerSine();
 				}
 			}
 			{

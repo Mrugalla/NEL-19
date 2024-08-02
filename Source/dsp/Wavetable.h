@@ -6,6 +6,7 @@ namespace dsp
 {
 	using String = juce::String;
 	static constexpr double Pi = 3.1415926535897932384626433832795;
+	static constexpr double Tau = 2. * Pi;
 
 	template<typename Float, size_t Size>
 	struct Wavetable
@@ -68,6 +69,72 @@ namespace dsp
 				return A + wt * (B - A);
 
 			}, false, true);
+		}
+
+		void makePowerSine(Float wt)
+		{
+			const auto n = static_cast<Float>(.5);
+
+			auto m = [n](Float x)
+			{
+				const auto sgn = x < 0 ? -1.f : 1.f;
+				return sgn * std::pow(std::abs(x), n);
+			};
+
+			const auto tmod = [](Float t)
+			{
+				const auto zero = static_cast<Float>(0);
+				const auto one = static_cast<Float>(1);
+				auto md = std::fmod(t, one);
+				if(t < zero)
+					++md;
+				return md;
+			};
+
+			const auto lpd = [tmod](Float t)
+			{
+				return tmod(t);
+			};
+
+			const auto mpd1 = [](Float t, Float d, Float tmodt)
+			{
+				const auto p5 = static_cast<Float>(.5);
+				const auto p5md = p5 - d;
+				return p5md * tmodt / d;
+			};
+
+			const auto mpd2 = [](Float t, Float d, Float tmodt)
+			{
+				const auto p5 = static_cast<Float>(.5);
+				const auto one = static_cast<Float>(1);
+				const auto p5md = p5 - d;
+				return p5md * (one - tmodt) / (one - d);
+			};
+
+			const auto mpd = [wt, tmod, mpd1, mpd2](Float t)
+			{
+				const auto d = wt;
+				const auto tmodt = tmod(t);
+				if (tmodt < d)
+					return mpd1(t, d, tmodt);
+				else
+					return mpd2(t, d, tmodt);
+			};
+
+			const auto fpd = [mpd, lpd](Float t)
+			{
+				return mpd(t) + lpd(t);
+			};
+
+			const auto fsinepd = [fpd](Float t)
+			{
+				return std::sin(static_cast<Float>(Tau) * fpd(t * static_cast<Float>(.5)));
+			};
+
+			fill([m, fsinepd](Float x)
+			{
+				return m(fsinepd(x));
+			}, false, false);
 		}
 
 		Wavetable() :
@@ -243,6 +310,14 @@ namespace dsp
 				tables[n].makeTableSinc(wt);
 		}
 
+		void makeTablesPowerSine()
+		{
+			name = "Power Sine";
+			auto wt = NumTablesInv * static_cast<Float>(.5);
+			for (auto n = 0; n < NumTables; ++n, wt += NumTablesInv)
+				tables[n].makePowerSine(wt);
+		}
+
 		Wavetable3D() :
 			tables(),
 			name("empty table")
@@ -279,7 +354,7 @@ namespace dsp
 		String name;
 	};
 
-	enum TableType { Weierstrass, Tri, Sinc, NumTypes };
+	enum TableType { Weierstrass, Tri, Sinc, PowerSine, NumTypes };
 
 	inline String toString(TableType t)
 	{
@@ -288,6 +363,7 @@ namespace dsp
 		case TableType::Weierstrass: return "Weierstrass";
 		case TableType::Tri: return "Triangle";
 		case TableType::Sinc: return "Sinc";
+		case TableType::PowerSine: return "Power Sine";
 		default: return "";
 		}
 	}

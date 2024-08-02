@@ -176,6 +176,9 @@ private:
 
 todo:
 
+lfo rate crossfades erzeugen diskontinuität ein paar sekunden nach modulation
+    leicht zu hören mit testton auf langsamer rate
+
 better oversampler
     performance
     sound
