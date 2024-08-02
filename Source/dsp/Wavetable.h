@@ -202,6 +202,31 @@ namespace dsp
 			}, false, false);
 		}
 
+		void makeSqueeze(Float wt)
+		{
+			const auto one = static_cast<Float>(1);
+			const auto two = static_cast<Float>(2);
+			const auto zero = static_cast<Float>(0);
+			const auto pi = static_cast<Float>(Pi);
+
+			const auto h = [one, two](Float a, Float b)
+			{
+				const auto ab = a * b;
+				return ab / (one - a - b + two * ab);
+			};
+
+			const auto f = [zero, wt, h](Float x)
+			{
+				const auto k = wt;
+				return x < zero ? -h(-x, k) : h(x, k);
+			};
+
+			fill([wt, f, pi](Float x)
+			{
+				return std::sin(f(x) * pi);
+			}, false, false);
+		}
+
 		Wavetable() :
 			table()
 		{}
@@ -383,6 +408,14 @@ namespace dsp
 				tables[n].makePowerSine(wt);
 		}
 
+		void makeSqueeze()
+		{
+			name = "Squeeze";
+			auto wt = NumTablesInv * static_cast<Float>(.5);
+			for (auto n = 0; n < NumTables; ++n, wt += NumTablesInv)
+				tables[n].makeSqueeze(wt);
+		}
+
 		Wavetable3D() :
 			tables(),
 			name("empty table")
@@ -419,7 +452,7 @@ namespace dsp
 		String name;
 	};
 
-	enum TableType { Weierstrass, Tri, Sinc, PowerSine, NumTypes };
+	enum TableType { Weierstrass, Tri, Sinc, PowerSine, Squeeze, NumTypes };
 
 	inline String toString(TableType t)
 	{
@@ -429,6 +462,7 @@ namespace dsp
 		case TableType::Tri: return "Triangle";
 		case TableType::Sinc: return "Sinc";
 		case TableType::PowerSine: return "Power Sine";
+		case TableType::Squeeze: return "Squeeze";
 		default: return "";
 		}
 	}

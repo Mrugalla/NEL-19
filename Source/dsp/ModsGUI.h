@@ -871,6 +871,17 @@ namespace gui
                     wavetableBrowser.setVisible(false);
                 }
             );
+			wavetableBrowser.addEntry
+			(
+				"Squeeze",
+				"lol",
+				[this]()
+				{
+					tables.makeSqueeze();
+					tableView.repaint();
+					wavetableBrowser.setVisible(false);
+				}
+			);
         }
     };
 
