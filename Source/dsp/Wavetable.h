@@ -73,6 +73,8 @@ namespace dsp
 
 		void makePowerSine(Float wt)
 		{
+			// POWER SINE
+			/*
 			const auto n = static_cast<Float>(.5);
 
 			auto m = [n](Float x)
@@ -134,6 +136,69 @@ namespace dsp
 			fill([m, fsinepd](Float x)
 			{
 				return m(fsinepd(x));
+			}, false, false);
+			*/
+			
+			//UNIT CIRCLE
+			/*
+			const auto f = [](Float x)
+			{
+				const auto one = static_cast<Float>(1);
+				return std::sqrt(std::abs(one - x * x));
+			};
+
+			fill([wt, f](Float x)
+			{
+				const auto one = static_cast<Float>(1);
+				const auto two = static_cast<Float>(2);
+				const auto d = wt;
+				const auto g = two * d - one;
+				const auto d3 = one / d;
+				const auto onemd = one - d;
+				const auto d4 = one / onemd;
+				const auto j = f((x + onemd) * d3);
+				const auto k = -f((x - d) * d4);
+				const auto y = x <= g ? j : k;
+				return y;
+			}, false, false);
+			*/
+			
+			//SQRSIN
+			/*
+			fill([wt](Float x)
+			{
+				const auto one = static_cast<Float>(1);
+				const auto two = static_cast<Float>(2);
+				const auto pi = static_cast<Float>(Pi);
+				const auto d = wt;
+				const auto g = two * d - one;
+				const auto d1 = one / (two * d);
+				const auto d2 = one / (two * (one - d));
+				const auto s1 = std::sin((x + one) * pi * d1);
+				const auto s2 = std::sin((x - one) * pi * d2);
+				//const auto y = x <= g ? s1 : s2;
+				const auto y = x <= g ? std::sqrt(s1) : -std::sqrt(-s2);
+				return y;
+			}, false, false);
+			*/
+			
+			//MIXEDSIN
+			fill([wt](Float x)
+			{
+				const auto one = static_cast<Float>(1);
+				const auto two = static_cast<Float>(2);
+				const auto pi = static_cast<Float>(Pi);
+				const auto d = wt;
+				const auto g = two * d - one;
+				const auto d1 = one / (two * d);
+				const auto d2 = one / (two * (one - d));
+				const auto s1 = std::sin((x + one) * pi * d1);
+				const auto s2 = std::sin((x - one) * pi * d2);
+				const auto y0 = x <= g ? s1 : s2;
+				const auto y1 = x <= g ? std::sqrt(s1) : -std::sqrt(-s2);
+				const auto frac = std::abs(two * d - 1);
+				const auto y = y0 + frac * (y1 - y0);
+				return y;
 			}, false, false);
 		}
 
