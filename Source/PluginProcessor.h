@@ -166,10 +166,7 @@ private:
     PRM depth, modsMix;
 
     void processBlockVibrato(AudioBufferD&, const juce::MidiBuffer&, bool) noexcept;
-    
     void timerCallback() override;
-
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Nel19AudioProcessor)
 };
 
 /*

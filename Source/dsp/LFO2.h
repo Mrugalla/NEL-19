@@ -293,8 +293,10 @@ namespace dsp
             }
             else
                 nInc = _rateHz * sampleRateInv;
-
-            if (isLooping(timeInSamples) || (changesSpeed(nBpm, nInc) && !mixer.stillFading()))
+            
+            if (mixer.stillFading())
+                return;
+            if (isLooping(timeInSamples) || changesSpeed(nBpm, nInc))
                 initXFade(nInc, nBpm, nBps, nQuarterNoteLength, _rateSync, _rateHz);
         }
 
