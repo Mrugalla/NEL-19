@@ -172,8 +172,8 @@ namespace oversampling
 	template<typename Float>
 	struct ConvolutionFilter
 	{
-		using Convolution = Convolution<Float>;
-        using IR = typename Convolution::IR;
+		using Convolver = Convolution<Float>;
+        using IR = typename Convolver::IR;
 		
 		ConvolutionFilter(Float _Fs = static_cast<Float>(1),
 			Float _cutoff = static_cast<Float>(.25), Float _bandwidth = static_cast<Float>(.25),
@@ -212,6 +212,6 @@ namespace oversampling
 		
 	protected:
 		IR ir;
-		std::array<Convolution, 4> filters;
+		std::array<Convolver, 4> filters;
 	};
 }
