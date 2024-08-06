@@ -862,11 +862,11 @@ namespace gui
             );
             wavetableBrowser.addEntry
             (
-                "Power Sine",
-                "It's a funny sine wave",
+                "PWM Sine",
+                "It's a phase modulatable sine wave.",
                 [this]()
                 {
-                    tables.makeTablesPowerSine();
+                    tables.makeTablesPWMSine();
                     tableView.repaint();
                     wavetableBrowser.setVisible(false);
                 }
@@ -874,7 +874,7 @@ namespace gui
 			wavetableBrowser.addEntry
 			(
 				"Squeeze",
-				"lol",
+				"Squeezes a sine wave in unheard of (until now) ways. wow!",
 				[this]()
 				{
 					tables.makeSqueeze();

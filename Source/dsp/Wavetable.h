@@ -71,7 +71,7 @@ namespace dsp
 			}, false, true);
 		}
 
-		void makePowerSine(Float wt)
+		void makePWMSine(Float wt)
 		{
 			// POWER SINE
 			/*
@@ -400,12 +400,12 @@ namespace dsp
 				tables[n].makeTableSinc(wt);
 		}
 
-		void makeTablesPowerSine()
+		void makeTablesPWMSine()
 		{
-			name = "Power Sine";
+			name = "PWM Sine";
 			auto wt = NumTablesInv * static_cast<Float>(.5);
 			for (auto n = 0; n < NumTables; ++n, wt += NumTablesInv)
-				tables[n].makePowerSine(wt);
+				tables[n].makePWMSine(wt);
 		}
 
 		void makeSqueeze()
@@ -452,7 +452,7 @@ namespace dsp
 		String name;
 	};
 
-	enum TableType { Weierstrass, Tri, Sinc, PowerSine, Squeeze, NumTypes };
+	enum TableType { Weierstrass, Tri, Sinc, PWMSine, Squeeze, NumTypes };
 
 	inline String toString(TableType t)
 	{
@@ -461,7 +461,7 @@ namespace dsp
 		case TableType::Weierstrass: return "Weierstrass";
 		case TableType::Tri: return "Triangle";
 		case TableType::Sinc: return "Sinc";
-		case TableType::PowerSine: return "Power Sine";
+		case TableType::PWMSine: return "PWM Sine";
 		case TableType::Squeeze: return "Squeeze";
 		default: return "";
 		}
