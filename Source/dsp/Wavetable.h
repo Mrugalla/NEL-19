@@ -30,7 +30,7 @@ namespace dsp
 			{
 				const auto xpi = x * static_cast<Float>(Pi);
 				const auto a = wt * static_cast<Float>(.5);
-				const auto b = static_cast<Float>(1) + static_cast<Float>(2) * sqrt(wt);
+				const auto b = static_cast<Float>(1) + static_cast<Float>(2) * std::sqrt(wt);
 
 				return weierstrass(a, b, xpi, 32);
 			}, false, true);
@@ -40,12 +40,14 @@ namespace dsp
 		{
 			fill([wt](Float x)
 			{
-				auto wt2 = wt * 2.f - 1.f;
+				static constexpr auto one = static_cast<Float>(1);
+				static constexpr auto two = static_cast<Float>(2);
+				static constexpr auto eight = static_cast<Float>(8);
+				static constexpr auto pi = static_cast<Float>(Pi);
 
-				auto pi = static_cast<Float>(Pi);
-
-				auto A = static_cast<Float>(2) * std::asin(std::sin(x * pi + pi * static_cast<Float>(.5))) / pi;
-				auto B = static_cast<Float>(1) - static_cast<Float>(8) * std::pow(x * static_cast<Float>(.5), static_cast<Float>(2));
+				const auto wt2 = wt * two - one;
+				const auto A = two * std::asin(std::sin(x * pi + pi / two)) / pi;
+				const auto B = one - eight * std::pow(x / two, two);
 
 				return A + wt2 * (B - A);
 
@@ -183,6 +185,7 @@ namespace dsp
 			*/
 			
 			//MIXEDSIN
+
 			fill([wt](Float x)
 			{
 				const auto one = static_cast<Float>(1);
@@ -200,6 +203,7 @@ namespace dsp
 				const auto y = y0 + frac * (y1 - y0);
 				return y;
 			}, false, false);
+
 		}
 
 		void makeSqueeze(Float wt)
@@ -242,6 +246,7 @@ namespace dsp
 				table[s] = func(x);
 			}
 
+			// POST PROCESSING
 			if (removeDC)
 			{
 				auto sum = static_cast<Float>(0);
@@ -389,7 +394,6 @@ namespace dsp
 			{
 				tables[n].makeTableTriangle(wt);
 			}
-				
 		}
 
 		void makeTablesSinc()
