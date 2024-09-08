@@ -38,6 +38,47 @@ namespace benchmark
 		Duration timeStart;
 	};
 
+	struct MeasureX
+	{
+		MeasureX() :
+			duration(),
+			timeStart()
+		{
+		}
+
+		void start()
+		{
+			timeStart = Clock::now().time_since_epoch();
+		}
+
+		const Duration stop()
+		{
+			const auto now = Clock::now().time_since_epoch();
+			duration = now - timeStart;
+			return duration.load();
+		}
+
+		void stopAndRead(String&& id)
+		{
+			const auto time = stop();
+
+			const auto desktop = SpecialLoc::userDesktopDirectory;
+			const auto folder = File::getSpecialLocation(desktop).getChildFile("Benchmark");
+			const auto file = folder.getChildFile(String("log_") + id + ".txt");
+			if (file.existsAsFile())
+				file.deleteFile();
+			file.create();
+
+			// convert time to microsecs
+			auto timeMs = std::chrono::duration_cast<Micro>(time).count();
+
+			file.appendText(String(timeMs));
+		}
+
+		AtomicDuration duration;
+		Duration timeStart;
+	};
+
 	inline void processBlock(AudioProcessor& p, int numIterations = 1024, int numChannels = 2, int blockSize = 512)
 	{
 		AtomicDuration duration;

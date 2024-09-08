@@ -11,13 +11,13 @@ namespace presets
         const auto directoryPresets = directorySettings.getChildFile("Presets");
         if (!directoryPresets.exists())
             directoryPresets.createDirectory();
-        const auto ext = ".nel";
+        auto ext = ".nel";
         
-        const auto load = [&](juce::String&& name, const void* data, int size)
+        const auto load = [&](juce::String&& name, const juce::File& direc, const void* data, int size)
         {
-            const auto file = directoryPresets.getChildFile(name + ext);
+            const auto file = direc.getChildFile(name + ext);
             if (file.existsAsFile())
-                file.deleteFile();
+                return;
             const auto result = file.create();
             if (result.failed())
                 return;
@@ -25,11 +25,26 @@ namespace presets
             file.appendText(str);
         };
 
-        load("Drums", BinaryData::Drums_nel, BinaryData::Drums_nelSize);
-        load("Flanger", BinaryData::Flanger_nel, BinaryData::Flanger_nelSize);
-        load("Lofi", BinaryData::Lofi_nel, BinaryData::Lofi_nelSize);
-        load("Lunatic", BinaryData::Lunatic_nel, BinaryData::Lunatic_nelSize);
-        load("Phase Distortion", BinaryData::Phase_Distortion_nel, BinaryData::Phase_Distortion_nelSize);
-        load("Vibrato", BinaryData::Vibrato_nel, BinaryData::Vibrato_nelSize);
+        load("Drums", directoryPresets, BinaryData::Drums_nel, BinaryData::Drums_nelSize);
+        load("Flanger", directoryPresets, BinaryData::Flanger_nel, BinaryData::Flanger_nelSize);
+        load("Lofi", directoryPresets, BinaryData::Lofi_nel, BinaryData::Lofi_nelSize);
+        load("Lunatic", directoryPresets, BinaryData::Lunatic_nel, BinaryData::Lunatic_nelSize);
+        load("Phase Distortion", directoryPresets, BinaryData::Phase_Distortion_nel, BinaryData::Phase_Distortion_nelSize);
+        load("Vibrato", directoryPresets, BinaryData::Vibrato_nel, BinaryData::Vibrato_nelSize);
+
+		const auto directoryColours = directorySettings.getChildFile("Colours");
+		if (!directoryColours.exists())
+			directoryColours.createDirectory();
+		ext = ".col";
+
+		load("Blue", directoryColours, BinaryData::Blue_col, BinaryData::Blue_colSize);
+        load("Creamy", directoryColours, BinaryData::Creamy_col, BinaryData::Creamy_colSize);
+		load("Dark", directoryColours, BinaryData::Dark_col, BinaryData::Dark_colSize);
+		load("Frosty", directoryColours, BinaryData::Frosty_col, BinaryData::Frosty_colSize);
+        load("GRiP", directoryColours, BinaryData::GRiP_col, BinaryData::GRiP_colSize);
+        load("Lime", directoryColours, BinaryData::Lime_col, BinaryData::Lime_colSize);
+		load("Milka", directoryColours, BinaryData::Milka_col, BinaryData::Milka_colSize);
+		load("Nowgad", directoryColours, BinaryData::Nowgad_col, BinaryData::Nowgad_colSize);
+        load("Techy", directoryColours, BinaryData::Techy_col, BinaryData::Techy_colSize);
 	}
 }

@@ -847,6 +847,8 @@ namespace vibrato
 						tables.makeTablesSinc();
 					else if (tableType == toString(dsp::TableType::PWMSine))
 						tables.makeTablesPWMSine();
+					else if (tableType == toString(dsp::TableType::Squeeze))
+						tables.makeSqueeze();
 				}
 			}
 			{

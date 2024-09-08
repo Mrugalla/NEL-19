@@ -114,15 +114,15 @@ namespace gui
     {
         switch (i)
         {
-        case ColourID::Txt: return Colour(0xffcc5f2d);
-        case ColourID::Bg: return Colour(0xffc5c9ca);
-        case ColourID::Inactive: return Colour(0xff82919b);
-        case ColourID::Abort: return Colour(0xffd21846);
-        case ColourID::Mod: return Colour(0xff1a6a62);
+        case ColourID::Txt: return Colour(0xffffffff);
+        case ColourID::Bg: return Colour(0xff342c3e);
+        case ColourID::Inactive: return Colour(0xff707070);
+        case ColourID::Abort: return Colour(0xffde5050);
+        case ColourID::Mod: return Colour(0xffff5c00);
         case ColourID::Bias: return Colour(0xff20a1ff);
-        case ColourID::Interact: return Colour(0xff68b39d);
-        case ColourID::Darken: return Colour(0xea000000);
-        case ColourID::Hover: return Colour(0xff818181);
+        case ColourID::Interact: return Colour(0xff7bc9b6);
+        case ColourID::Darken: return Colour(0xea6b6262);
+        case ColourID::Hover: return Colour(0x53ffffff);
         default: return Colour(0x00000000);
         }
     }
@@ -219,19 +219,19 @@ namespace gui
         void init(juce::PropertiesFile* p)
         {
             props = p;
-            if (props->isValidFile())
+            if (!props->isValidFile())
+                return;
+
+            // INIT COLOURS
+            for (auto c = 0; c < colours.size(); ++c)
             {
-                // INIT COLOURS
-                for (auto c = 0; c < colours.size(); ++c)
-                {
-                    const auto cID = static_cast<ColourID>(c);
-                    const auto colStr = props->getValue(toStringProps(cID), getDefault(cID).toString());
-                    setColour(c, Colour::fromString(colStr));
-                }
-                // INIT TOOLTIPS
-                tooltipsEnabled = props->getBoolValue("tooltips", true);
-                setTooltipsEnabled(tooltipsEnabled);
+                const auto cID = static_cast<ColourID>(c);
+                const auto colStr = props->getValue(toStringProps(cID), getDefault(cID).toString());
+                setColour(c, Colour::fromString(colStr));
             }
+            // INIT TOOLTIPS
+            tooltipsEnabled = props->getBoolValue("tooltips", true);
+            setTooltipsEnabled(tooltipsEnabled);
         }
 
         bool setColour(const String& i, Colour col)
@@ -497,6 +497,7 @@ namespace gui
             img = juce::ImageCache::getFromMemory(BinaryData::cursorCross_png, BinaryData::cursorCross_pngSize).createCopy();
         else
             img = juce::ImageCache::getFromMemory(BinaryData::cursor_png, BinaryData::cursor_pngSize).createCopy();
+        img = juce::SoftwareImageType().convert(img);
         {
             const Colour imgCol(0xff37946e);
             const auto col = t == CursorType::Default ?

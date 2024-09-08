@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<PROPERTIES>
+  <text val="ffffffff"/>
+  <background val="ff7b62a0"/>
+  <abort val="ffff0000"/>
+  <mod val="ff00ceff"/>
+  <bias val="fffffa00"/>
+  <interact val="ff0300a3"/>
+  <inactive val="ffa0a0a0"/>
+  <darken val="67000000"/>
+  <hover val="ff3b3b3b"/>
+  <transp val="0"/>
+</PROPERTIES>

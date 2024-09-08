@@ -44,27 +44,20 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     ),
     utils(*this, p.appProperties.getUserSettings(), p),
     notify(utils.events, makeNotify(this)),
-
     nelLabel(utils, "<< NEL >>", gui::ColourID::Transp, gui::ColourID::Transp, gui::ColourID::Txt),
-
     tooltips(utils),
     buildDate(utils),
-    
     modulatables(),
-
     macro0(utils, "M0", "Modulate parameters with this macro.", modSys6::PID::MSMacro0, modulatables, gui::ParameterType::Knob),
     macro1(utils, "M1", "Modulate parameters with this macro.", modSys6::PID::MSMacro1, modulatables, gui::ParameterType::Knob),
     macro2(utils, "M2", "Modulate parameters with this macro.", modSys6::PID::MSMacro2, modulatables, gui::ParameterType::Knob),
     macro3(utils, "M3", "Modulate parameters with this macro.", modSys6::PID::MSMacro3, modulatables, gui::ParameterType::Knob),
-
     modComps
     {
         gui::ModComp(utils, modulatables, audioProcessor.modulators[0].getTables(), 0),
         gui::ModComp(utils, modulatables, audioProcessor.modulators[1].getTables(), modSys6::NumParamsPerMod)
     },
-
     visualizer(utils, "Visualizes the sum of the vibrato's modulators.", p.getChannelCountOfBus(false, 0), 1),
-
 	bufferSizes(utils, "Buffer", "Switch between different buffer sizes for the vibrato.", modSys6::PID::BufferSize, modulatables, gui::ParameterType::Knob),
     modsDepth(utils, "Depth", "Modulate the depth of the vibrato.", modSys6::PID::Depth, modulatables, gui::ParameterType::Knob),
     modsMix(utils, "Mods", "Interpolate between the vibrato's modulators.", modSys6::PID::ModsMix, modulatables, gui::ParameterType::Knob),
@@ -73,18 +66,15 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
     stereoConfig(utils, "StereoConfig", "Configurate if effect is applied to l/r or m/s", modSys6::PID::StereoConfig, modulatables, gui::ParameterType::Switch),
 	feedback(utils, "FB", "Dial in some feedback to this vibrato's delay.", modSys6::PID::Feedback, modulatables, gui::ParameterType::Knob),
 	damp(utils, "Damp", "This is a lowpass filter in the feedback path.", modSys6::PID::Damp, modulatables, gui::ParameterType::Knob),
-	
     macro0Dragger(utils, 0, modulatables),
     macro1Dragger(utils, 1, modulatables),
     macro2Dragger(utils, 2, modulatables),
     macro3Dragger(utils, 3, modulatables),
-    
     paramRandomizer(utils, modulatables),
 	hq(utils, "HQ", "Strong vibrato causes less 'grainy' sidelobes with 4x oversampling.", modSys6::PID::HQ, modulatables, gui::ParameterType::Switch),
 	lookahead(utils, "Lookahead", "Lookahead aligns the average position of the vibrato with the dry signal.", modSys6::PID::Lookahead, modulatables, gui::ParameterType::Switch),
     popUp(utils),
     enterValue(utils),
-
 #if DebugMenuExists
     menu(nullptr),
     menuButton
@@ -157,7 +147,7 @@ Nel19AudioProcessorEditor::Nel19AudioProcessorEditor(Nel19AudioProcessor& p) :
 
     addAndMakeVisible(popUp);
     addChildComponent(enterValue);
-    
+
 #if PresetsExist
     presetBrowser.init(*this);
     presetBrowser.saveFunc = [&]()
